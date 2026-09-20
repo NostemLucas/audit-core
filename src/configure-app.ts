@@ -1,8 +1,9 @@
 import { RequestMethod, VersioningType } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import type { Env } from './platform/config/index.js'
-import { AllExceptionsFilter, EnvelopeInterceptor, requestId } from './platform/http/index.js'
+import { AllExceptionsFilter, ApiSerializerInterceptor, EnvelopeInterceptor, createValidationPipe, requestId } from './platform/http/index.js'
 
 /**
  * Configuración HTTP compartida por `main.ts` y por los tests e2e: lo que se prueba es lo que se ejecuta.
@@ -15,6 +16,8 @@ export function configureApp(app: NestExpressApplication, env: Env): void {
   app.setGlobalPrefix('api', { exclude: [{ path: 'health/live', method: RequestMethod.GET }] })
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' })
   app.useGlobalFilters(new AllExceptionsFilter())
-  app.useGlobalInterceptors(new EnvelopeInterceptor())
+  app.useGlobalPipes(createValidationPipe())
+  // El primero envuelve al segundo: la respuesta se serializa (esquema) y luego se envuelve ({ data, meta }).
+  app.useGlobalInterceptors(new EnvelopeInterceptor(), new ApiSerializerInterceptor(app.get(Reflector)))
   app.enableShutdownHooks()
 }
