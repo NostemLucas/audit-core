@@ -86,8 +86,8 @@ una norma completa son cientos o pocos miles de nodos, y se carga entera por pla
 3. **Sin niveles definidos.** El árbol tiene la profundidad que cada rama necesite (de 2 a 4 niveles, y una rama puede ser
    más profunda que otra). No hay etiquetas ni prefijos por nivel.
 4. **Lo que se evalúa y se pondera es el último nodo** (la hoja): el criterio/actividad, que es la pregunta ("¿la empresa
-   tiene control de backups?"). **El criterio es el `title` de la hoja.** `description` (texto explicativo de la norma) y
-   `guidance` (ayuda para el auditor) son opcionales en cualquier nodo. Un nodo con hijos es un agrupador y no se evalúa. Si una pregunta tuviera sub-preguntas,
+   tiene control de backups?"). **El criterio es el `title` de la hoja.** `description` (texto explicativo de la norma) es
+   opcional en cualquier nodo. No hay guía del auditor en la plantilla (ver §4.4). Un nodo con hijos es un agrupador y no se evalúa. Si una pregunta tuviera sub-preguntas,
    la pregunta original pasa a ser el primer hijo.
 5. **Solo el primer nivel se mide.** Los nodos raíz son los "dominios" (en ISO 27001, `A.5`, `A.6`…) y sirven para las
    gráficas de araña y los subtotales del informe. Todo lo que hay debajo son criterios/actividades organizados para leer.
@@ -105,6 +105,26 @@ una norma completa son cientos o pocos miles de nodos, y se carga entera por pla
 9. **Para quien audita, el árbol es contexto.** El auditor trabaja con la lista plana de criterios (las hojas), cada uno con
    su ruta (dominio › objetivo) para no ser ambiguo entre dominios. El árbol se mantiene poco: la plantilla publicada es
    inmutable, se importa con la columna `nivel`, y se corrige subiendo o bajando elementos.
+
+### 4.4 La guía del auditor no va en la plantilla; el nivel esperado se justifica por auditoría
+
+La norma es objetiva (el control existe o no); lo que depende de la institución es **cuánto se espera de ese control en
+ESTA auditoría y por qué**. Una guía escrita en la plantilla habría que corregirla o limpiarla en cada auditoría, y además
+es contenido a mantener. Por eso:
+
+- **`controls.guidance` se elimina**, y con él la columna "guía del auditor" del Excel (al importar un archivo antiguo se
+  ignora con un aviso).
+- **Por auditoría y criterio** (`evaluations`): `expectedLevelId` (ya existía; nulo = el valor base) y **`expectedLevelReason`**
+  (nuevo, texto opcional): "base 3 porque…". Aparece en el informe junto al nivel esperado.
+- **No se reintroduce una guía por auditoría.** El proyecto anterior la tenía como sobreescritura (`auditorGuidance`, con
+  ejemplos como "En nuestra organización, las políticas deben ser aprobadas por el CISO…") y ahí es donde sí era institucional.
+  Si se necesita, el motivo del nivel esperado cubre el contexto y un campo nuevo se agrega después sin migrar datos.
+- **Corrección a D13** (`01`): se dijo que la guía por auditoría "no se usaba" porque solo se buscaron lectores en la lógica y
+  se excluyeron los DTOs; en realidad existía un endpoint que la escribía y la devolvía al frontend.
+- **Propuesta pendiente de confirmar:** un nivel base por auditoría, `audits.baseExpectedLevelId` (nulo = máximo de la escala).
+  El nivel esperado efectivo sería `evaluación.expectedLevelId ?? auditoría.baseExpectedLevelId ?? máximo`, calculado en un
+  solo lugar (`scoring.ts`). Así solo se guardan (con su motivo) las excepciones a la base, en vez de fijar cien controles uno
+  a uno.
 
 ### 4.2 Lo que se propuso y se DESCARTÓ (para no reabrirlo)
 
@@ -134,4 +154,5 @@ hubiera, se separa (sus hijos pasan a ser el primer nivel). No hace falta una pr
 - Nuevo `library/domain/control-tree.ts` (pura): dominio y ruta de cada hoja, con su suite de pruebas usando los códigos que
   hoy fallan (COBIT, NIST, ASFI, numeraciones sin puntos) y ramas de distinta profundidad.
 - Importación/exportación por `nivel`, con ida y vuelta probada.
+- `controls.guidance` se elimina; `evaluations.expectedLevelReason` (nullable, nuevo); pendiente: `audits.baseExpectedLevelId` (§4.4).
 - Migración inicial regenerada (no hay BD desplegada).

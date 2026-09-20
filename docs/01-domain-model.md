@@ -34,7 +34,7 @@ Estado: **propuesta para revisión**. Nada de esto está implementado. Reemplaza
 | D10 | **Se eliminan `global_feed` y `notifications`** del alcance inicial. Queda **`audit_events`**, el historial de cada auditoría. | Definir qué notificar y a quién es una decisión de producto que hoy no está tomada; las tablas solo agregan peso. El historial de auditoría sí se usa (19 puntos de escritura). Se agregan después vía §6. |
 | D11 | Los eventos se guardan como **`type + payload`**, sin texto. El mensaje se genera al leer. | Congelar prosa en español impide cambiar redacción o idioma. |
 | D12 | **Textos predefinidos → `suggested_findings`** (hallazgo sugerido por control y nivel). Solo existen filas con texto real. | Ver §4. |
-| D13 | Se eliminan `guidanceOverride` (la guía por auditoría, sin uso) y `audits.description` (no aparece en informes). La guía vive solo en el control. | Solo entra lo que se usa. |
+| D13 | Se elimina `audits.description` (no aparece en informes). **La guía del auditor se elimina de la plantilla** y no se reintroduce por auditoría: lo institucional es el nivel esperado y su motivo (`evaluations.expectedLevelReason`). Ver `04` §4.4, que corrige el razonamiento original de este punto. | Una guía en la plantilla hay que reescribirla o limpiarla en cada auditoría porque depende de la institución. |
 | D14 | Los valores derivables no se guardan: `achievedEvaluationLevel`, `expectedEvaluationLevel`, `WorkPaper.type`, `fileSizeFormatted`, `nextcloudFolderPath`, `level`, `actorName`. El `score` **sí** se guarda. | Menos columnas que puedan divergir. El `score` lo agregan los dashboards y queda congelado al cerrar. |
 | D15 | **Sin campos sin lector.** Se quitaron: `Template.description`, `Audit.startedAt` (solo la escribía la máquina de estados; el momento queda en el evento `AuditStarted`), `AuditMember.notes`, `Report.fileName`/`size` (de Nextcloud; el nombre de descarga se deriva del título) y las columnas de `Scale`/`ScaleLevel` citadas en D8. | Verificado contra el proyecto anterior campo por campo (lectores reales, no DTOs ni Swagger). Ver el principio de §0. |
 
@@ -66,7 +66,7 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **scale_levels**: `scaleId` FK, `value Decimal(5,2)`, `label`, `description?`. UQ(`scaleId`, `value`). Orden = orden del `value`.
 - **templates**: `name` UQ, `status` (`DRAFT | PUBLISHED | ARCHIVED`).
 - **controls**: `templateId` FK (cascade), `parentId?` FK→controls (cascade), `code`, `title`, `description?`,
-  `guidance?`, `position`. UQ(`templateId`, `code`). Índice (`templateId`, `parentId`, `position`).
+  `position`. UQ(`templateId`, `code`). Índice (`templateId`, `parentId`, `position`).
   **FK compuesta** (`parentId`, `templateId`) → controls(`id`, `templateId`): la BD garantiza que el padre es de
   la misma plantilla.
   Se carga completo por plantilla (cientos de nodos) y el árbol se arma en memoria.
@@ -84,7 +84,7 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **audit_members**: `auditId`, `userId`, `role` (`LEAD_AUDITOR | INSPECTOR`). UQ(`auditId`, `userId`).
   Quitar un miembro es un borrado; queda en `audit_events`.
 - **evaluations** (una por auditoría × control **hoja**): `auditId` FK, `controlId` FK, `weight Decimal(5,2)`,
-  `expectedLevelId?` FK (nulo = máximo de la escala), `assignedUserId?` FK, `status`
+  `expectedLevelId?` FK (nulo = el valor base) y `expectedLevelReason?` (por qué ese nivel en esta auditoría), `assignedUserId?` FK, `status`
   (`NOT_STARTED|IN_PROGRESS|COMPLETED|RETURNED|APPROVED`), `round` (desde 1), `achievedLevelId?` FK,
   `score? Decimal`, `findings?`, `notes?`, `isNotApplicable`, `notApplicableReason?`, `version`.
   UQ(`auditId`, `controlId`). Índices (`auditId`, `status`) y (`assignedUserId`, `status`).
