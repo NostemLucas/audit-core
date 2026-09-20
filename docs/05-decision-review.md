@@ -224,3 +224,27 @@ atributos × evidencia, con reglas para determinar el nivel), o usar una escala 
 en cada opción: p. ej. 12 cumple / 3 parcial / 2 no cumple). En una auditoría de conformidad es el resultado más natural y
 no depende de tratar categorías ordinales como números; el promedio queda como resumen.
 
+## 10. Ponderación por dimensión: de dónde sale (o no) un peso
+
+**El peso no lo define ningún método.** ISO 27001 no pondera; en COBIT PAM el nivel de un proceso se determina por reglas sobre las
+calificaciones de sus atributos y no se pondera nada. Lo que cada método define es qué se califica (la escala) y contra qué se
+compara (el nivel esperado). Cuánto cuenta cada criterio en un agregado es una **política de la función de auditoría**.
+
+| | Conformidad (cumple / parcial / no cumple) | Capacidad o madurez (0–5) |
+|---|---|---|
+| Pregunta | ¿se satisface el requisito? | ¿qué tan establecido está el control o proceso? |
+| Se compara con | el requisito: lo esperado es casi siempre "Cumple" | un objetivo que varía por criterio |
+| Agregado | % de cumplimiento + conteo por opción | madurez promedio frente al objetivo (indicativa) |
+| Dónde aparece la "importancia" | en qué se incluye y en la no conformidad de cada hoja | **en el nivel esperado** (crítico = 4, menor = 2) |
+
+**Cómo se pondera una auditoría:** todos los criterios aplicables cuentan igual; lo no aplicable se excluye. Ejemplo con seis
+criterios. *Conformidad* (100/50/0, esperado Cumple): 4 cumple, 1 parcial, 1 no cumple → 75 %, distribución 4/1/1, dos hojas con
+brecha. *Madurez* (esperados 3,3,4,4,2,2; alcanzados 3,2,4,2,2,1): esperada 3,0, alcanzada 2,33, brecha −0,67, tres hojas por debajo.
+
+**Reglas.**
+- Las dos dimensiones **no se suman** en un solo número. Una escala por auditoría; cada auditoría informa su dimensión.
+- Si se necesitara ambas dimensiones para el mismo conjunto de criterios en una misma auditoría, serían dos calificaciones por
+  criterio: un cambio mayor del modelo. Pregunta abierta.
+- Un peso, si un día hiciera falta, sería una columna opcional con valor 1 por defecto (`Σ(peso × valor) / Σ(peso)`), decidida por
+  la política de riesgo de la institución. No se construye ahora.
+
