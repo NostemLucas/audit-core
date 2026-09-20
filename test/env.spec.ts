@@ -9,6 +9,8 @@ describe('loadEnv', () => {
       NODE_ENV: 'development',
       DATABASE_URL: DB_URL,
       PORT: 3000,
+      LOG_LEVEL: 'info',
+      LOG_PRETTY: true,
       CORS_ORIGINS: [],
       THROTTLE_TTL_MS: 60_000,
       THROTTLE_LIMIT: 100,

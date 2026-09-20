@@ -38,6 +38,7 @@ class DbProbeController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly cls: ClsService,
+    private readonly demo: DemoService,
   ) {}
 
   @Post('org')
@@ -45,9 +46,20 @@ class DbProbeController {
     return this.db.organization.create({ data: { name: 'HTTP-ACME' }, select: { name: true } })
   }
 
-  @Get('request-id')
-  requestId() {
-    return { requestId: this.cls.get('requestId') }
+  /** @Transactional por HTTP: comprueba que el contexto que abre `platform/http` sirve a las transacciones. */
+  @Post('tx-fail')
+  async txFail() {
+    await this.demo.orgWithScale('HTTP-TX', true)
+  }
+
+  @Post('tx-ok')
+  async txOk() {
+    await this.demo.orgWithScale('HTTP-TX-OK')
+  }
+
+  @Get('correlation')
+  correlation() {
+    return { correlationId: this.cls.get('correlationId') }
   }
 }
 
@@ -125,8 +137,18 @@ describe('de extremo a extremo por HTTP', () => {
     expect(JSON.stringify(res.body)).not.toContain('organizations_name_key')
   })
 
-  it('el requestId de la petición está disponible en el contexto (CLS)', async () => {
-    const res = await request(app.getHttpServer()).get('/api/v1/__db/request-id').set('x-request-id', 'trace-cls-12345').expect(200)
-    expect(res.body.data.requestId).toBe('trace-cls-12345')
+  it('el x-request-id de la petición queda como correlationId en el contexto ambiental (CLS)', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/__db/correlation').set('x-request-id', 'trace-cls-12345').expect(200)
+    expect(res.body.data.correlationId).toBe('trace-cls-12345')
+  })
+
+  it('@Transactional funciona dentro de una petición HTTP: un fallo revierte TODO, un éxito confirma todo', async () => {
+    const server = app.getHttpServer()
+    await request(server).post('/api/v1/__db/tx-fail').expect(500)
+    expect(await count()).toBe(0)
+    expect(await db.scale.count()).toBe(0)
+    await request(server).post('/api/v1/__db/tx-ok').expect(201)
+    expect(await count()).toBe(1)
+    expect(await db.scale.count()).toBe(1)
   })
 })

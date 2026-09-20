@@ -1,25 +1,19 @@
-import { ClsModule } from 'nestjs-cls'
+import { Global, Module } from '@nestjs/common'
 import { ClsPluginTransactional } from '@nestjs-cls/transactional'
 import { TransactionalAdapterPrisma } from '@nestjs-cls/transactional-adapter-prisma'
-import type { Response } from 'express'
-import { DB } from '../db/db.module.js'
-import { DbModule } from '../db/db.module.js'
+import { ClsModule } from 'nestjs-cls'
+import { DB, DbModule } from '../db/db.module.js'
+import { ContextRunner } from './context-runner.js'
 import './cls-store.js'
 
 /**
- * Contexto por petición (CLS) + transacciones declarativas.
- *  - `requestId` queda disponible para el logger sin pasarlo a mano.
- *  - `@Transactional()` abre una transacción; dentro, `@InjectTx()` resuelve al cliente transaccional. Fuera de
- *    una transacción resuelve al cliente normal.
+ * Contexto ambiental por unidad de trabajo (CLS) + transacciones declarativas. NO sabe de HTTP:
+ *  - Quien abre el contexto es el PUNTO DE ENTRADA: en HTTP, `platform/http` monta el middleware (ver `configure-app.ts`);
+ *    en jobs y seeds, `ContextRunner`.
+ *  - `@Transactional()` abre una transacción; dentro, `@InjectTx()` resuelve al cliente transaccional.
  */
-export const ContextModule = ClsModule.forRoot({
+const cls = ClsModule.forRoot({
   global: true,
-  middleware: {
-    mount: true,
-    setup: (cls, _req, res: Response) => {
-      cls.set('requestId', String(res.locals['requestId'] ?? ''))
-    },
-  },
   plugins: [
     new ClsPluginTransactional({
       imports: [DbModule],
@@ -28,3 +22,7 @@ export const ContextModule = ClsModule.forRoot({
     }),
   ],
 })
+
+@Global()
+@Module({ imports: [cls], providers: [ContextRunner], exports: [ContextRunner] })
+export class ContextModule {}

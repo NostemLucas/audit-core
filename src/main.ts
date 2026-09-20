@@ -1,13 +1,17 @@
-import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { AppModule } from './app.module.js'
 import { configureApp } from './configure-app.js'
 import { ENV, type Env } from './platform/config/index.js'
+import { AppLogger } from './platform/logging/index.js'
 
 // Un entorno inválido falla aquí, en NestFactory.create (el proveedor ENV lo valida al instanciarse).
-const app = await NestFactory.create<NestExpressApplication>(AppModule)
+// `bufferLogs` retiene los logs del arranque hasta tener el logger propio, para que salgan todos por el mismo canal.
+const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true })
+const logger = app.get(AppLogger)
+app.useLogger(logger)
+
 const env = app.get<Env>(ENV)
 configureApp(app, env)
 await app.listen(env.PORT)
-new Logger('Bootstrap').log(`Escuchando en :${env.PORT} (${env.NODE_ENV})`)
+logger.for('Bootstrap').info('Servidor escuchando', { port: env.PORT, env: env.NODE_ENV })

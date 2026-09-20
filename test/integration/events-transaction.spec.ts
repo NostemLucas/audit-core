@@ -98,17 +98,17 @@ describe('los eventos se publican dentro de la transacción del caso de uso', ()
     expect(await counts()).toEqual({ orgs: 1, history: 0 }) // la organización quedó: nada la revirtió
   })
 
-  it('el evento lleva el usuario y el requestId de la petición', async () => {
+  it('el evento lleva el usuario y el correlationId del contexto', async () => {
     await inContext(async () => {
       cls.set('userId', '00000000-0000-7000-8000-0000000000aa')
-      cls.set('requestId', 'trace-evt-12345')
+      cls.set('correlationId', 'trace-evt-12345')
       await useCase.register('ACME')
     })
     expect(recorder.seen[0]).toMatchObject({
       name: 'OrganizationRegistered',
       payload: { name: 'ACME' },
       actorId: '00000000-0000-7000-8000-0000000000aa',
-      requestId: 'trace-evt-12345',
+      correlationId: 'trace-evt-12345',
     })
   })
 

@@ -8,10 +8,12 @@ import { ContextModule } from './platform/context/context.module.js'
 import { DbModule } from './platform/db/index.js'
 import { EventsModule } from './platform/events/index.js'
 import { HealthController } from './platform/health/health.controller.js'
+import { LoggingModule } from './platform/logging/index.js'
 
 @Module({
   imports: [
     EnvModule,
+    LoggingModule,
     DbModule,
     ContextModule,
     EventsModule,

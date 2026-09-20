@@ -14,11 +14,17 @@ const csv = z
       .filter(Boolean),
   )
 
+export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   /** Cadena de conexión de PostgreSQL. */
   DATABASE_URL: z.string().min(1).refine((v) => /^postgres(ql)?:\/\//.test(v), 'debe ser una URL postgresql://'),
+  /** Nivel mínimo de log. Por defecto: `silent` en test, `info` en el resto. */
+  LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
+  /** Salida legible en consola en vez de JSON. Por defecto solo en desarrollo; `pino-pretty` es dependencia de desarrollo. */
+  LOG_PRETTY: z.stringbool().optional(),
   /** Orígenes permitidos por CORS, separados por coma. Vacío = ninguno. */
   CORS_ORIGINS: csv,
   /** Ventana del rate limit global, en milisegundos. */
@@ -27,11 +33,18 @@ export const envSchema = z.object({
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 })
 
-export type Env = z.infer<typeof envSchema>
+/** Aplica los valores por defecto que dependen de `NODE_ENV`. */
+const resolvedEnvSchema = envSchema.transform((env) => ({
+  ...env,
+  LOG_LEVEL: env.LOG_LEVEL ?? (env.NODE_ENV === 'test' ? ('silent' as const) : ('info' as const)),
+  LOG_PRETTY: env.LOG_PRETTY ?? env.NODE_ENV === 'development',
+}))
+
+export type Env = z.output<typeof resolvedEnvSchema>
 
 /** Falla al arrancar, listando TODAS las variables inválidas de una vez. */
 export function loadEnv(source: Record<string, string | undefined> = process.env): Env {
-  const result = envSchema.safeParse(source)
+  const result = resolvedEnvSchema.safeParse(source)
   if (!result.success) {
     const lines = result.error.issues.map((issue) => `  - ${issue.path.join('.') || '(raíz)'}: ${issue.message}`)
     throw new Error(`Configuración de entorno inválida:\n${lines.join('\n')}`)

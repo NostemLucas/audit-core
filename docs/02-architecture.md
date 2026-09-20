@@ -62,6 +62,7 @@ Prisma convierte `P2003` en el código de error del catálogo. Así `organizatio
 | Rutas de Nextcloud | `audits/domain/storage-paths.ts` | Provisioning, evidencias, informes |
 | Variables de entorno | `platform/config/env.ts` | Todo el proyecto |
 | Paginación, orden, búsqueda | `platform/http/list-query.ts` | Todos los listados |
+| Campos que nunca llegan a un log | `platform/logging/redaction.ts` | Logger (todas las líneas) |
 | Traducción de errores de la BD | `onUnique` / `onForeignKeyDelete` en cada definición de error + `platform/db/translate-db-error.ts` (una extensión de Prisma la aplica a toda operación) | Casos de uso y filtro HTTP: reciben ya un `DomainError` |
 
 Consecuencias concretas:
@@ -166,7 +167,7 @@ export class ApproveEvaluationUseCase {
 
 Convenciones fijas:
 - `execute(actor, …)`. El actor se pasa **explícito**; el dominio nunca lee CLS. CLS solo lo usan la extensión
-  de Prisma (`createdById/updatedById`) y el logger (`requestId`).
+  de Prisma (`createdById/updatedById`) y el logger (`correlationId`).
 - Toda operación que escribe lleva `@Transactional()`. Los eventos se publican dentro de la transacción.
 - Los errores se lanzan como `new DomainError('EVALUATION_NOT_EDITABLE', { … })`. No hay una clase por error,
   ni `HttpException` en dominio.
@@ -354,7 +355,7 @@ onModuleInit() { this.bus.on(AuditEvents.AuditStarted, (e) => this.tx.auditEvent
 3. Los handlers son rápidos y solo escriben en la BD (con `@InjectTx()`). El trabajo externo (Nextcloud, email) va
    **después del commit**, no en un handler.
 4. Un handler no publica un evento que lo dispare a sí mismo (no hay guarda de profundidad: sería falsa seguridad).
-5. El evento lleva `actorId` y `requestId` del contexto de la petición; sin contexto (seeds, jobs) van vacíos.
+5. El evento lleva `actorId` y `correlationId` del contexto ambiental; sin contexto (seeds, jobs) van vacíos.
 6. Nombre en PascalCase y participio (`AuditStarted`); único en todo el sistema (`defineEvents` lo exige).
 7. El texto se genera **al leer** (`renderEventMessage(type, payload)`): una fila de un evento que ya no existe, o
    con un payload que ya no cumple el esquema, devuelve `undefined` en vez de romper el historial.
@@ -369,4 +370,71 @@ registrado en `app-events.ts` tenga mensaje y nombre único.
   de un `cls.run` anidado *sigue* dentro de la transacción. Para salirse de ella hace falta
   `cls.run({ ifNested: 'override' }, …)`. Una mutación con el `run` por defecto no rompía nada; con `override` sí.
   Quien modifique el bus debe probar con la segunda forma.
+
+## 13. Logging (Fase 1j): un contexto propio, separado de HTTP
+
+**El error que se evita.** El logger del proyecto anterior era un solo servicio de 258 líneas que importaba `Request` y
+`Response` de Express, tenía `logHttpRequest`, `logDatabaseQuery` y `logException`, y leía el payload del JWT desde
+`req.user`. El logger de aplicación conocía HTTP, autenticación y base de datos. Y el interceptor solo registraba las
+respuestas exitosas: no veía un 404 ni un rechazo antes del handler. Aquí son cuatro cosas distintas:
+
+| Qué | Dónde | Sabe de | No sabe de |
+|-----|-------|---------|------------|
+| **Contexto ambiental** (`correlationId`, `userId`) | `platform/context` | CLS | HTTP |
+| **Logger de aplicación** (`AppLogger`, `Log`) | `platform/logging` | `pino` y el contexto ambiental | HTTP, Nest (salvo su adaptador), negocio |
+| **Log de acceso** (una línea por petición) | `platform/http/access-log.ts` | HTTP; usa el logger | — |
+| **Historial de negocio** (`audit_events`) | módulo `audits` | negocio | logs |
+
+La dependencia va en un solo sentido: `http → logging → context`. Lo impone `test/architecture.spec.ts` (y después
+`dependency-cruiser`): `platform/logging`, `context`, `events` y `db` no pueden importar Express ni `platform/http`;
+`domain/` no puede importar el logger.
+
+**`correlationId`, no `requestId`.** Fuera de HTTP no hay petición. El id que enlaza logs, eventos y errores lo fija el
+**punto de entrada**: en HTTP, `configureApp` monta el middleware que copia el `x-request-id`; en un job o un seed, el
+`ContextRunner` abre un contexto nuevo con `<entrada>:<uuid>`. Ese puente (HTTP → contexto) es lo único que vincula a
+ambos, y vive en `platform/http`. El logger solo *lee* `correlationId` y `userId`, sin saber de dónde vinieron.
+
+**Cómo se escribe un log.**
+```ts
+private readonly log = this.logger.for('AuditService')   // AppLogger inyectado
+
+this.log.info('Auditoría iniciada', { auditId })             // mensaje FIJO; lo variable, en campos
+this.log.error('Falló la generación', { err, auditId })      // un error va en `err`
+```
+1. El **mensaje es texto fijo**. Los datos van en campos: se pueden buscar y la redacción de secretos actúa sobre ellos
+   (no puede censurar un secreto pegado dentro del texto).
+2. `correlationId` y `userId` se agregan **solos**; no se pasan a mano.
+3. **`err`** se serializa con una **lista blanca** (tipo, mensaje, stack, `code`/`details` de un `DomainError`, y la
+   cadena de `cause`, máx. 5). Nunca se vuelcan otras propiedades: un error de Prisma trae en `meta` la fila que falló.
+4. **Redacción** (`redaction.ts`, única lista): `password`, `token`, `authorization`, `cookie`, `clientSecret`, `jwt`…
+   a uno y dos niveles, incluidas las cabeceras.
+
+**Log de acceso.** Middleware (no interceptor) que escribe una línea al cerrarse la respuesta, así ve también un 404,
+un cuerpo rechazado antes del handler o una conexión cortada (`aborted`). Campos: método, ruta, patrón de ruta,
+estado, duración, bytes, `correlationId`, `userId` si ya hay usuario. **No** registra cabeceras, cuerpo ni query string.
+Nivel por estado: 2xx/3xx `info`, 4xx `warn`, 5xx `error`. Omite `/health/*`.
+
+**Quién registra qué en un error.** El filtro registra los fallos **nuestros** (≥ 500) con su `err` completo; un error
+de negocio (4xx) es un resultado esperado: solo `debug`, y el log de acceso ya deja constancia. Una respuesta 500
+lleva el `traceId`; el detalle solo está en el log.
+
+**Configuración.** `LOG_LEVEL` (por defecto `silent` en test, `info` en el resto) y `LOG_PRETTY` (por defecto solo en
+desarrollo; `pino-pretty` es dependencia de desarrollo, así que en producción es JSON a stdout). Los logs internos de
+Nest salen por el mismo canal (`bufferLogs` + `useLogger`).
+
+**Por qué `pino` directo y no `nestjs-pino`.** `nestjs-pino` está construido alrededor de `pino-http`: su logger nace
+ligado a la petición. Es cómodo, pero es el mismo acoplamiento que se quería evitar. Con `pino` directo son ~150
+líneas propias y el logger funciona igual en un job que en una petición.
+
+**Lo que NO es un log.** El historial de negocio (`audit_events`) no se deriva de los logs ni al revés: uno es un
+registro de auditoría consultable por el usuario, el otro es telemetría técnica que se rota y se descarta.
+
+**Fuera de esta fase (a propósito).** Registro de consultas lentas de Prisma y métricas: son de la base de datos, no de
+HTTP ni del logger; entran como su propio componente cuando haga falta.
+
+**Verificado.** 7 mutaciones sobre las garantías (el logger importa HTTP, lista de secretos vacía, sin leer el
+contexto, el filtro registra 4xx como error, query string en el acceso, serializador sin lista blanca, sin middleware
+de contexto) hacen fallar los tests. Dos de mis primeras mutaciones eran sintácticamente inválidas (el total de tests
+bajó): una mutación que no compila no prueba nada, por eso el resumen incluye siempre el conteo de archivos.
+Ejecución real del build en Node en JSON y en modo legible, sin secretos en la salida.
 

@@ -10,8 +10,8 @@ export interface DomainEvent<N extends string = string, P = unknown> {
   readonly occurredAt: Date
   /** Usuario de la petición (CLS). Ausente en seeds y jobs. */
   readonly actorId?: string
-  /** Mismo valor que `x-request-id` / `traceId`. */
-  readonly requestId?: string
+  /** Id de correlación del contexto ambiental (en HTTP, el `x-request-id`). */
+  readonly correlationId?: string
 }
 
 export type EventHandler<N extends string = string, P = unknown> = (event: DomainEvent<N, P>) => void | Promise<void>
@@ -63,7 +63,7 @@ export class EventBus {
       payload: parsed.data,
       occurredAt: new Date(),
       actorId: active ? this.cls.get('userId') : undefined,
-      requestId: active ? this.cls.get('requestId') || undefined : undefined,
+      correlationId: active ? this.cls.get('correlationId') || undefined : undefined,
     }
 
     for (const { names, handle } of [...this.subscriptions]) {

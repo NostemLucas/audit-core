@@ -68,22 +68,22 @@ describe('EventBus', () => {
     expect(after).toBe(false)
   })
 
-  it('incluye el usuario y el requestId del contexto de la petición', async () => {
-    const bus = newBus({ userId: 'user-1', requestId: 'trace-9' })
+  it('incluye el usuario y el correlationId del contexto', async () => {
+    const bus = newBus({ userId: 'user-1', correlationId: 'trace-9' })
     let event: DomainEvent | undefined
     bus.onAny((e) => void (event = e))
     await bus.publish(Events.BusSecondHappened, { id: 'a' })
-    expect(event).toMatchObject({ name: 'BusSecondHappened', actorId: 'user-1', requestId: 'trace-9' })
+    expect(event).toMatchObject({ name: 'BusSecondHappened', actorId: 'user-1', correlationId: 'trace-9' })
     expect(event?.occurredAt).toBeInstanceOf(Date)
   })
 
-  it('sin contexto activo (seeds, jobs) no hay actor ni requestId, y no falla', async () => {
+  it('sin contexto activo (seeds, jobs) no hay actor ni correlationId, y no falla', async () => {
     const bus = newBus(null)
     let event: DomainEvent | undefined
     bus.onAny((e) => void (event = e))
     await bus.publish(Events.BusSecondHappened, { id: 'a' })
     expect(event?.actorId).toBeUndefined()
-    expect(event?.requestId).toBeUndefined()
+    expect(event?.correlationId).toBeUndefined()
   })
 
   it('un handler suscrito mientras se publica no altera esa publicación', async () => {

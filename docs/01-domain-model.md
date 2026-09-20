@@ -225,7 +225,7 @@ Reglas:
 | Necesidad | Solución |
 |-----------|----------|
 | Config | Validación de env con Zod; falla al arrancar |
-| Logging | `nestjs-pino`: JSON, `redact` de secretos, `requestId` vía CLS, pretty solo en dev |
+| Logging | `pino` directo (no `nestjs-pino`, que acopla el logger a HTTP): JSON, `redact` de secretos, `correlationId` vía CLS, pretty solo en dev. Ver `02` §13 |
 | Errores | Errores de dominio con `code` estable + un filtro → `{ error: { code, message, details?, traceId } }` |
 | Éxito | `{ data, meta? }`; solo DTOs de respuesta con mapper, nunca entidades |
 | Validación / OpenAPI | Zod 4 con el soporte **nativo** de Nest 12 y `@nestjs/swagger` 12 (Standard Schema): un esquema da validación, tipos y documentación. Sin `nestjs-zod` (ver `02` §10) |
