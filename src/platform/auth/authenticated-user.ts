@@ -10,7 +10,6 @@ export interface AuthenticatedUser {
 }
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       /** Lo fija `AuthGuard`. Ausente en rutas `@Public()`. */

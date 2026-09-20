@@ -1,0 +1,27 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+
+  // Raíces desde las que se alcanza el código. Los plugins de knip ya detectan eslint, vitest y prisma.
+  "entry": [
+    "src/main.ts",
+    "src/app-errors.ts",
+    "src/app-events.ts",
+    "src/**/*.spec.ts",
+    "test/**/*.spec.ts",
+    "eslint/rules.js",
+  ],
+  "project": ["src/**/*.ts", "test/**/*.ts", "eslint/**/*.js"],
+  "ignore": ["test/lint-fixtures/**"],
+
+  // Lo exportado y usado solo dentro de su propio archivo no es código muerto (p. ej. un tipo que un test necesita).
+  "ignoreExportsUsedInFile": true,
+
+  // ── EXCEPCIONES: API de plataforma ya implementada y probada, que AÚN NO consume ningún módulo de negocio ───────────
+  // Cada una se retira sola: cuando un módulo la use, knip avisa de que la excepción sobra ("Remove from ignore").
+  "ignoreIssues": {
+    // defineMessages / renderEventMessage: los usará `audits` (mensajes del historial). Fase 3.
+    "src/platform/events/index.ts": ["exports", "types"],
+    // defineLifecycle: lo usarán `library` (Template) y `audits` (Audit, Evaluation). Fases 2 y 3.
+    "src/platform/state/index.ts": ["files"],
+  },
+}

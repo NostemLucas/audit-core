@@ -236,7 +236,7 @@ Reglas:
 | HTTP | `helmet`, `@nestjs/throttler`, CORS explícito |
 | Observabilidad | Sentry |
 | Etiquetas ES | `labels.es.ts` tipado `Record<Enum, string>` (exhaustivo en compilación); el API devuelve códigos |
-| Calidad | TS `strict`, ESLint type-checked, `no-explicit-any` en error, `dependency-cruiser`, `knip`, Vitest + testcontainers, commitlint/husky |
+| Calidad | TS `strict`, **ESLint** + typescript-eslint (reglas curadas), Prettier, `dependency-cruiser`, `knip`, Vitest + testcontainers, commitlint/husky, CI. Por qué ESLint y no Biome/oxlint: `02` §15 |
 
 Sin Redis ni colas mientras los informes sean síncronos.
 

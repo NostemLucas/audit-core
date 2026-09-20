@@ -1,0 +1,9 @@
+node_modules
+dist
+src/generated
+prisma/migrations
+package-lock.json
+coverage
+# Fijaciones de las pruebas de las reglas de lint: violan reglas a propósito y su forma es parte de la prueba.
+test/lint-fixtures
+docs

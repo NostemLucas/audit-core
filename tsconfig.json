@@ -25,5 +25,6 @@
     "outDir": "./dist",
     "incremental": true
   },
-  "include": ["src", "test", "prisma.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", "prisma.config.ts", "vitest.config.ts", "vitest.integration.config.ts"],
+  "exclude": ["test/lint-fixtures"]
 }

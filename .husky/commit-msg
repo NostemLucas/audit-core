@@ -1,0 +1,2 @@
+# Solo los mensajes de commit convencionales (ver commitlint.config.js).
+npx --no -- commitlint --edit "$1"

@@ -1,0 +1,2 @@
+# Comprobaciones rápidas antes de cada commit: reglas de calidad y formato.
+npm run lint && npm run format:check

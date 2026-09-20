@@ -197,16 +197,16 @@ Convenciones fijas:
 |-------|-----------|
 | `domain/` no importa Nest ni Prisma (salvo enums) | `dependency-cruiser` en CI |
 | Un módulo solo importa el `index.ts` de otro; sin ciclos; respeta el grafo de §2 | `dependency-cruiser` |
-| `status ===` fuera de `*.lifecycle.ts` | ESLint `no-restricted-syntax` sobre comparaciones con `.status` |
+| `status ===` / `switch` sobre `.status` fuera de `*.lifecycle.ts` (solo en `src/modules`) | ESLint `no-restricted-syntax` (`eslint/rules.js`, alcance en `eslint.config.js`) |
 | Prohibido `process.env` fuera de `config/env.ts` | ESLint `no-restricted-properties` |
 | El cliente generado de Prisma (`src/generated/prisma`) solo lo importan `platform/db`, `infrastructure/` y `shared/enums.ts` | `dependency-cruiser` |
-| Prohibido `any`, `@ts-ignore` sin motivo | TS `strict` + ESLint type-checked |
+| Prohibido `any` (en `src`), `@ts-ignore`, `@ts-expect-error` sin razón escrita | TS `strict` + ESLint (`no-explicit-any`, `ban-ts-comment`) |
 | Toda ruta declara `@Public`, `@Can` o `@NoAbilityRequired` | Test que recorre las rutas registradas |
 | Códigos de error únicos y todos en el catálogo | Test sobre el registro |
 | Mapas `Record<Enum, …>` completos | Compilación |
 | El contrato HTTP no rompe sin querer | Test *snapshot* del OpenAPI (un cambio debe ser deliberado) |
 | Código sin usar, exportaciones huérfanas | `knip` en CI |
-| Archivos > 300 líneas | ESLint `max-lines` |
+| Archivos > 300 líneas (600 en pruebas) | ESLint `max-lines` |
 | Transacción + eventos correctos | Tests de integración con Postgres real (testcontainers) |
 
 ### Estrategia de pruebas
@@ -385,8 +385,8 @@ respuestas exitosas: no veía un 404 ni un rechazo antes del handler. Aquí son 
 | **Log de acceso** (una línea por petición) | `platform/http/access-log.ts` | HTTP; usa el logger | — |
 | **Historial de negocio** (`audit_events`) | módulo `audits` | negocio | logs |
 
-La dependencia va en un solo sentido: `http → logging → context`. Lo impone `test/architecture.spec.ts` (y después
-`dependency-cruiser`): `platform/logging`, `context`, `events` y `db` no pueden importar Express ni `platform/http`;
+La dependencia va en un solo sentido: `http → logging → context`. Lo impone `dependency-cruiser`
+(`.dependency-cruiser.cjs`, regla `contextos-neutrales-no-conocen-http`): `platform/logging`, `context`, `events` y `db` no pueden importar Express ni `platform/http`;
 `domain/` no puede importar el logger.
 
 **`correlationId`, no `requestId`.** Fuera de HTTP no hay petición. El id que enlaza logs, eventos y errores lo fija el
@@ -506,4 +506,87 @@ compilado contra un Authentik simulado que publica un JWKS real por HTTP.
 email sin minúsculas, protección del último ADMIN, escritura en cada petición, enlace por email, y reintento de la carrera.
 La de la carrera **no** se detectaba con la prueba concurrente (no llega a colisionar): se extrajo a una función pura y se
 probó de forma determinista.
+
+## 15. Herramientas de calidad (Fase 1l)
+
+### La decisión: ESLint, y por qué no Biome ni oxlint
+
+Se probaron las tres contra **las reglas que este proyecto necesita**, no contra sus listas de características. Las
+reglas: `.status ===` fuera del ciclo de vida (regla a medida), `process.env`, `any`/`@ts-ignore`, **promesas sin
+`await`** (necesita tipos), imports restringidos, tamaño de archivo, y que los decoradores de Nest no den falsos positivos.
+
+| | ESLint 10 + typescript-eslint | oxlint 1.83 (+ tsgolint) | Biome 2.5 |
+|---|---|---|---|
+| Reglas con tipos (promesas) sobre los tipos **reales** del proyecto (Prisma `$extends`, bus, `$transaction`, `cls.run`) | ✔ las 4 | ✔ las 4 | **✘ ninguna** |
+| Regla `.status` a medida | ✔ nativa (`no-restricted-syntax`) | ✔ vía plugin JS | ✔ vía GritQL (solo comparaciones) |
+| Decoradores de Nest sin falsos positivos | ✔ | ✔ | ✔ (con `unsafeParameterDecoratorsEnabled`) |
+| Hallazgos sobre el código real (108 archivos) | 18 | **los mismos 18** | — |
+| Tiempo sobre el código real | ~6 s | ~1,5 s | ~0,4 s |
+| Estado según su propia documentación | maduro | tipos: "cobertura incompleta (pero muy cercana)"; plugins JS: **alpha** | reglas de promesas en el grupo **Nursery** (inestable) |
+
+- **Biome se descartó** para el linter: su inferencia de tipos propia no resuelve los tipos de Prisma/Nest y **no detectó
+  ninguna** de las cuatro llamadas sin `await`. Justo el error más peligroso del sistema (un `await` olvidado en
+  `bus.publish` deja al handler fuera del rollback sin ningún aviso).
+- **oxlint es viable y ~4× más rápido**, pero las dos piezas de las que dependen nuestras reglas más valiosas (tipos y
+  plugins JS) son las que su documentación marca como no finales. Con ~5.300 líneas la diferencia es de ~5 s por ejecución:
+  no compensa hoy.
+- **Migrar a oxlint más adelante es barato**: los dos motores dieron hallazgos **idénticos regla por regla** sobre el
+  código real, y `test/lint/lint-rules.spec.ts` es una suite de regresión que fija el comportamiento esperado. Reevaluar
+  cuando los plugins JS y las reglas con tipos de oxlint salgan de alpha/"incompletas", o cuando el tiempo de lint moleste.
+- **Prettier** para el formato (estable; `oxfmt` está en 0.x). Los documentos (`docs/`) quedan fuera: realinea las tablas anchas.
+
+### Reglas (`eslint/rules.js`) y dónde aplican (`eslint.config.js`)
+
+Reglas **curadas**, no un preset: `recommended-type-checked` trae decenas (`no-unsafe-*`, `require-await`…) que chocan con el
+estilo de Prisma/Nest y ahogan las pocas que importan. Cada regla tiene su motivo escrito en el archivo.
+
+| Regla | Dónde | Por qué |
+|-------|-------|---------|
+| `no-floating-promises`, `no-misused-promises`, `await-thenable`, `only-throw-error`, `switch-exhaustiveness-check` | todo el código | un `await` olvidado pierde errores o el rollback; un enum nuevo debe forzar a revisar cada `switch` |
+| `no-unused-vars`, `ban-ts-comment` (razón ≥ 10 caracteres), `eqeqeq`, `prefer-const`, `no-var` | todo el código | |
+| `no-explicit-any`, `no-console`, `max-lines` 300 | `src` (las pruebas: `any` libre y 600 líneas) | se registra con `AppLogger`; un archivo largo mezcla responsabilidades |
+| `process.env` prohibido | `src`, salvo `platform/config/env.ts` | única fuente de la configuración |
+| cliente generado de Prisma prohibido | `src`, salvo `platform/db`, `shared/enums.ts`, `*/infrastructure/` | |
+| `.status` comparado / `switch` | `src/modules`, salvo `*.lifecycle.ts` | solo el ciclo de vida conoce los estados (`03` §2.3) |
+
+El alcance importa: `res.status` (HTTP) y el `status` de `Promise.allSettled` no son estados de una entidad, y por eso la regla
+`.status` no aplica fuera de `src/modules`. `reportUnusedDisableDirectives` retira solas las excepciones que dejan de hacer
+falta; hoy hay una, documentada, en el `switch` de los sellos (`platform/db/extensions.ts`).
+
+### Fronteras de arquitectura (`.dependency-cruiser.cjs`)
+
+Única fuente de las fronteras (reemplaza al test de arquitectura casero): sin ciclos; `platform` no importa módulos;
+`shared` no importa el proyecto; `domain/` sin Nest/Express/Prisma/infraestructura; logger, contexto, eventos y BD no
+conocen HTTP; los módulos solo se importan por su `index.ts`; el cliente generado solo donde corresponde. Cuenta también los
+imports **de solo tipos** (`import type … from 'express'` ya es conocer Express). Verificado con 11 violaciones provocadas.
+Una lección: excluir `src/generated` del grafo hacía invisibles los imports hacia él y la regla nunca disparaba; debe estar
+en el grafo pero sin recorrerse por dentro (`doNotFollow`).
+
+### Código muerto y dependencias (`knip.jsonc`)
+
+Detecta archivos y exportaciones sin uso y dependencias sobrantes o sin declarar. Al aplicarlo salieron: tres dependencias
+redundantes (`pg`, `@types/pg`, `testcontainers`: ya las traen `@prisma/adapter-pg` y `@testcontainers/postgresql`), una
+declarada de menos (`@standard-schema/spec`, cuyos tipos importamos) y ~30 re-exportaciones que nadie usaba. Las únicas
+excepciones son la **API de plataforma ya implementada y probada que aún no consume ningún módulo** (`defineMessages`,
+`defineLifecycle`, Fases 2-3), con su razón escrita en el archivo; cuando un módulo las use, `knip` avisa de que sobran.
+
+### Cómo se ejecuta
+
+| Comando | Qué hace |
+|---------|----------|
+| `npm run check` | tipos + lint + formato + fronteras + código muerto + pruebas unitarias (lo mismo que el CI) |
+| `npm run check:all` | lo anterior + integración con Postgres real |
+| `npm run lint:fix` / `npm run format` | corrige lo corregible |
+| gancho `pre-commit` (husky) | `lint` + `format:check` |
+| gancho `commit-msg` (commitlint) | commits convencionales (`feat`, `fix`, `refactor`, `style`…) |
+| `.github/workflows/ci.yml` | 3 trabajos: calidad + unitarias; integración (testcontainers usa el Docker del runner); mensajes de commit en PR |
+
+**Verificado con errores reales** en código real (no fijaciones): un `await` olvidado en el test del bus, `.status` en un
+módulo (y permitido en un `*.lifecycle.ts`), `process.env`, `console.log`, código muerto, código sin formato, `@ts-ignore`, y
+los dos ganchos de git rechazando un commit. **Lo que NO se pudo verificar aquí:** el workflow de GitHub Actions nunca se
+ejecutó (no hay repositorio remoto); se validó su sintaxis YAML y se corrieron localmente exactamente los mismos comandos.
+
+### Cómo agregar una regla
+1. Escribirla en `eslint/rules.js` con su motivo. 2. Aplicarla por carpeta en `eslint.config.js`. 3. Agregar una fijación que
+la viole en `test/lint-fixtures/` y su expectativa exacta en `test/lint/lint-rules.spec.ts` (más una prueba de su alcance).
 

@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Una ejecución nueva cancela la anterior de la misma rama.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: 0 # los ganchos de git son de la máquina del desarrollador, no del CI
+
+jobs:
+  quality:
+    name: Calidad y pruebas unitarias
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Tipos
+        run: npm run typecheck
+      - name: Reglas de calidad (ESLint)
+        run: npm run lint
+      - name: Formato (Prettier)
+        run: npm run format:check
+      - name: Fronteras de arquitectura (dependency-cruiser)
+        run: npm run deps
+      - name: Código muerto y dependencias (knip)
+        run: npm run knip
+      - name: Pruebas unitarias
+        run: npm test
+
+  integration:
+    name: Pruebas de integración (Postgres real)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # testcontainers levanta un Postgres desechable con el Docker del runner y aplica las migraciones reales.
+      - run: npm run test:integration
+
+  commits:
+    name: Mensajes de commit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}

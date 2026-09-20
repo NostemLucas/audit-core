@@ -1,4 +1,4 @@
-import { Controller, Get, Injectable, Post } from '@nestjs/common'
+import { Controller, Get, Injectable } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'

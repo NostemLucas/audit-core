@@ -31,6 +31,7 @@ export function stampsExtension(getUserId: () => string | undefined) {
           const userId = getUserId() ?? null
           const a = args as { data?: Data | Data[]; create?: Data; update?: Data }
 
+          // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- solo se sellan las escrituras; lecturas, borrados y agregados no se tocan
           switch (operation) {
             case 'create':
               a.data = stampCreate(a.data as Data, userId)
@@ -49,6 +50,9 @@ export function stampsExtension(getUserId: () => string | undefined) {
             case 'upsert':
               a.create = stampCreate(a.create as Data, userId)
               a.update = stampUpdate(a.update as Data, userId)
+              break
+            default:
+              // Lecturas, borrados y agregados no llevan sellos.
               break
           }
           return query(a as typeof args)
