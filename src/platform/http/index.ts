@@ -1,6 +1,6 @@
 export { AllExceptionsFilter } from './error.filter.js'
 export { EnvelopeInterceptor } from './envelope.interceptor.js'
-export { page } from './page.js'
+export { page, type Page } from './page.js'
 export { requestId } from './request-id.js'
 export { accessLog } from './access-log.js'
 export { createValidationPipe } from './validation.js'

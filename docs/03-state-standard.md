@@ -130,7 +130,7 @@ Borrar: solo `DRAFT` y sin uso (la FK lo garantiza). Corregir una publicada = cl
 | Desde | Evento | Hacia | Efectos / precondiciones |
 |-------|--------|-------|--------------------------|
 | `DRAFT` | `START` | `IN_PROGRESS` | Precondición: al menos un miembro (`AUDIT_HAS_NO_MEMBERS`). Efecto: evento `AuditStarted` (el momento queda en el historial) |
-| `IN_PROGRESS` | `CLOSE` | `CLOSED` | Precondición: todas las evaluaciones aprobadas (`AUDIT_HAS_PENDING_EVALUATIONS`). Efectos: `closedAt`, `finalScore` (snapshot) |
+| `IN_PROGRESS` | `CLOSE` | `CLOSED` | Precondición: todas las evaluaciones aprobadas (`AUDIT_HAS_PENDING_EVALUATIONS`). Efecto: `closedAt`. Los resultados no se guardan: se derivan (`05` §11) |
 | `CLOSED` | `ARCHIVE` | `ARCHIVED` | — |
 
 Capacidades: `DRAFT` → `editable`; `IN_PROGRESS` → `evaluable` (se evalúa y se adjunta evidencia).
@@ -140,10 +140,10 @@ Capacidades: `DRAFT` → `editable`; `IN_PROGRESS` → `evaluable` (se evalúa y
 | Desde | Evento | Hacia | Efectos / precondiciones |
 |-------|--------|-------|--------------------------|
 | `NOT_STARTED` | `START` | `IN_PROGRESS` | — |
-| `IN_PROGRESS` | `COMPLETE` | `COMPLETED` | Precondiciones: nivel y score presentes (o N/A con motivo); hallazgos si `score < 100` (`EVALUATION_INCOMPLETE`) |
+| `IN_PROGRESS` | `COMPLETE` | `COMPLETED` | Precondiciones: nivel alcanzado presente (o N/A con motivo); hallazgos si el nivel alcanzado es inferior al esperado (`EVALUATION_INCOMPLETE`) |
 | `RETURNED` | `RESUME` | `IN_PROGRESS` | Corregir una evaluación devuelta |
 | `RETURNED` | `COMPLETE` | `COMPLETED` | Igual que arriba |
-| `COMPLETED` | `APPROVE` | `APPROVED` | Precondición: score presente. Escribe `evaluation_reviews` |
+| `COMPLETED` | `APPROVE` | `APPROVED` | Precondición: nivel alcanzado presente. Escribe `evaluation_reviews` |
 | `COMPLETED` | `RETURN` | `RETURNED` | Abre nueva ronda (`round + 1`). Escribe `evaluation_reviews` |
 | `APPROVED` | `REOPEN` | `RETURNED` | Excepcional, exige comentario. Abre nueva ronda. Escribe `evaluation_reviews` |
 
@@ -157,7 +157,7 @@ Para `Organization` y `Scale`.
 
 - **Significado único:** "se puede elegir para usos **nuevos**". No afecta a nada ya existente: una auditoría
   vieja sigue mostrando su organización aunque esté inactiva.
-- Booleano `isActive`, por defecto `true`. Se cambia con dos casos de uso, `activate` y `deactivate`.
+- Booleano `isActive`, por defecto `true`. Se cambia con dos endpoints, `activate` y `deactivate`, que comparten un solo caso de uso (`isActive` es su único parámetro).
   Sin ciclo de vida, sin máquina, sin eventos.
 - **Validación al crear una referencia nueva** (auditoría → organización, auditoría → escala):
   el caso de uso comprueba `isActive` y, si no, lanza `<ENTIDAD>_INACTIVE` (422): `ORGANIZATION_INACTIVE`,

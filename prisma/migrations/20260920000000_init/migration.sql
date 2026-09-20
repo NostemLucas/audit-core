@@ -446,6 +446,12 @@ ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_targetUserId_fkey" FOREI
 -- Código legible de auditoría: la aplicación formatea `nextval('audit_code_seq')` (p. ej. AUD-2026-00042).
 CREATE SEQUENCE "audit_code_seq" START WITH 1 INCREMENT BY 1;
 
+-- Orden de los textos que se listan ordenados. Sin esto el orden lo decide la collation con la que se creó la base
+-- (en unas es "C": mayúsculas antes que minúsculas; en otras es del idioma), y un listado paginado no puede
+-- depender del servidor. ICU raíz: sin distinguir mayúsculas al ordenar, y determinista (la unicidad sigue siendo exacta).
+-- Prisma no modela collations de columna: esto no genera diferencias con schema.prisma.
+ALTER TABLE "organizations" ALTER COLUMN "name" TYPE TEXT COLLATE "und-x-icu";
+
 -- users: el email se normaliza a minúsculas. El username NO: es el usuario de Nextcloud (distingue mayúsculas)
 -- y debe coincidir tal cual con el `preferred_username` de Authentik.
 ALTER TABLE "users"

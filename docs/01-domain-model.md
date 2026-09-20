@@ -119,6 +119,7 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 | `email` y `username` en minúsculas | CHECK en `users` |
 | Puntaje de una opción ≥ 0; `payload` y `snapshot` son objetos JSON | CHECK |
 | Código de auditoría correlativo sin carreras | Secuencia `audit_code_seq` |
+| Orden de los nombres que se listan (`organizations.name`; las demás columnas de nombre al llegar su módulo) | Collation ICU `und-x-icu` en la columna: sin ella el orden depende de cómo se creó la base (con la de la imagen de prueba `alfa` iba después de `Delta`). Prisma no la modela; está en el bloque manual de la migración |
 
 Lo que **no** se puede expresar en la BD y queda como regla de dominio: el
 nivel elegido pertenece a la escala de la auditoría; las invariantes de la escala (§2.2); el alcance solo se edita en `DRAFT` y un seguimiento no puede modificarlo;

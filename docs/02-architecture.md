@@ -55,7 +55,7 @@ Prisma convierte `P2003` en el código de error del catálogo. Así `organizatio
 | Ciclo de vida (estados, transiciones, capacidades) | `*.lifecycle.ts` con `defineLifecycle` — ver [`03-state-standard.md`](./03-state-standard.md) | `allowedActions` del API, validación en use-cases |
 | Permisos globales por rol | `platform/authz/abilities.ts` (CASL) | Guard, `packRules` para el frontend, test de rutas |
 | Permisos contextuales (membresía en la auditoría) | `audits/domain/audit-policy.ts` | Use-cases, `allowedActions` |
-| Fórmulas (score, peso, brecha) | `audits/domain/scoring.ts` | Use-cases, dashboard, informes |
+| Fórmulas (distribución por opción, promedios esperado/alcanzado, brecha) | `audits/domain/scoring.ts` | Use-cases, dashboard, informes |
 | Errores | `errors.ts` de cada módulo (registrados en un catálogo) | Filtro HTTP, OpenAPI, tests |
 | Eventos y su payload | `events.ts` del módulo (Zod) | `audit_events.payload`, mensajes |
 | Textos en español | `shared/labels.es.ts`, `<modulo>/messages.es.ts` | Informes, mensajes de eventos |
@@ -76,8 +76,8 @@ Consecuencias concretas:
   (`StandardSchemaSerializerInterceptor`) hace `schema.parse(resultado)`: recorta campos no declarados (adiós fugas de `createdBy`) y garantiza que la
   respuesta real coincide con el OpenAPI.
 - **`if (x.status === …)` solo existe dentro del `*.lifecycle.ts`.** El resto pregunta `lifecycle.can(...)` / `lifecycle.has(...)`.
-- **La score global se calcula solo en TypeScript** (`scoring.ts`). El SQL nunca reimplementa la fórmula; los
-  dashboards usan `audits.finalScore` (cerradas) o llaman a `scoring.ts` (en curso).
+- **Los resultados se calculan solo en TypeScript** (`scoring.ts`) y no se guardan. El SQL nunca reimplementa la fórmula;
+  los dashboards llaman a `scoring.ts`.
 
 ### Errores: una definición lo dice todo
 
