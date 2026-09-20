@@ -72,7 +72,7 @@ describe('traducción de errores de la BD (Prisma 7 + adaptador pg, contra Postg
     await db.organization.create({ data: { name: 'ACME-SECRETO' } })
     const error = (await catchError(db.organization.create({ data: { name: 'ACME-SECRETO' } }))) as DomainError
     expect(JSON.stringify({ code: error.code, message: error.message, details: error.details })).not.toMatch(
-      /organizations_name_key|ACME-SECRETO/,
+      /organizations_name_lower_key|ACME-SECRETO/,
     )
     expect(error.cause).toBeDefined()
   })

@@ -139,7 +139,7 @@ describe('de extremo a extremo por HTTP', () => {
       message: 'Ya existe una organización con ese nombre',
     })
     expect(res.body.error.traceId).toBe(res.headers['x-request-id'])
-    expect(JSON.stringify(res.body)).not.toContain('organizations_name_key')
+    expect(JSON.stringify(res.body)).not.toContain('organizations_name_lower_key')
   })
 
   it('el x-request-id de la petición queda como correlationId en el contexto ambiental (CLS)', async () => {

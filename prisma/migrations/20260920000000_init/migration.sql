@@ -267,16 +267,7 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "organizations_name_key" ON "organizations"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "scales_name_key" ON "scales"("name");
-
--- CreateIndex
 CREATE UNIQUE INDEX "scale_levels_scaleId_value_key" ON "scale_levels"("scaleId", "value");
-
--- CreateIndex
-CREATE UNIQUE INDEX "templates_name_key" ON "templates"("name");
 
 -- CreateIndex
 CREATE INDEX "controls_templateId_parentId_position_idx" ON "controls"("templateId", "parentId", "position");
@@ -446,11 +437,17 @@ ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_targetUserId_fkey" FOREI
 -- Código legible de auditoría: la aplicación formatea `nextval('audit_code_seq')` (p. ej. AUD-2026-00042).
 CREATE SEQUENCE "audit_code_seq" START WITH 1 INCREMENT BY 1;
 
--- Orden de los textos que se listan ordenados. Sin esto el orden lo decide la collation con la que se creó la base
--- (en unas es "C": mayúsculas antes que minúsculas; en otras es del idioma), y un listado paginado no puede
--- depender del servidor. ICU raíz: sin distinguir mayúsculas al ordenar, y determinista (la unicidad sigue siendo exacta).
--- Prisma no modela collations de columna: esto no genera diferencias con schema.prisma.
+-- Nombres de organización, escala y plantilla: (1) únicos SIN distinguir mayúsculas ("ACME" y "acme" son el mismo
+-- auditado), y (2) ordenados con ICU raíz. Sin (2) el orden de un listado lo decide la collation con la que se creó la
+-- base (en unas es "C": mayúsculas antes que minúsculas; en otras, la del idioma) y un listado paginado no puede
+-- depender del servidor. "und-x-icu" es determinista: la comparación exacta sigue siendo por bytes.
+-- Prisma no modela ni índices sobre expresiones ni collations de columna: esto no genera diferencias con schema.prisma.
 ALTER TABLE "organizations" ALTER COLUMN "name" TYPE TEXT COLLATE "und-x-icu";
+ALTER TABLE "scales"        ALTER COLUMN "name" TYPE TEXT COLLATE "und-x-icu";
+ALTER TABLE "templates"     ALTER COLUMN "name" TYPE TEXT COLLATE "und-x-icu";
+CREATE UNIQUE INDEX "organizations_name_lower_key" ON "organizations" (lower("name"));
+CREATE UNIQUE INDEX "scales_name_lower_key"        ON "scales" (lower("name"));
+CREATE UNIQUE INDEX "templates_name_lower_key"     ON "templates" (lower("name"));
 
 -- users: el email se normaliza a minúsculas. El username NO: es el usuario de Nextcloud (distingue mayúsculas)
 -- y debe coincidir tal cual con el `preferred_username` de Authentik.

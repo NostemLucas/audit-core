@@ -5,7 +5,7 @@ export const OrganizationErrors = defineErrors({
   ORGANIZATION_NAME_TAKEN: {
     http: 409,
     message: 'Ya existe una organización con ese nombre',
-    onUnique: 'organizations_name_key',
+    onUnique: 'organizations_name_lower_key',
   },
   /** Estándar de disponibilidad (docs/03): una organización inactiva no se elige para auditorías nuevas. */
   ORGANIZATION_INACTIVE: { http: 422, message: 'La organización está inactiva' },

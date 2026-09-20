@@ -4,7 +4,7 @@ export const LibraryErrors = defineErrors({
   // ── Escalas ────────────────────────────────────────────────────────────────
   SCALE_NOT_FOUND: { http: 404, message: 'Escala no encontrada' },
   SCALE_INACTIVE: { http: 422, message: 'La escala está inactiva' },
-  SCALE_NAME_TAKEN: { http: 409, message: 'Ya existe una escala con ese nombre', onUnique: 'scales_name_key' },
+  SCALE_NAME_TAKEN: { http: 409, message: 'Ya existe una escala con ese nombre', onUnique: 'scales_name_lower_key' },
   SCALE_IN_USE: {
     http: 409,
     message: 'La escala está en uso por alguna auditoría; desactívala en lugar de eliminarla',
@@ -38,7 +38,7 @@ export const LibraryErrors = defineErrors({
   TEMPLATE_NAME_TAKEN: {
     http: 409,
     message: 'Ya existe una plantilla con ese nombre',
-    onUnique: 'templates_name_key',
+    onUnique: 'templates_name_lower_key',
   },
   TEMPLATE_IN_USE: {
     http: 409,

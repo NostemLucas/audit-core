@@ -49,7 +49,7 @@ describe('catálogo de errores', () => {
     expect(() =>
       defineErrors({
         NUEVO_A: { http: 409, message: 'x' },
-        NUEVO_B: { http: 409, message: 'y', onUnique: 'organizations_name_key' },
+        NUEVO_B: { http: 409, message: 'y', onUnique: 'organizations_name_lower_key' },
       }),
     ).toThrow(/ya está asignada/)
     expect(errorRegistry.all()).toHaveLength(before)
@@ -68,7 +68,7 @@ describe('catálogo de errores', () => {
 
   it('traduce una FK de borrado al error del módulo dueño', () => {
     expect(errorRegistry.byForeignKeyDelete('audits_organizationId_fkey')?.code).toBe('ORGANIZATION_IN_USE')
-    expect(errorRegistry.byUnique('organizations_name_key')?.code).toBe('ORGANIZATION_NAME_TAKEN')
+    expect(errorRegistry.byUnique('organizations_name_lower_key')?.code).toBe('ORGANIZATION_NAME_TAKEN')
   })
 
   it('todo UNIQUE de la migración tiene un error asignado o una excepción justificada', () => {

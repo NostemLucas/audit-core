@@ -27,6 +27,7 @@ describe('sellos createdById / updatedById (extensión de Prisma)', () => {
   })
 
   it('createMany / createManyAndReturn / updateMany / upsert', async () => {
+    const UP_ID = '0199c0de-0000-7000-8000-0000000000aa'
     currentUser = U1
     await db.organization.createMany({ data: [{ name: 'M1' }, { name: 'M2' }] })
     const returned = await db.organization.createManyAndReturn({ data: [{ name: 'M3' }] })
@@ -38,15 +39,15 @@ describe('sellos createdById / updatedById (extensión de Prisma)', () => {
     expect(rows.every((r) => r.createdById === U1 && r.updatedById === U2)).toBe(true)
 
     const created = await db.organization.upsert({
-      where: { name: 'UP' },
-      create: { name: 'UP' },
+      where: { id: UP_ID },
+      create: { id: UP_ID, name: 'UP' },
       update: { isActive: false },
     })
     expect(created).toMatchObject({ createdById: U2, updatedById: U2 })
     currentUser = U1
     const updated = await db.organization.upsert({
-      where: { name: 'UP' },
-      create: { name: 'UP' },
+      where: { id: UP_ID },
+      create: { id: UP_ID, name: 'UP' },
       update: { isActive: false },
     })
     expect(updated).toMatchObject({ createdById: U2, updatedById: U1 })

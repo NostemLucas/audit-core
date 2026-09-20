@@ -129,6 +129,14 @@ describe('crear', () => {
     expect(res.body.error.code).toBe('ORGANIZATION_NAME_TAKEN')
   })
 
+  it('el nombre es único sin distinguir mayúsculas: "ACME" y "acme" son el mismo auditado', async () => {
+    await create('ACME')
+    const res = await create('acme')
+    expect(res.status).toBe(409)
+    expect(res.body.error.code).toBe('ORGANIZATION_NAME_TAKEN')
+    expect(await db.organization.count()).toBe(1)
+  })
+
   it('dos altas simultáneas con el mismo nombre: una gana, la otra es 409 (nunca 500)', async () => {
     const results = await Promise.all([create('Carrera'), create('Carrera'), create('Carrera')])
     expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409])

@@ -118,7 +118,8 @@ model User {
 /// (FK Restrict): se desactiva.
 model Organization {
   id       String  @id @default(uuid(7)) @db.Uuid
-  name     String  @unique
+  /// Único sin distinguir mayúsculas (índice sobre lower(name) en el bloque manual de la migración)
+  name     String
   isActive Boolean @default(true)
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
@@ -143,7 +144,8 @@ model Organization {
 /// mayúsculas, y el puntaje máximo > 0. El puntaje de una opción no se edita una vez usada en una auditoría.
 model Scale {
   id        String         @id @default(uuid(7)) @db.Uuid
-  name      String         @unique
+  /// Único sin distinguir mayúsculas (índice sobre lower(name) en el bloque manual de la migración)
+  name      String
   dimension ScaleDimension
   isActive  Boolean        @default(true)
 
@@ -184,7 +186,8 @@ model ScaleLevel {
 /// PUBLISHED es inmutable: corregir = clonar con otro nombre.
 model Template {
   id     String         @id @default(uuid(7)) @db.Uuid
-  name   String         @unique
+  /// Único sin distinguir mayúsculas (índice sobre lower(name) en el bloque manual de la migración)
+  name   String
   status TemplateStatus @default(DRAFT)
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
