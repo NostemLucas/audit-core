@@ -5,7 +5,7 @@
 //  - Instantes = Timestamptz(3). Fechas de calendario (plazos) = Date.
 //  - Puntajes, pesos y valores de nivel = Decimal(5,2). Se convierten a `number` en los mappers, nunca en el dominio.
 //  - Sellos `createdById` / `updatedById`: ids planos (sin FK) rellenados por una Prisma client extension.
-//    El nombre se hidrata con UserDirectory. Solo las raíces de agregado los llevan.
+//    El nombre se hidrata con UserDirectory. Solo las raíces de agregado los llevan (no `User`).
 //  - Sin soft-delete genérico. Único `deletedAt`: Evidence.
 //  - Lo que Prisma no puede declarar (CHECK, secuencia del código de auditoría) está en el bloque
 //    "Objetos que Prisma no modela" al final de prisma/migrations/*_init/migration.sql.
@@ -97,26 +97,24 @@ enum ReportType {
 // Identidad y auditados
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Se crea/actualiza solo por sincronización con Authentik en cada login. Nunca se borra (el resto del sistema
-/// lo referencia). NO tiene estado de activación: si una persona puede entrar o no lo decide Authentik.
-/// `email` y `username` se normalizan a minúsculas en la aplicación antes de guardar.
+/// Espejo mínimo de la cuenta en Authentik: solo lo que el sistema usa. Se crea/actualiza únicamente por la
+/// sincronización en cada login. Nunca se borra (el resto del sistema lo referencia). NO tiene estado de
+/// activación (lo decide Authentik) ni sellos de auditoría (nadie "crea" a un usuario: lo crea su propio login).
 model User {
-  id          String  @id @default(uuid(7)) @db.Uuid
-  authentikId String  @unique
-  email       String  @unique
-  username    String  @unique
-  names       String
-  lastNames   String
-  /// Dato local (no sincronizado)
-  ci          String?
-  /// Dato local (no sincronizado)
-  phone       String?
+  id          String @id @default(uuid(7)) @db.Uuid
+  /// Claim `sub`. Inmutable.
+  authentikId String @unique
+  /// Claim `email`. Se normaliza a minúsculas (lo garantiza un CHECK).
+  email       String @unique
+  /// Claim `preferred_username`, TAL CUAL (sin normalizar): es el usuario de Nextcloud al compartir carpetas.
+  username    String @unique
+  /// Claim `name` (nombre completo). Authentik no entrega apellidos por separado de forma fiable.
+  name        String
+  /// Sincronizado desde los grupos de Authentik; no es editable localmente.
   roles       Role[]
 
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
-  createdById String?  @db.Uuid
-  updatedById String?  @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   managedAudits       Audit[]            @relation("AuditManager")
   memberships         AuditMember[]

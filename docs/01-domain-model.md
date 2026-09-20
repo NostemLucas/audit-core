@@ -37,7 +37,7 @@ Estado: **propuesta para revisión**. Nada de esto está implementado. Reemplaza
 ## 2. Modelo de datos objetivo
 
 Todas las tablas llevan `id uuid` (UUIDv7, ordenable por tiempo), `createdAt` y `updatedAt` (`Timestamptz`),
-salvo puentes y logs. Las **raíces de agregado** (`users`, `organizations`, `assets`, `scales`, `templates`,
+salvo puentes y logs. Las **raíces de agregado** (`organizations`, `assets`, `scales`, `templates`,
 `audits`, `evaluations`, `evidences`, `reports`) llevan además los sellos `createdById` / `updatedById`: ids
 planos **sin FK**, que rellena una Prisma client extension; el nombre se hidrata con un `UserDirectory`. Es la
 única excepción a "toda referencia a un usuario lleva FK". Con esto `evidences.createdById` **es** quien subió el
@@ -47,9 +47,11 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 `prisma/migrations/*_init/migration.sql`; ver §2.1.
 
 ### Identidad y auditados
-- **users**: `authentikId` UQ, `email` UQ, `username` UQ, `names`, `lastNames`, `ci?`, `phone?`, `roles Role[]`.
-  Sin `isActive`: la activación de cuentas es de Authentik (`03` §4). Nunca se borran (el resto del sistema los
-  referencia).
+- **users** (espejo **mínimo** de Authentik; solo lo que el sistema usa): `authentikId` UQ (`sub`), `email` UQ (minúsculas,
+  CHECK), `username` UQ (`preferred_username` **tal cual**: es el usuario de Nextcloud al compartir carpetas y este
+  distingue mayúsculas), `name` (claim `name`; Authentik no entrega apellidos por separado de forma fiable), `roles
+  Role[]` (desde los grupos). Sin `ci`/`phone` (nadie los consumía), sin `isActive` (`03` §4) y sin sellos de
+  auditoría (nadie "crea" a un usuario: lo crea su propio login). Nunca se borran (el resto del sistema los referencia).
 - **organizations**: `name` UQ, `description?`, `address?`, `phone?`, `email?`, `isActive`. No se borran si
   tienen auditorías.
 - **assets**: `organizationId` FK, `name`, `type` (`APPLICATION | SYSTEM | INFRASTRUCTURE | PROCESS | FACILITY |

@@ -37,15 +37,10 @@ CREATE TABLE "users" (
     "authentikId" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "username" TEXT NOT NULL,
-    "names" TEXT NOT NULL,
-    "lastNames" TEXT NOT NULL,
-    "ci" TEXT,
-    "phone" TEXT,
+    "name" TEXT NOT NULL,
     "roles" "Role"[],
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
-    "createdById" UUID,
-    "updatedById" UUID,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -512,10 +507,10 @@ ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_targetUserId_fkey" FOREI
 -- Código legible de auditoría: la aplicación formatea `nextval('audit_code_seq')` (p. ej. AUD-2026-00042).
 CREATE SEQUENCE "audit_code_seq" START WITH 1 INCREMENT BY 1;
 
--- users: normalización que la aplicación aplica siempre; la BD la garantiza.
+-- users: el email se normaliza a minúsculas. El username NO: es el usuario de Nextcloud (distingue mayúsculas)
+-- y debe coincidir tal cual con el `preferred_username` de Authentik.
 ALTER TABLE "users"
-  ADD CONSTRAINT "users_email_lowercase"    CHECK ("email" = lower("email")),
-  ADD CONSTRAINT "users_username_lowercase" CHECK ("username" = lower("username"));
+  ADD CONSTRAINT "users_email_lowercase" CHECK ("email" = lower("email"));
 
 -- scale_levels
 ALTER TABLE "scale_levels"
