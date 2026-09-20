@@ -9,13 +9,14 @@ import { AppModule } from '../src/app.module.js'
 import { configureApp } from '../src/configure-app.js'
 import { ENV } from '../src/platform/config/index.js'
 import { testEnv } from './support/env.js'
-import { Responds, page } from '../src/platform/http/index.js'
+import { Instant, Responds, page } from '../src/platform/http/index.js'
 import { Public } from '../src/platform/authz/index.js'
 
 // Esquemas de ejemplo: una sola definición da validación, tipo y documentación.
 const CreateInput = z.object({ name: z.string().min(3).max(20), tags: z.array(z.string()).default([]) })
 const ListQuery = z.object({ page: z.coerce.number().int().min(1).default(1), active: z.stringbool().optional() })
 const ItemView = z.object({ id: z.uuid(), name: z.string() })
+const DatedView = z.object({ name: z.string(), createdAt: Instant })
 
 const ID = '0199c0de-0000-7000-8000-000000000001'
 type CreateInputT = z.infer<typeof CreateInput>
@@ -59,6 +60,12 @@ class ItemsController {
   @Get('paged')
   paged() {
     return page([{ id: ID, name: 'A', createdById: 's' }], { page: 1, pageSize: 10, total: 1 })
+  }
+
+  @Responds(DatedView)
+  @Get('dated')
+  dated() {
+    return { name: 'x', createdAt: new Date('2026-01-02T03:04:05.000Z'), createdById: 'secreto' }
   }
 
   @Responds(ItemView)
@@ -150,6 +157,13 @@ describe('serialización de salida (nativa) + envelope', () => {
     ])
   })
 
+  it('un Instant sale como texto ISO 8601 aunque el use case devuelva la fila con Date (sin mapper)', async () => {
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__items/dated')
+      .expect(200)
+    expect(res.body).toEqual({ data: { name: 'x', createdAt: '2026-01-02T03:04:05.000Z' } })
+  })
+
   it('un Page se serializa ítem por ítem y conserva meta', async () => {
     const res = await request((await boot()).getHttpServer())
       .get('/api/v1/__items/paged')
@@ -186,6 +200,14 @@ describe('OpenAPI generado desde los mismos esquemas (@nestjs/swagger 12)', () =
     }
     const oneSchema = one.content['application/json']!.schema
     expect(oneSchema.properties.data.properties).toHaveProperty('name') // documenta el envelope { data: ítem }
+
+    const dated = doc.paths['/api/v1/__items/dated']?.get?.responses?.['200'] as {
+      content: Record<string, { schema: any }>
+    }
+    expect(dated.content['application/json']!.schema.properties.data.properties.createdAt).toMatchObject({
+      type: 'string',
+      format: 'date-time',
+    })
 
     const paged = doc.paths['/api/v1/__items/paged']?.get?.responses?.['200'] as {
       content: Record<string, { schema: any }>

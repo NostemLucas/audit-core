@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { Instant } from '../../platform/http/index.js'
 import { LIMITS } from '../../shared/limits.js'
 
 /**
@@ -11,10 +12,9 @@ export const OrganizationView = z.object({
   id: z.uuid(),
   name: z.string(),
   isActive: z.boolean(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
+  createdAt: Instant,
+  updatedAt: Instant,
 })
-export type OrganizationViewT = z.infer<typeof OrganizationView>
 
 export const CreateOrganization = z.object({ name: Name })
 export type CreateOrganizationT = z.infer<typeof CreateOrganization>

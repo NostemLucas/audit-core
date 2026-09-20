@@ -7,7 +7,7 @@ import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppModule } from '../src/app.module.js'
 import { configureApp } from '../src/configure-app.js'
-import { rolesFromGroups } from '../src/modules/identity/roles-from-groups.js'
+import { rolesFromGroups } from '../src/modules/identity/authentik/roles-from-groups.js'
 import {
   CurrentUser,
   JWT_KEYS,

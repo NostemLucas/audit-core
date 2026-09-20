@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DomainError } from '../../platform/errors/index.js'
-import '../../app-errors.js'
+import { DomainError } from '../../../platform/errors/index.js'
+import '../../../app-errors.js'
 import { identityFromClaims } from './token-identity.js'
 
 const base = {

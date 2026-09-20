@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { DomainError } from '../../platform/errors/index.js'
-import '../../app-errors.js'
-import { IdentityErrors } from './errors.js'
+import { DomainError } from '../../../platform/errors/index.js'
+import '../../../app-errors.js'
+import { IdentityErrors } from '../errors.js'
 import { retryOnceOnIdentityConflict } from './retry-identity-conflict.js'
 
 const conflict = () => new DomainError(IdentityErrors.USER_IDENTITY_CONFLICT)

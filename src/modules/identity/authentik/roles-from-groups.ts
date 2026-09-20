@@ -1,4 +1,4 @@
-import { Role } from '../../shared/enums.js'
+import { Role } from '../../../shared/enums.js'
 
 /**
  * Convención de nombres de los GRUPOS de Authentik → roles del sistema (misma regla que el proyecto anterior):

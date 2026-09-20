@@ -1,4 +1,4 @@
-import { DomainError } from '../../platform/errors/index.js'
+import { DomainError } from '../../../platform/errors/index.js'
 
 /**
  * Dos primeros logins simultáneos del mismo usuario chocan en un índice único (authentikId / email / username): el

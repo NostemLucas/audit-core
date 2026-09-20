@@ -1,7 +1,7 @@
-import type { TokenClaims } from '../../platform/auth/index.js'
-import { DomainError } from '../../platform/errors/index.js'
-import type { Role } from '../../shared/enums.js'
-import { IdentityErrors } from './errors.js'
+import type { TokenClaims } from '../../../platform/auth/index.js'
+import { DomainError } from '../../../platform/errors/index.js'
+import type { Role } from '../../../shared/enums.js'
+import { IdentityErrors } from '../errors.js'
 import { rolesFromGroups } from './roles-from-groups.js'
 
 /** Lo que el sistema toma de un token de Authentik. */

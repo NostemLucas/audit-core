@@ -2,7 +2,7 @@ import { Controller, Get } from '@nestjs/common'
 import { type AuthenticatedUser, CurrentUser } from '../../platform/auth/index.js'
 import { NoAbilityRequired } from '../../platform/authz/index.js'
 import { Responds } from '../../platform/http/index.js'
-import { GetProfileUseCase } from './get-profile.use-case.js'
+import { GetProfileUseCase } from './use-cases/get-profile.use-case.js'
 import { ProfileView } from './profile.schemas.js'
 
 @Controller('profile')

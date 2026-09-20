@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import type { AuthenticatedUser, TokenClaims, UserResolver } from '../../platform/auth/index.js'
-import { InjectTx, Transactional, type Tx } from '../../platform/db/index.js'
-import { AppLogger, type Log } from '../../platform/logging/index.js'
-import { Role } from '../../shared/enums.js'
+import type { AuthenticatedUser, TokenClaims, UserResolver } from '../../../platform/auth/index.js'
+import { InjectTx, Transactional, type Tx } from '../../../platform/db/index.js'
+import { AppLogger, type Log } from '../../../platform/logging/index.js'
+import { Role } from '../../../shared/enums.js'
 import { retryOnceOnIdentityConflict } from './retry-identity-conflict.js'
 import { identityFromClaims, type TokenIdentity } from './token-identity.js'
 

@@ -119,7 +119,7 @@ Reglas por tier:
 - Un único **mapper** por agregado (`toDomain` / `toPersistence`) en `infrastructure/`. Es el único punto de
   traducción entre fila y dominio.
 
-**Tier B**
+**Tier B** (estructura concreta más abajo)
 - Sin repositorio ni port: el use-case llama a Prisma directamente. Siempre hay use-case, aunque sea corto,
   porque ahí viven la transacción, el evento y la comprobación de permisos; el controller nunca toca Prisma.
 - Los esquemas de entrada se **derivan** del esquema base (`.pick`, `.partial`, `.omit`), no se reescriben.
@@ -127,6 +127,29 @@ Reglas por tier:
 **Tier C**
 - Solo lectura. Puede unir tablas de varios módulos con Prisma/SQL (es el único tier con esa licencia).
 - No contiene reglas de negocio: si necesita una fórmula, llama a `scoring.ts` vía `audits/index.ts`.
+
+### Estructura de un módulo Tier B (y por qué no tiene `domain/`)
+
+Un módulo Tier B **no tiene `domain/`** porque no tiene reglas de negocio: validar y guardar. Lo único que "sabe" (nombre
+único, no borrar con auditorías) lo hace cumplir la BD y el catálogo de errores lo traduce; un `domain/` aquí sería una
+carpeta con clases que repiten las columnas. La misma estructura para todos:
+
+```
+<modulo>/
+  <modulo>.module.ts        <modulo>.controller.ts        index.ts (API pública)
+  <recurso>.schemas.ts      un esquema base; crear/editar/consulta se derivan de él (.pick/.partial), y la vista de salida
+  errors.ts                 los errores del módulo (defineErrors)
+  use-cases/                <verbo>-<sustantivo>.use-case.ts, uno por operación
+  <recurso>.rules.ts        SOLO si hay invariantes que la BD no puede expresar: función pura, sin Nest ni Prisma, con su test
+  <adaptador>/              SOLO si integra un sistema externo (p. ej. identity/authentik/); nunca suelto en la raíz
+```
+
+- **Sin mapper.** El use case devuelve la fila y la vista de salida la recorta y da formato (`Instant` entrega las fechas
+  como ISO 8601). Un mapper fila → vista sería otra copia de la lista de campos. Los mappers son cosa del Tier A, donde la
+  entidad de dominio es distinta de la fila.
+- **Cuándo un módulo pasa a Tier A:** en cuanto aparece una regla que no es "validar y guardar": una invariante entre
+  varias filas, un ciclo de vida o un cálculo. Hasta entonces, `.rules.ts` alcanza para una invariante aislada (p. ej.
+  `library/scales`).
 
 ### Anatomía de `audits` (el módulo grande)
 

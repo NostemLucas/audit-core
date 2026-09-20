@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { packRules } from '@casl/ability/extra'
-import type { AuthenticatedUser } from '../../platform/auth/index.js'
-import { defineAbilityFor } from '../../platform/authz/index.js'
-import type { ProfileViewT } from './profile.schemas.js'
+import type { AuthenticatedUser } from '../../../platform/auth/index.js'
+import { defineAbilityFor } from '../../../platform/authz/index.js'
+import type { ProfileViewT } from '../profile.schemas.js'
 
 @Injectable()
 export class GetProfileUseCase {
