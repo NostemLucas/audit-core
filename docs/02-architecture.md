@@ -322,3 +322,51 @@ enums del schema.
 testcontainers, migraciones reales, en serie). Toda regla de esta sección tiene al menos una mutación verificada:
 si se rompe el código, el test falla.
 
+## 12. Eventos de dominio (Fase 1i, verificado contra Postgres real)
+
+**Qué es.** `platform/events`: un bus **síncrono que corre dentro de la transacción** del caso de uso. Es el punto de
+extensión previsto en §8: hoy no tiene suscriptores de negocio; el registrador de `audit_events` llega con el módulo
+`audits` (Fase 3), y notificaciones, feed o webhooks serán handlers nuevos sin tocar ningún caso de uso.
+
+**Cómo se usa.**
+```ts
+// modules/audits/domain/events.ts   ← única definición del evento
+export const AuditEvents = defineEvents({
+  AuditStarted: z.object({ auditId: z.uuid() }),
+})
+// modules/audits/messages.es.ts     ← su texto; sin él no compila
+defineMessages(AuditEvents, { AuditStarted: (p) => `Inició la auditoría` })
+
+// caso de uso
+@Transactional()
+async execute(...) { …; await this.events.publish(AuditEvents.AuditStarted, { auditId }) }
+
+// handler (en su propio módulo)
+onModuleInit() { this.bus.on(AuditEvents.AuditStarted, (e) => this.tx.auditEvent.create(…)) }
+```
+
+**Reglas.**
+1. `publish` valida el payload contra su esquema **antes** de llamar a ningún handler; un payload inválido es un bug
+   de quien publica y falla ahí (no aparece años después en el historial).
+2. Los handlers corren **en orden y esperados**. Si uno falla, el error sube al publicador y **toda** la transacción
+   se revierte; si el caso de uso falla después, lo que escribieron los handlers se revierte con él. Nunca queda un
+   historial de algo que no ocurrió (por eso no se usa `@nestjs/event-emitter`).
+3. Los handlers son rápidos y solo escriben en la BD (con `@InjectTx()`). El trabajo externo (Nextcloud, email) va
+   **después del commit**, no en un handler.
+4. Un handler no publica un evento que lo dispare a sí mismo (no hay guarda de profundidad: sería falsa seguridad).
+5. El evento lleva `actorId` y `requestId` del contexto de la petición; sin contexto (seeds, jobs) van vacíos.
+6. Nombre en PascalCase y participio (`AuditStarted`); único en todo el sistema (`defineEvents` lo exige).
+7. El texto se genera **al leer** (`renderEventMessage(type, payload)`): una fila de un evento que ya no existe, o
+   con un payload que ya no cumple el esquema, devuelve `undefined` en vez de romper el historial.
+
+**Guardas (CI).** Un mapa de mensajes incompleto no compila; `test/events-catalog.spec.ts` exige que todo evento
+registrado en `app-events.ts` tenga mensaje y nombre único.
+
+**Lo que se comprobó al probarlo.**
+- Mutaciones verificadas: si el bus no esperase a los handlers, si se tragase sus errores, o si los ejecutase fuera de
+  la transacción, los tests fallan.
+- **Trampa de `nestjs-cls`:** `cls.run(fn)` **hereda** el contexto padre por defecto, así que ejecutar un handler dentro
+  de un `cls.run` anidado *sigue* dentro de la transacción. Para salirse de ella hace falta
+  `cls.run({ ifNested: 'override' }, …)`. Una mutación con el `run` por defecto no rompía nada; con `override` sí.
+  Quien modifique el bus debe probar con la segunda forma.
+

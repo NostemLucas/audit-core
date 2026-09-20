@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import './app-errors.js' // registra el catálogo de errores completo (lo necesita el traductor de errores de la BD)
+import './app-events.js' // registra el catálogo de eventos completo
 import { ENV, EnvModule, type Env } from './platform/config/index.js'
 import { ContextModule } from './platform/context/context.module.js'
 import { DbModule } from './platform/db/index.js'
+import { EventsModule } from './platform/events/index.js'
 import { HealthController } from './platform/health/health.controller.js'
 
 @Module({
@@ -12,6 +14,7 @@ import { HealthController } from './platform/health/health.controller.js'
     EnvModule,
     DbModule,
     ContextModule,
+    EventsModule,
     ThrottlerModule.forRootAsync({
       imports: [], // EnvModule es global
       inject: [ENV],
