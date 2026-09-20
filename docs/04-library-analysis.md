@@ -121,10 +121,28 @@ es contenido a mantener. Por eso:
   Si se necesita, el motivo del nivel esperado cubre el contexto y un campo nuevo se agrega después sin migrar datos.
 - **Corrección a D13** (`01`): se dijo que la guía por auditoría "no se usaba" porque solo se buscaron lectores en la lógica y
   se excluyeron los DTOs; en realidad existía un endpoint que la escribía y la devolvía al frontend.
-- **Propuesta pendiente de confirmar:** un nivel base por auditoría, `audits.baseExpectedLevelId` (nulo = máximo de la escala).
-  El nivel esperado efectivo sería `evaluación.expectedLevelId ?? auditoría.baseExpectedLevelId ?? máximo`, calculado en un
-  solo lugar (`scoring.ts`). Así solo se guardan (con su motivo) las excepciones a la base, en vez de fijar cien controles uno
-  a uno.
+- **El nivel esperado es POR CRITERIO, no uno por auditoría** (decidido). Unos controles se puntúan con 3, otros con 4 y otros
+  con 2; una auditoría no tiene un único nivel. Se descartó un nivel base por auditoría (`audits.baseExpectedLevelId`).
+- **Para no fijar cien controles uno a uno:** una **operación masiva** (caso de uso, sin cambio de schema) fija el nivel de
+  varios criterios a la vez: los seleccionados, o todos los de un dominio, con un motivo compartido opcional. Cada criterio
+  guarda su propio valor; el motivo se puede afinar después en los que sean excepción.
+
+### 4.5 Consecuencias del nivel esperado por criterio
+
+**Fallo encontrado en el proyecto anterior.** El gráfico "Nivel objetivo vs actual" usaba, para TODOS los dominios, el máximo de la
+escala (`getMaxValueByFramework`), mientras el score de cada control sí se calculaba contra su nivel esperado (`achieved /
+target × 100`). Con niveles mezclados la barra mostraba un objetivo que ningún control tenía. Lo mismo el "actual", que era un
+promedio simple y no ponderado.
+
+**Propuesta (pendiente de confirmar)** — una sola definición en `audits/domain/scoring.ts`, usada por gráficos, análisis de
+brechas e informes:
+- Nivel esperado y nivel alcanzado de un **dominio** = promedio **ponderado por el peso** de sus hojas, excluyendo las no
+  aplicables y las sin evaluar (el mismo criterio que ya usa el score).
+- **Sin valor por defecto silencioso.** Antes, un criterio sin nivel esperado se puntuaba contra el máximo de la escala: si se
+  olvidaba fijar 10 de 50 controles, esos diez se medían contra 5 y bajaban el resultado sin avisar. En su lugar, **iniciar la
+  auditoría exige que todo criterio tenga nivel esperado** (`AUDIT_EXPECTED_LEVELS_MISSING`, 422, con la lista de los que
+  faltan). Así el máximo de la escala deja de ser un valor por defecto y `expectedLevelId` es siempre un dato explícito
+  en una auditoría en curso.
 
 ### 4.2 Lo que se propuso y se DESCARTÓ (para no reabrirlo)
 
@@ -154,5 +172,6 @@ hubiera, se separa (sus hijos pasan a ser el primer nivel). No hace falta una pr
 - Nuevo `library/domain/control-tree.ts` (pura): dominio y ruta de cada hoja, con su suite de pruebas usando los códigos que
   hoy fallan (COBIT, NIST, ASFI, numeraciones sin puntos) y ramas de distinta profundidad.
 - Importación/exportación por `nivel`, con ida y vuelta probada.
-- `controls.guidance` se elimina; `evaluations.expectedLevelReason` (nullable, nuevo); pendiente: `audits.baseExpectedLevelId` (§4.4).
+- `controls.guidance` se elimina; `evaluations.expectedLevelReason` (nullable, nuevo). Sin nivel base por auditoría (§4.4).
+- Pendiente de confirmar (§4.5): `AUDIT_EXPECTED_LEVELS_MISSING` al iniciar; promedio ponderado por dominio en `scoring.ts`.
 - Migración inicial regenerada (no hay BD desplegada).

@@ -84,7 +84,7 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **audit_members**: `auditId`, `userId`, `role` (`LEAD_AUDITOR | INSPECTOR`). UQ(`auditId`, `userId`).
   Quitar un miembro es un borrado; queda en `audit_events`.
 - **evaluations** (una por auditoría × control **hoja**): `auditId` FK, `controlId` FK, `weight Decimal(5,2)`,
-  `expectedLevelId?` FK (nulo = el valor base) y `expectedLevelReason?` (por qué ese nivel en esta auditoría), `assignedUserId?` FK, `status`
+  `expectedLevelId?` FK (nulo = aún sin fijar; por criterio, no por auditoría) y `expectedLevelReason?` (por qué ese nivel en esta auditoría), `assignedUserId?` FK, `status`
   (`NOT_STARTED|IN_PROGRESS|COMPLETED|RETURNED|APPROVED`), `round` (desde 1), `achievedLevelId?` FK,
   `score? Decimal`, `findings?`, `notes?`, `isNotApplicable`, `notApplicableReason?`, `version`.
   UQ(`auditId`, `controlId`). Índices (`auditId`, `status`) y (`assignedUserId`, `status`).
