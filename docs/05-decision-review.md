@@ -248,3 +248,32 @@ brecha. *Madurez* (esperados 3,3,4,4,2,2; alcanzados 3,2,4,2,2,1): esperada 3,0,
 - Un peso, si un día hiciera falta, sería una columna opcional con valor 1 por defecto (`Σ(peso × valor) / Σ(peso)`), decidida por
   la política de riesgo de la institución. No se construye ahora.
 
+## 11. La escala es el lugar donde vive la puntuación
+
+| Pieza | Qué decide | Dónde vive |
+|---|---|---|
+| Plantilla | qué se pregunta (los criterios) | `templates`, `controls` |
+| **Escala** | cómo se califica y se puntúa: opciones, puntaje de cada una y **dimensión** | `scales`, `scale_levels` |
+| Auditoría | elige una plantilla y una escala, más alcance y equipo | `audits` |
+| Evaluación | opción elegida, opción esperada, su motivo y el hallazgo | `evaluations` |
+
+La plantilla no conoce puntajes: la misma plantilla se audita con una escala de conformidad o de madurez, y lo decide la
+auditoría al crearse. Sea COBIT o cumple/no cumple, es el mismo camino; solo cambia la escala elegida.
+
+**Escalas de ejemplo (datos, no código):** *ISO 27001 – Conformidad* = Cumple 100 · Parcial 50 · No cumple 0 (dimensión
+conformidad). *Madurez 0–5* = seis opciones con su etiqueta (dimensión madurez). "No aplica" **no** es una opción: sigue siendo
+un indicador aparte con justificación.
+
+**Dos aclaraciones al modelo.**
+1. El número de una opción es su **puntaje** (convención de la función de auditoría), no un nivel ni un peso. La columna puede
+   seguir llamándose `value`; la interfaz y la documentación dicen "puntaje".
+2. **`scales.dimension` (`CONFORMITY` | `MATURITY`)** — se había eliminado `type` (rango/binaria/cualitativa) porque solo afectaba
+   a un widget; esta dimensión sí tiene lógica y no es derivable de la forma de la escala:
+   - etiqueta del resultado: "% de cumplimiento" (conformidad) frente a "madurez promedio (indicativa)" (madurez);
+   - resultado principal: distribución por opción (conformidad) frente a promedios esperado/alcanzado (madurez);
+   - nivel esperado sugerido: la opción más alta (conformidad); ninguno (madurez, lo fija el auditor por criterio).
+   El **cálculo es el mismo**; solo cambian la presentación y el valor sugerido.
+
+Las invariantes de la escala no cambian (`04`/`01` §2.2: al menos 2 opciones, puntajes únicos, etiquetas únicas, máximo > 0) ni la
+regla de que el puntaje de una opción no se edita una vez que la escala se usó en alguna auditoría.
+

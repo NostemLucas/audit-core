@@ -62,7 +62,8 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
   enlazará con un `externalId` (columna nueva, migración aditiva; no se agrega antes de que exista esa integración). Un
   contacto útil es una **persona con rol** (`contacts`), no columnas de la organización. No se borran si tienen auditorías.
 ### Biblioteca
-- **scales**: `name` UQ, `isActive`. Una lista ordenada de niveles; nada más (ver §2.2).
+- **scales**: `name` UQ, `dimension` (`CONFORMITY | MATURITY`, propuesta pendiente de confirmar: `05` §11), `isActive`. Una lista ordenada
+  de opciones con etiqueta y **puntaje** (ver §2.2).
 - **scale_levels**: `scaleId` FK, `value Decimal(5,2)`, `label`, `description?`. UQ(`scaleId`, `value`). Orden = orden del `value`.
 - **templates**: `name` UQ, `status` (`DRAFT | PUBLISHED | ARCHIVED`).
 - **controls**: `templateId` FK (cascade), `parentId?` FK→controls (cascade), `code`, `title`, `description?`,
