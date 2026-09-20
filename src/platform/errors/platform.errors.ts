@@ -1,4 +1,4 @@
-import { defineErrors } from './define-errors'
+import { defineErrors } from './define-errors.js'
 
 /** Errores genéricos que no pertenecen a ningún módulo de negocio. */
 export const PlatformErrors = defineErrors({

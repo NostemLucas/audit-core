@@ -71,7 +71,7 @@ Consecuencias concretas:
   regla, se cambia en un lugar.
 - **Las longitudes solo viven en Zod.** Las columnas de texto son `text` (en Postgres `varchar(n)` no aporta
   rendimiento). No hay que sincronizar `@db.VarChar(200)` con `@MaxLength(200)` con constantes de entidad.
-- **La salida se valida con el mismo esquema que la documenta.** Un interceptor (`ZodSerializerInterceptor`)
+- **La salida se valida con el mismo esquema que la documenta.** Un interceptor propio (Fase 2)
   hace `schema.parse(resultado)`: recorta campos no declarados (adiós fugas de `createdBy`) y garantiza que la
   respuesta real coincide con el OpenAPI.
 - **`if (x.status === …)` solo existe dentro del `*.lifecycle.ts`.** El resto pregunta `lifecycle.can(...)` / `lifecycle.has(...)`.
@@ -232,3 +232,29 @@ Convenciones fijas:
 - [ ] Escrituras en `@Transactional()`; evento publicado si hay algo que historiar.
 - [ ] Prueba de dominio para la regla y de integración para la operación.
 - [ ] `lint`, `dependency-cruiser`, `knip`, tests y snapshot OpenAPI en verde.
+
+## 10. Runtime y herramientas (decidido en la Fase 1b, con evidencia)
+
+| Pieza | Decisión | Por qué |
+|-------|----------|---------|
+| Framework | **NestJS 12** (`12.0.3`), Express | Última estable. Es **ESM nativo** (`"type": "module"`). Express por ecosistema y por ser lo que asume la documentación de Nest; el rendimiento no es el cuello de botella de este sistema. |
+| Módulos | **ESM**: `"type": "module"`, `module`/`moduleResolution: nodenext`, imports relativos **con extensión `.js`** (carpetas como `./x/index.js`) | Es la plantilla oficial de Nest 12 (`nest new`). Con ESM, `tsc` no rescribe imports: Node exige la extensión. |
+| Compilador | `nest build` (tsc) + **TypeScript 6** | `tsc` emite los metadatos de decoradores que necesita la inyección de dependencias. Un transpilador sin ellos (esbuild/`tsx`) rompería el DI: por eso el arranque real se comprueba sobre el JS compilado, no solo en Vitest. |
+| Tests | **Vitest 4**, sin plugin SWC | Funciona con decoradores según la plantilla oficial; verificado con un e2e que arranca la app real. |
+| Cliente Prisma | Generador `prisma-client` (emite TypeScript dentro del proyecto) | Al compilar con el resto, no hay diferencia de formato. Nota: Prisma 7.10 también admite `moduleFormat = "cjs"`; no hace falta. |
+| Zod | Zod 4 con capa propia (~100 líneas) en lugar de `nestjs-zod` | `nestjs-zod@5.5.0` declara peers solo hasta Nest 11 y `@nestjs/swagger` ≤ 11. Zod 4 ya trae `z.toJSONSchema`, así que la capa propia es pequeña y no depende de un paquete rezagado. Se revisa si `nestjs-zod` publica soporte para 12. |
+| Alias de rutas | No; imports relativos | Con ESM el compilador no los rescribe y evita depender de plugins de resolución. La frontera entre módulos la impone `dependency-cruiser`, no la ruta. |
+
+Rutas: negocio bajo `/api/v1/...`; `GET /health/live` fuera del prefijo y de la versión, y exento de rate limit.
+
+### Formato de respuesta (implementado en `platform/http`)
+
+```jsonc
+// éxito                      // lista paginada                                   // error
+{ "data": { … } }             { "data": [ … ], "meta": { "page", "pageSize",     { "error": { "code": "…", "message": "…",
+                                "total", "totalPages" } }                             "details"?: …, "traceId": "…" } }
+```
+
+`traceId` = `x-request-id` (el entrante si es válido, o uno generado); vuelve también en la cabecera. Un error
+desconocido responde `INTERNAL` (500) **sin** mensaje ni stack; se registra en el servidor con su `traceId`.
+

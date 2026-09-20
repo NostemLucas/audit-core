@@ -1,4 +1,4 @@
-import { defineErrors } from '../../platform/errors'
+import { defineErrors } from '../../platform/errors/index.js'
 
 /**
  * No hay errores de "usuario desactivado" ni de "último administrador": la activación de cuentas la decide

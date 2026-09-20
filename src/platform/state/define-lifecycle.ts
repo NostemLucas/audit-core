@@ -1,4 +1,4 @@
-import { DomainError, type ErrorDef } from '../errors'
+import { DomainError, type ErrorDef } from '../errors/index.js'
 
 /**
  * Ciclo de vida de una entidad: un grafo de estados con etiquetas de capacidad. Ver docs/03-state-standard.md.

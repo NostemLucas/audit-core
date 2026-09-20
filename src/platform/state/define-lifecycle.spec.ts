@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DomainError, defineErrors } from '../errors'
-import { defineLifecycle } from './define-lifecycle'
+import { DomainError, defineErrors } from '../errors/index.js'
+import { defineLifecycle } from './define-lifecycle.js'
 
 const Errors = defineErrors({
   DEMO_INVALID_STATE: { http: 409, message: 'Estado inválido' },

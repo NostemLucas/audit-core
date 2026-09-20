@@ -1,4 +1,4 @@
-import { defineErrors } from '../../../platform/errors'
+import { defineErrors } from '../../../platform/errors/index.js'
 
 export const AuditErrors = defineErrors({
   // ── Auditoría ──────────────────────────────────────────────────────────────

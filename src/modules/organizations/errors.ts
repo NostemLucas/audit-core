@@ -1,4 +1,4 @@
-import { defineErrors } from '../../platform/errors'
+import { defineErrors } from '../../platform/errors/index.js'
 
 export const OrganizationErrors = defineErrors({
   ORGANIZATION_NOT_FOUND: { http: 404, message: 'Organización no encontrada' },

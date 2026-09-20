@@ -1,4 +1,4 @@
-export { defineErrors, errorRegistry } from './define-errors'
-export type { ErrorDef, ErrorSpec, HttpStatus } from './define-errors'
-export { DomainError } from './domain-error'
-export { PlatformErrors } from './platform.errors'
+export { defineErrors, errorRegistry } from './define-errors.js'
+export type { ErrorDef, ErrorSpec, HttpStatus } from './define-errors.js'
+export { DomainError } from './domain-error.js'
+export { PlatformErrors } from './platform.errors.js'

@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { defineErrors, errorRegistry } from '../src/platform/errors'
-import '../src/app-errors'
+import { defineErrors, errorRegistry } from '../src/platform/errors/index.js'
+import '../src/app-errors.js'
 
 /** Nombres de restricciones reales, leídos de las migraciones (la fuente de verdad de la BD). */
 function loadConstraints() {
-  const dir = join(__dirname, '..', 'prisma', 'migrations')
+  const dir = join(import.meta.dirname, '..', 'prisma', 'migrations')
   const sql = readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => readFileSync(join(dir, d.name, 'migration.sql'), 'utf8'))

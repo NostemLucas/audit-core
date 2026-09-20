@@ -208,7 +208,7 @@ Reglas:
 | Logging | `nestjs-pino`: JSON, `redact` de secretos, `requestId` vía CLS, pretty solo en dev |
 | Errores | Errores de dominio con `code` estable + un filtro → `{ error: { code, message, details?, traceId } }` |
 | Éxito | `{ data, meta? }`; solo DTOs de respuesta con mapper, nunca entidades |
-| Validación / OpenAPI | Zod (`nestjs-zod`): un esquema da validación, tipos y documentación |
+| Validación / OpenAPI | Zod 4: un esquema da validación, tipos y documentación. Capa delgada propia (pipe + serializador + `z.toJSONSchema`): `nestjs-zod` no declara soporte para Nest 12 (ver `02` §9) |
 | Transacciones | `@nestjs-cls/transactional` + adaptador Prisma |
 | Campos de auditoría | Prisma client extension (`createdById/updatedById`) |
 | Autorización | CASL + test que recorre todas las rutas |

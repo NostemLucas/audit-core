@@ -1,4 +1,4 @@
-import type { ErrorDef } from './define-errors'
+import type { ErrorDef } from './define-errors.js'
 
 /**
  * Único tipo de error de negocio. Se lanza con una definición del catálogo:

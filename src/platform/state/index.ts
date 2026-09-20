@@ -1,2 +1,2 @@
-export { defineLifecycle } from './define-lifecycle'
-export type { Lifecycle, LifecycleSpec, StateSpec } from './define-lifecycle'
+export { defineLifecycle } from './define-lifecycle.js'
+export type { Lifecycle, LifecycleSpec, StateSpec } from './define-lifecycle.js'
