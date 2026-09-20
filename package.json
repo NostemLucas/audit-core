@@ -1,0 +1,25 @@
+{
+  "name": "audit-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Backend de auditorías de seguridad y cumplimiento",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "prisma": "7.10.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  },
+  "dependencies": {
+    "@prisma/client": "7.10.0"
+  },
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate"
+  }
+}

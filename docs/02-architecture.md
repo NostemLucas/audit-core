@@ -1,0 +1,234 @@
+# Audit Core — Arquitectura y reglas (borrador v1)
+
+Complementa `01-domain-model.md`. Objetivo: que cada cosa se defina **en un solo lugar**, que las reglas de
+cada módulo sean explícitas, y que agregar funcionalidad tenga una receta corta y predecible.
+
+## 1. Principio rector
+
+> **Cada hecho del sistema tiene una única fuente. Todo lo demás se deriva de ella o falla en compilación,
+> en un test o en el CI.**
+
+Si al agregar un campo, una regla o un permiso hay que editar 3 o más archivos "parecidos", el diseño está mal.
+Este documento define la fuente de cada cosa (§3) y cómo se impone (§7).
+
+## 2. Estructura
+
+```
+src/
+  platform/        infraestructura transversal, SIN lógica de negocio
+    config/ auth/ authz/ db/ errors/ events/ http/ logging/ storage/ health/
+  shared/          tipos puros compartidos: enums.ts, labels.es.ts, limits.ts
+  modules/
+    identity/  organizations/  library/  audits/  reporting/  dashboard/
+prisma/
+  schema.prisma    ← fuente de la forma de los datos
+  migrations/
+```
+
+Cada módulo expone **solo** su `index.ts` (API pública). Nadie importa archivos internos de otro módulo.
+
+### Grafo de dependencias (sin ciclos, impuesto por CI)
+
+```
+platform, shared            → (nada del proyecto)
+identity, organizations,
+library                     → platform, shared
+audits                      → + identity, organizations, library   (solo por su index.ts)
+reporting                   → + audits
+dashboard                   → lectura de todo (Tier C)
+```
+
+`reporting` y `dashboard` no los importa nadie.
+
+**Integridad referencial la garantiza la BD, no otro módulo.** "No se puede eliminar una organización con
+auditorías" o "una plantilla en uso" se resuelve con FK `onDelete: Restrict`; un único traductor de errores de
+Prisma convierte `P2003` en el código de error del catálogo. Así `organizations` y `library` no dependen de
+`audits`.
+
+## 3. Única fuente de verdad
+
+| Hecho | Única fuente | Se deriva / se valida contra |
+|-------|--------------|------------------------------|
+| Tablas, columnas, relaciones, **enums** | `prisma/schema.prisma` | Tipos de Prisma; `shared/enums.ts` solo los reexporta |
+| Longitud y formato de campos de texto | `shared/limits.ts` (columnas `String` sin `VarChar`) | Esquemas Zod, OpenAPI |
+| Contrato HTTP (entrada y salida) | `<recurso>.schemas.ts` (Zod) | Validación, serialización de respuesta, tipos TS, OpenAPI |
+| Ciclo de vida (estados, transiciones, capacidades) | `*.lifecycle.ts` con `defineLifecycle` — ver [`03-state-standard.md`](./03-state-standard.md) | `allowedActions` del API, validación en use-cases |
+| Permisos globales por rol | `platform/authz/abilities.ts` (CASL) | Guard, `packRules` para el frontend, test de rutas |
+| Permisos contextuales (membresía en la auditoría) | `audits/domain/audit-policy.ts` | Use-cases, `allowedActions` |
+| Fórmulas (score, peso, brecha) | `audits/domain/scoring.ts` | Use-cases, dashboard, informes |
+| Errores | `errors.ts` de cada módulo (registrados en un catálogo) | Filtro HTTP, OpenAPI, tests |
+| Eventos y su payload | `events.ts` del módulo (Zod) | `audit_events.payload`, mensajes |
+| Textos en español | `shared/labels.es.ts`, `<modulo>/messages.es.ts` | Informes, mensajes de eventos |
+| Rutas de Nextcloud | `audits/domain/storage-paths.ts` | Provisioning, evidencias, informes |
+| Variables de entorno | `platform/config/env.ts` | Todo el proyecto |
+| Paginación, orden, búsqueda | `platform/http/list-query.ts` | Todos los listados |
+| Traducción de errores de Prisma | `platform/db/prisma-errors.ts` | Filtro HTTP |
+
+Consecuencias concretas:
+
+- **El frontend no reimplementa reglas.** Consume `abilities` (reglas CASL empaquetadas) y, por recurso,
+  `allowedActions: ['submit', 'approve', …]` calculado con el ciclo de vida + la policy. Si cambia una
+  regla, se cambia en un lugar.
+- **Las longitudes solo viven en Zod.** Las columnas de texto son `text` (en Postgres `varchar(n)` no aporta
+  rendimiento). No hay que sincronizar `@db.VarChar(200)` con `@MaxLength(200)` con constantes de entidad.
+- **La salida se valida con el mismo esquema que la documenta.** Un interceptor (`ZodSerializerInterceptor`)
+  hace `schema.parse(resultado)`: recorta campos no declarados (adiós fugas de `createdBy`) y garantiza que la
+  respuesta real coincide con el OpenAPI.
+- **`if (x.status === …)` solo existe dentro del `*.lifecycle.ts`.** El resto pregunta `lifecycle.can(...)` / `lifecycle.has(...)`.
+- **La score global se calcula solo en TypeScript** (`scoring.ts`). El SQL nunca reimplementa la fórmula; los
+  dashboards usan `audits.finalScore` (cerradas) o llaman a `scoring.ts` (en curso).
+
+### Errores: una definición lo dice todo
+
+```ts
+ORGANIZATION_IN_USE: {
+  http: 409,
+  message: 'La organización tiene auditorías o activos; desactívala en lugar de eliminarla',
+  onForeignKeyDelete: ['audits_organizationId_fkey', 'assets_organizationId_fkey'],
+}
+```
+
+Esa entrada es la única fuente del código, el HTTP, el mensaje **y** la traducción del error de la BD. Reglas
+descubiertas al probar contra Postgres:
+
+- `onForeignKeyDelete` solo aplica a **borrados**. Un fallo de FK al insertar significa "referencia inválida"; lo
+  valida el dominio con un error específico y, si se le escapa, sale `REFERENCE_INVALID`. La misma FK puede fallar
+  por causas distintas según la operación.
+- Postgres informa **la primera FK que falla**, no la más relevante (borrar una organización con auditorías y
+  activos reportó `assets_…`). Por eso un error agrupa varias restricciones.
+- Un test compara cada nombre de restricción referenciado contra la migración: si se renombra una columna y no
+  el error, el CI falla (verificado con una mutación).
+
+## 4. Tres tiers de módulo (cada módulo declara el suyo)
+
+| Tier | Cuándo | Módulos | Estructura permitida |
+|------|--------|---------|----------------------|
+| **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits`, `library/templates` | `domain/` + `application/` + `infrastructure/` + `presentation/` |
+| **B · CRUD** | Sin reglas más allá de validar y guardar | `identity`, `organizations` (+`assets`), `library/scales`, `audits/scope`, `audits/team`, `audits/evidence` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
+| **C · Lectura** | Agregaciones, listados, informes; nunca escribe | `dashboard`, `reporting`, listados de `audits` | *query services* con Prisma directo. Sin dominio |
+
+Reglas por tier:
+
+**Tier A**
+- `domain/` es TypeScript puro: entidades, ciclos de vida, `scoring`, `policy`, eventos, errores. No importa Nest ni
+  Prisma (salvo los enums vía `shared/enums.ts`). No hace I/O.
+- Los *ports* (interfaces) se declaran en `application/ports/`; los adaptadores viven en `infrastructure/`.
+- Solo hay port para: repositorios de agregados (`Audit`, `Evaluation`, `Template`), `FileStoragePort`, `Clock`.
+- Un único **mapper** por agregado (`toDomain` / `toPersistence`) en `infrastructure/`. Es el único punto de
+  traducción entre fila y dominio.
+
+**Tier B**
+- Sin repositorio ni port: el use-case llama a Prisma directamente. Siempre hay use-case, aunque sea corto,
+  porque ahí viven la transacción, el evento y la comprobación de permisos; el controller nunca toca Prisma.
+- Los esquemas de entrada se **derivan** del esquema base (`.pick`, `.partial`, `.omit`), no se reescriben.
+
+**Tier C**
+- Solo lectura. Puede unir tablas de varios módulos con Prisma/SQL (es el único tier con esa licencia).
+- No contiene reglas de negocio: si necesita una fórmula, llama a `scoring.ts` vía `audits/index.ts`.
+
+### Anatomía de `audits` (el módulo grande)
+
+```
+audits/
+  domain/                 ← compartido dentro del módulo, puro
+    audit.lifecycle.ts   evaluation.lifecycle.ts   scoring.ts   audit-policy.ts
+    events.ts          errors.ts               storage-paths.ts
+  infrastructure/         ← PrismaAuditRepository, PrismaEvaluationRepository, mappers, StorageAdapter
+  lifecycle/  scope/  team/  evaluation/  evidence/     ← cortes verticales
+     <corte>.controller.ts
+     <corte>.schemas.ts
+     use-cases/<verbo>-<sustantivo>.use-case.ts
+  audits.module.ts   index.ts
+```
+
+Regla: **los cortes no se importan entre sí.** Lo que comparten está en `domain/` (puro) o `infrastructure/`. Esto
+sustituye al `_shared/` actual (7.1k líneas de todo mezclado): aquí `domain/` solo admite código puro y sin I/O.
+
+## 5. Anatomía de una operación (y cuántos archivos toca)
+
+Una operación = 1 use-case + 1 método de controller + sus esquemas (en el `.schemas.ts` del recurso).
+
+```ts
+@Injectable()
+export class ApproveEvaluationUseCase {
+  @Transactional()
+  async execute(actor: Actor, id: string, input: ApproveInput): Promise<EvaluationView> {
+    const evaluation = await this.evaluations.getOrFail(id)      // port (Tier A)
+    this.policy.assert(actor, membership, 'approve', evaluation)  // audit-policy.ts
+    evaluation.approve(actor, input.comments)                     // dominio: usa el ciclo de vida
+    await this.evaluations.save(evaluation)
+    await this.events.publish(new EvaluationApproved({ ... }))    // bus: escribe audit_events
+    return toView(evaluation)
+  }
+}
+```
+
+Convenciones fijas:
+- `execute(actor, …)`. El actor se pasa **explícito**; el dominio nunca lee CLS. CLS solo lo usan la extensión
+  de Prisma (`createdById/updatedById`) y el logger (`requestId`).
+- Toda operación que escribe lleva `@Transactional()`. Los eventos se publican dentro de la transacción.
+- Los errores se lanzan como `new DomainError('EVALUATION_NOT_EDITABLE', { … })`. No hay una clase por error,
+  ni `HttpException` en dominio.
+- Identificadores en inglés; el español solo en `labels.es.ts` y `messages.es.ts`.
+- Archivos de ~300 líneas como techo (lint `max-lines`). Un servicio de 900 líneas indica que mezcla
+  responsabilidades.
+
+## 6. Recetas: qué se toca al agregar cada cosa
+
+| Quiero agregar… | Archivos | Detalle |
+|-----------------|----------|---------|
+| **Un campo a un recurso simple (Tier B)** | **2** | `schema.prisma` (+ migración generada) y el esquema base en `<recurso>.schemas.ts`. Los esquemas de crear/editar/respuesta se derivan. |
+| **Un campo a un agregado (Tier A)** | 4 | `schema.prisma`, `schemas.ts`, entidad de dominio y mapper. Es el costo de tener dominio; el mapper es el único punto de traducción. |
+| **Un endpoint** | 3 | use-case, método en el controller, esquemas. El permiso se declara en el decorador `@Can('accion', 'Sujeto')` del método. |
+| **Un permiso nuevo** | 1–2 | `abilities.ts`; si es contextual, `audit-policy.ts`. El test de rutas falla si un endpoint no declara permiso. |
+| **Un error** | 1 | `errors.ts` del módulo: `{ code, http, message }`. Filtro y OpenAPI lo toman del catálogo. |
+| **Un evento** | 2 | `events.ts` (tipo + esquema del payload) y `messages.es.ts` (texto). TypeScript exige el mensaje: el mapa es exhaustivo. Publicarlo en el use-case. |
+| **Una notificación (a futuro)** | 1 handler + 1 tabla | Un handler suscrito al bus. No se toca ningún use-case. |
+| **Un estado o transición** | 1 (+ enum si es estado nuevo) | El `.lifecycle.ts`. `allowedActions`, validaciones y el frontend se derivan. Receta completa en `03` §5. |
+| **Un enum nuevo o valor** | 1–2 | `schema.prisma`; `labels.es.ts` falla en compilación hasta que se traduzca. |
+| **Una regla de cálculo** | 1 | `scoring.ts` (+ su test). |
+| **Un módulo nuevo** | — | Elegir tier (§4), copiar su plantilla, declarar dependencias permitidas en `.dependency-cruiser.cjs`. |
+
+## 7. Cómo se impone (no depende de disciplina)
+
+| Regla | Mecanismo |
+|-------|-----------|
+| `domain/` no importa Nest ni Prisma (salvo enums) | `dependency-cruiser` en CI |
+| Un módulo solo importa el `index.ts` de otro; sin ciclos; respeta el grafo de §2 | `dependency-cruiser` |
+| `status ===` fuera de `*.lifecycle.ts` | ESLint `no-restricted-syntax` sobre comparaciones con `.status` |
+| Prohibido `process.env` fuera de `config/env.ts` | ESLint `no-restricted-properties` |
+| El cliente generado de Prisma (`src/platform/db/generated`) solo lo importan `platform/db`, `infrastructure/` y `shared/enums.ts` | `dependency-cruiser` |
+| Prohibido `any`, `@ts-ignore` sin motivo | TS `strict` + ESLint type-checked |
+| Toda ruta declara `@Public`, `@Can` o `@NoAbilityRequired` | Test que recorre las rutas registradas |
+| Códigos de error únicos y todos en el catálogo | Test sobre el registro |
+| Mapas `Record<Enum, …>` completos | Compilación |
+| El contrato HTTP no rompe sin querer | Test *snapshot* del OpenAPI (un cambio debe ser deliberado) |
+| Código sin usar, exportaciones huérfanas | `knip` en CI |
+| Archivos > 300 líneas | ESLint `max-lines` |
+| Transacción + eventos correctos | Tests de integración con Postgres real (testcontainers) |
+
+### Estrategia de pruebas
+
+- **Dominio** (ciclos de vida, scoring, policy): unitarias puras, sin BD, muy rápidas. Aquí está la mayor cobertura.
+- **Use-cases**: integración con Postgres real; incluye las condiciones de carrera (`Promise.all`) donde importen.
+- **Contrato**: rutas ↔ permisos, catálogo de errores, snapshot OpenAPI, arquitectura.
+- Sin mocks de Prisma: se prueba contra la base real o no se prueba el acceso a datos.
+
+## 8. Extensibilidad: cómo crece sin romper
+
+- **Eventos de dominio síncronos dentro de la transacción** (`platform/events`): hoy un handler escribe
+  `audit_events`. Notificaciones, feed global, webhooks o métricas son handlers nuevos; los use-cases no cambian.
+- **API versionada** (`/api/v1`); un cambio incompatible es una versión nueva, no una edición.
+- **Migraciones aditivas** (expandir → migrar → contraer); nada de renombrar columnas en un solo paso.
+- **Puertos para lo externo**: si Nextcloud se cambia por S3, se reescribe un adaptador.
+- **Sin colas ni Redis** mientras los informes sean síncronos; si se necesitan, entran detrás de un port
+  (`ReportQueuePort`) sin tocar los use-cases.
+
+## 9. Definición de terminado (checklist de PR)
+
+- [ ] Cada dato nuevo tiene **una** fuente (§3); nada se copia a mano en otro archivo.
+- [ ] Endpoint con permiso declarado y esquema de respuesta.
+- [ ] Errores en el catálogo, no como strings sueltos.
+- [ ] Escrituras en `@Transactional()`; evento publicado si hay algo que historiar.
+- [ ] Prueba de dominio para la regla y de integración para la operación.
+- [ ] `lint`, `dependency-cruiser`, `knip`, tests y snapshot OpenAPI en verde.

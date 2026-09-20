@@ -1,0 +1,10 @@
+/**
+ * Raíz de composición del catálogo de errores. Importar este archivo registra TODOS los errores del sistema
+ * (los módulos registran los suyos al cargarse). El arranque de la app y los tests lo importan para que el
+ * traductor de errores de Prisma y el OpenAPI vean el catálogo completo.
+ */
+export { PlatformErrors } from './platform/errors'
+export { IdentityErrors } from './modules/identity/errors'
+export { OrganizationErrors } from './modules/organizations/errors'
+export { LibraryErrors } from './modules/library/errors'
+export { AuditErrors } from './modules/audits/domain/errors'

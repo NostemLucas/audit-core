@@ -1,0 +1,53 @@
+import { defineErrors } from '../../../platform/errors'
+
+export const AuditErrors = defineErrors({
+  // ── Auditoría ──────────────────────────────────────────────────────────────
+  AUDIT_NOT_FOUND: { http: 404, message: 'Auditoría no encontrada' },
+  /** Transición que el ciclo de vida de la auditoría no permite desde el estado actual (docs/03). */
+  AUDIT_INVALID_STATE: { http: 409, message: 'La auditoría no admite esa operación en su estado actual' },
+  /** Capacidad `editable` (docs/03): solo una auditoría en borrador se edita o se elimina. */
+  AUDIT_NOT_EDITABLE: { http: 409, message: 'Solo una auditoría en borrador puede modificarse o eliminarse' },
+  AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un miembro para iniciarse' },
+  AUDIT_HAS_PENDING_EVALUATIONS: { http: 422, message: 'Hay evaluaciones sin aprobar; no se puede cerrar la auditoría' },
+  AUDIT_CANNOT_FOLLOW_UP: { http: 409, message: 'Solo una auditoría cerrada admite seguimiento' },
+  /** Permiso contextual: el actor no es miembro (con el rol necesario) de esta auditoría. */
+  AUDIT_ACCESS_DENIED: { http: 403, message: 'No participas en esta auditoría con el rol necesario' },
+
+  // ── Alcance ────────────────────────────────────────────────────────────────
+  AUDIT_SCOPE_EMPTY: { http: 422, message: 'El alcance por activos requiere al menos un activo' },
+  AUDIT_ASSET_ORGANIZATION_MISMATCH: { http: 422, message: 'Un activo del alcance no pertenece a la organización auditada' },
+
+  // ── Equipo ─────────────────────────────────────────────────────────────────
+  MEMBER_NOT_FOUND: { http: 404, message: 'Miembro no encontrado en la auditoría' },
+  MEMBER_ALREADY_ASSIGNED: {
+    http: 409,
+    message: 'El usuario ya es miembro de la auditoría',
+    onUnique: 'audit_members_auditId_userId_key',
+  },
+  /** El usuario no tiene un rol de sistema que le permita participar en auditorías. */
+  MEMBER_USER_INELIGIBLE: { http: 422, message: 'El usuario no tiene un rol que le permita participar en auditorías' },
+
+  // ── Evaluación ─────────────────────────────────────────────────────────────
+  EVALUATION_NOT_FOUND: { http: 404, message: 'Evaluación no encontrada' },
+  /** Transición que el ciclo de vida de la evaluación no permite desde el estado actual (docs/03). */
+  EVALUATION_INVALID_STATE: { http: 409, message: 'La evaluación no admite esa operación en su estado actual' },
+  /** Capacidad `editable`: solo en IN_PROGRESS o RETURNED se modifican nivel, hallazgos y notas. */
+  EVALUATION_NOT_EDITABLE: { http: 409, message: 'La evaluación no puede modificarse en su estado actual' },
+  EVALUATION_NOT_ASSIGNED: { http: 403, message: 'La evaluación no está asignada a este usuario' },
+  /** Completar exige nivel alcanzado y score (o marcarla no aplicable). */
+  EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para completar la evaluación' },
+  EVALUATION_LEVEL_NOT_IN_SCALE: { http: 422, message: 'El nivel no pertenece a la escala de la auditoría' },
+  NOT_APPLICABLE_REASON_REQUIRED: { http: 422, message: 'Marcar como no aplicable requiere un motivo' },
+  /** Los pesos de una auditoría deben sumar 100. `details.sum` trae el total recibido. */
+  WEIGHTS_SUM_INVALID: { http: 422, message: 'Los pesos deben sumar 100' },
+  REVIEW_SNAPSHOT_NOT_FOUND: { http: 404, message: 'No existe esa ronda en el historial de la evaluación' },
+
+  // ── Evidencia ──────────────────────────────────────────────────────────────
+  EVIDENCE_NOT_FOUND: { http: 404, message: 'Evidencia no encontrada' },
+  /** No se adjunta ni se elimina evidencia de una evaluación cerrada (aprobada) o de una ronda anterior. */
+  EVIDENCE_LOCKED: { http: 409, message: 'La evidencia de esta evaluación no admite cambios en su estado actual' },
+
+  // ── Informes ───────────────────────────────────────────────────────────────
+  REPORT_NOT_FOUND: { http: 404, message: 'Informe no encontrado' },
+  REPORT_GENERATION_FAILED: { http: 502, message: 'No se pudo generar el informe' },
+})
