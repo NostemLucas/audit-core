@@ -21,6 +21,11 @@ Lo que contiene una hoja evaluable: el **título** es solo el nombre del control
 real ("Se debe definir un conjunto de políticas… aprobado por la dirección, publicado y comunicado…"). En ASFI una
 sola hoja llega a listar cinco aspectos a verificar en una línea. Los agrupadores llevan título y, a veces, el objetivo.
 
+> **Aclaración posterior (corrige una conclusión de este análisis):** las plantillas sembradas eran de demostración. En las
+> plantillas reales **la hoja evaluable no lleva descripción**: su **título es el criterio** ("existe control de backups"),
+> y la descripción es solo el texto explicativo de la norma, que aparece sobre todo en los agrupadores. Por eso no se exige
+> descripción en las hojas (ver §4.1, puntos 4 y 8).
+
 Formato de importación (Excel): columnas `código`, `título`, `descripción`, `código padre`, `guía del auditor`. La
 jerarquía se reconstruye con `código padre`, así que **el `code` es a la vez etiqueta visible, clave técnica del
 archivo, criterio de orden y, como se ve abajo, criterio de agrupación**. Son cuatro trabajos para un dato arbitrario.
@@ -81,7 +86,8 @@ una norma completa son cientos o pocos miles de nodos, y se carga entera por pla
 3. **Sin niveles definidos.** El árbol tiene la profundidad que cada rama necesite (de 2 a 4 niveles, y una rama puede ser
    más profunda que otra). No hay etiquetas ni prefijos por nivel.
 4. **Lo que se evalúa y se pondera es el último nodo** (la hoja): el criterio/actividad, que es la pregunta ("¿la empresa
-   tiene control de backups?"). Un nodo con hijos es un agrupador y no se evalúa. Si una pregunta tuviera sub-preguntas,
+   tiene control de backups?"). **El criterio es el `title` de la hoja.** `description` (texto explicativo de la norma) y
+   `guidance` (ayuda para el auditor) son opcionales en cualquier nodo. Un nodo con hijos es un agrupador y no se evalúa. Si una pregunta tuviera sub-preguntas,
    la pregunta original pasa a ser el primer hijo.
 5. **Solo el primer nivel se mide.** Los nodos raíz son los "dominios" (en ISO 27001, `A.5`, `A.6`…) y sirven para las
    gráficas de araña y los subtotales del informe. Todo lo que hay debajo son criterios/actividades organizados para leer.
@@ -92,8 +98,13 @@ una norma completa son cientos o pocos miles de nodos, y se carga entera por pla
 7. **Importación con una columna `nivel`** y las filas en orden de lectura: el padre de una fila es la fila anterior de nivel
    menor. Es lo único que no depende de códigos, que aquí son arbitrarios. Se sigue aceptando `código padre` (archivos
    existentes) resolviéndolo solo dentro del archivo. La exportación escribe el mismo formato (ida y vuelta estable).
-8. **Publicar exige criterio:** toda hoja debe tener descripción (`TEMPLATE_INCOMPLETE`, con la lista de los que faltan) y la
-   plantilla al menos un control. En los datos sembrados ninguna de las 33 hojas carece de ella.
+8. **Qué exige publicar** (`TEMPLATE_EMPTY` / `TEMPLATE_INVALID_STRUCTURE`, con la lista de nodos que fallan): la plantilla tiene
+   al menos una hoja; todo nodo tiene título; y **todo nodo raíz tiene hijos** (un dominio es un agrupador). Una plantilla plana
+   (un raíz que es a la vez criterio) no se publica: hay que agruparla, porque el dominio es siempre el primer nivel y de
+   otro modo no existiría para ese criterio. **No se exige descripción** en ningún nodo.
+9. **Para quien audita, el árbol es contexto.** El auditor trabaja con la lista plana de criterios (las hojas), cada uno con
+   su ruta (dominio › objetivo) para no ser ambiguo entre dominios. El árbol se mantiene poco: la plantilla publicada es
+   inmutable, se importa con la columna `nivel`, y se corrige subiendo o bajando elementos.
 
 ### 4.2 Lo que se propuso y se DESCARTÓ (para no reabrirlo)
 
@@ -113,14 +124,13 @@ una norma completa son cientos o pocos miles de nodos, y se carga entera por pla
 | D-C. Referencia | **Manual**, opcional, sin lógica encima. |
 | D-D. Material real | Pendiente: las plantillas de ISO y ASFI reales servirían para probar la importación. |
 
-Supuesto a confirmar: el **dominio es siempre el primer nivel**. Si alguna norma tuviera un nodo paraguas único (p. ej.
-"Anexo A") con los dominios debajo, el radar tendría un solo eje; en ese caso se agregaría una profundidad de gráfica
-por plantilla (aditivo, sin migración de datos). No se construye hasta que exista el caso.
+Supuesto **confirmado**: el dominio es siempre el primer nivel. No existe una norma con un único nodo paraguas y, si la
+hubiera, se separa (sus hijos pasan a ser el primer nivel). No hace falta una profundidad de gráfica por plantilla.
 
 ## 5. Qué cambia en el modelo
 
 - `controls`: `code` → `reference` (nullable, sin `UNIQUE`); resto igual.
-- Se elimina `CONTROL_CODE_TAKEN`; se agrega `TEMPLATE_INCOMPLETE` (422).
+- Se elimina `CONTROL_CODE_TAKEN`; se agrega `TEMPLATE_INVALID_STRUCTURE` (422). `description` queda opcional (ya lo es).
 - Nuevo `library/domain/control-tree.ts` (pura): dominio y ruta de cada hoja, con su suite de pruebas usando los códigos que
   hoy fallan (COBIT, NIST, ASFI, numeraciones sin puntos) y ramas de distinta profundidad.
 - Importación/exportación por `nivel`, con ida y vuelta probada.
