@@ -136,8 +136,8 @@ promedio simple y no ponderado.
 
 **Propuesta (pendiente de confirmar)** — una sola definición en `audits/domain/scoring.ts`, usada por gráficos, análisis de
 brechas e informes:
-- Nivel esperado y nivel alcanzado de un **dominio** = promedio **ponderado por el peso** de sus hojas, excluyendo las no
-  aplicables y las sin evaluar (el mismo criterio que ya usa el score).
+- Nivel esperado y nivel alcanzado de un **dominio** = promedio **simple** de los niveles de sus hojas (evaluadas y aplicables). Ya
+  no hay pesos: ver `05` §6, que reemplaza a la propuesta original de un promedio ponderado.
 - **Sin valor por defecto silencioso.** Antes, un criterio sin nivel esperado se puntuaba contra el máximo de la escala: si se
   olvidaba fijar 10 de 50 controles, esos diez se medían contra 5 y bajaban el resultado sin avisar. En su lugar, **iniciar la
   auditoría exige que todo criterio tenga nivel esperado** (`AUDIT_EXPECTED_LEVELS_MISSING`, 422, con la lista de los que

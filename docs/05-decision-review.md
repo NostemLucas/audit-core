@@ -134,3 +134,33 @@ Formato sugerido para los datos (una fila por criterio; sirve un Excel o un CSV)
 | Se elimina `evaluations.score` (se calcula) | Marcador de criterio crítico / cuenta de incumplimientos (§1.2b) |
 | Promedio ponderado por dominio como definición única | Clasificación de hallazgos y evidencia obligatoria (§1.2c) |
 | Nivel esperado por criterio; obligatorio para iniciar | Seguimiento: todas las hojas o solo las fallidas (#6) |
+
+## 6. Actualización tras la respuesta del usuario (decisión provisional, a validar con una auditoría real)
+
+Lo que se describió como práctica de sus auditores reemplaza a la fórmula heredada y resuelve buena parte de §1:
+
+| Punto | Resolución |
+|---|---|
+| Cómo se mide un dominio (§1.2a) | **Dos promedios en niveles**, no un porcentaje: nivel esperado promedio y nivel alcanzado promedio de las hojas del dominio, y su brecha. Al comparar niveles con niveles en la misma escala, el punto cero de la escala deja de importar. Un porcentaje, si hiciera falta, sería derivado (`Σ min(A,E) / Σ E`) y no se guarda. |
+| Un incumplimiento (§1.2b) | Es una **no conformidad de esa hoja** (alcanzado < esperado), **no** del dominio. No hay marcador de criterio crítico ni "puerta". El informe lista y cuenta las hojas por debajo del esperado, por dominio (dato derivado). |
+| Pesos (§1.1) | **Se eliminan.** Cada hoja cuenta igual y su influencia sale de sus niveles; lo no aplicable se excluye. Se van `evaluations.weight`, la edición masiva de pesos y `WEIGHTS_SUM_INVALID`. Reversible: una columna con valor 1 por defecto, sin migrar datos. |
+| Puntaje guardado (§1.1) | **Se elimina** `evaluations.score` y, sin ponderación, también `audits.finalScore`: todo se calcula desde los niveles. |
+| Clasificación de hallazgos, evidencia obligatoria (§1.2c) | Sin decidir: "depende de lo que se quiere revisar". No se construyen ahora. |
+
+**Reglas de cálculo propuestas** (`audits/domain/scoring.ts`, única fuente):
+1. Nivel esperado y alcanzado de un dominio o de la auditoría = **promedio simple** de los niveles de sus hojas.
+2. Ambos promedios se calculan sobre **las mismas hojas**: las evaluadas y aplicables (no aplicables excluidas), para que sean
+   comparables. El avance de una auditoría en curso se muestra aparte.
+3. El general de la auditoría es el promedio de **todas las hojas** (un dominio con más criterios influye más). *Pendiente de
+   confirmar frente al promedio de promedios por dominio.*
+4. La brecha de una hoja es `alcanzado − esperado`; una hoja con brecha negativa es una no conformidad.
+
+**Consecuencias que hay que atender:**
+- **Los resultados de una auditoría cerrada deben ser reproducibles.** Sin instantánea guardada, dependen de los valores de los
+  niveles de la escala: se debe **impedir editar el `value` de un nivel** de una escala ya usada por alguna auditoría (hoy solo se
+  impide borrarlo). Error nuevo: `SCALE_LEVEL_IN_USE` también para la edición del valor.
+- **Un seguimiento (y una auditoría parcial) elige qué criterios incluye**, por defecto los que no cumplieron. Como las
+  evaluaciones son una por (auditoría, hoja), basta con crear filas solo para los criterios incluidos. Pendiente de confirmar.
+- `01` (modelo de datos) todavía describe `weight`, `score` y `finalScore`; se actualizará junto con el schema al empezar la
+  Fase 2, una vez confirmado esto.
+
