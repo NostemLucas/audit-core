@@ -12,7 +12,12 @@ export interface RouteInfo {
 }
 
 const joinPath = (...parts: unknown[]): string =>
-  '/' + parts.flatMap((p) => (Array.isArray(p) ? p : [p])).map((p) => String(p ?? '').replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/')
+  '/' +
+  parts
+    .flatMap((p) => (Array.isArray(p) ? p : [p]))
+    .map((p) => String(p ?? '').replace(/^\/+|\/+$/g, ''))
+    .filter(Boolean)
+    .join('/')
 
 /** Recorre todas las rutas registradas y devuelve lo que cada una declara. Lo usan el arranque y los tests. */
 export function listRoutes(discovery: DiscoveryService, scanner: MetadataScanner, reflector: Reflector): RouteInfo[] {

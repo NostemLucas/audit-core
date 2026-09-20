@@ -60,7 +60,12 @@ describe('defineLifecycle', () => {
 
   it('genera el diagrama Mermaid', () => {
     expect(lifecycle.toMermaid()).toBe(
-      ['stateDiagram-v2', '  DRAFT --> PUBLISHED: PUBLISH', '  PUBLISHED --> ARCHIVED: ARCHIVE', '  ARCHIVED --> [*]'].join('\n'),
+      [
+        'stateDiagram-v2',
+        '  DRAFT --> PUBLISHED: PUBLISH',
+        '  PUBLISHED --> ARCHIVED: ARCHIVE',
+        '  ARCHIVED --> [*]',
+      ].join('\n'),
     )
   })
 

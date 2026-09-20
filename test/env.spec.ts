@@ -23,7 +23,12 @@ describe('loadEnv', () => {
   })
 
   it('convierte tipos y separa los orígenes CORS', () => {
-    const env = loadEnv({ ...BASE, PORT: '4000', CORS_ORIGINS: ' https://a.com , https://b.com ,', THROTTLE_LIMIT: '5' })
+    const env = loadEnv({
+      ...BASE,
+      PORT: '4000',
+      CORS_ORIGINS: ' https://a.com , https://b.com ,',
+      THROTTLE_LIMIT: '5',
+    })
     expect(env.PORT).toBe(4000)
     expect(env.CORS_ORIGINS).toEqual(['https://a.com', 'https://b.com'])
     expect(env.THROTTLE_LIMIT).toBe(5)
@@ -51,12 +56,18 @@ describe('loadEnv', () => {
     })
 
     it('el JWKS se deriva del issuer, con o sin barra final', () => {
-      expect(loadEnv({ ...BASE, AUTHENTIK_ISSUER: 'https://a.com/application/o/x/' }).AUTHENTIK_JWKS_URI).toBe('https://a.com/application/o/x/jwks/')
-      expect(loadEnv({ ...BASE, AUTHENTIK_ISSUER: 'https://a.com/application/o/x' }).AUTHENTIK_JWKS_URI).toBe('https://a.com/application/o/x/jwks/')
+      expect(loadEnv({ ...BASE, AUTHENTIK_ISSUER: 'https://a.com/application/o/x/' }).AUTHENTIK_JWKS_URI).toBe(
+        'https://a.com/application/o/x/jwks/',
+      )
+      expect(loadEnv({ ...BASE, AUTHENTIK_ISSUER: 'https://a.com/application/o/x' }).AUTHENTIK_JWKS_URI).toBe(
+        'https://a.com/application/o/x/jwks/',
+      )
     })
 
     it('el JWKS se puede fijar explícitamente', () => {
-      expect(loadEnv({ ...BASE, AUTHENTIK_JWKS_URI: 'https://otro.com/jwks/' }).AUTHENTIK_JWKS_URI).toBe('https://otro.com/jwks/')
+      expect(loadEnv({ ...BASE, AUTHENTIK_JWKS_URI: 'https://otro.com/jwks/' }).AUTHENTIK_JWKS_URI).toBe(
+        'https://otro.com/jwks/',
+      )
     })
   })
 })

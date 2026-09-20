@@ -71,7 +71,9 @@ describe('traducción de errores de la BD (Prisma 7 + adaptador pg, contra Postg
   it('el error traducido NO expone la restricción ni datos de la fila; solo queda en `cause` (log)', async () => {
     await db.organization.create({ data: { name: 'ACME-SECRETO' } })
     const error = (await catchError(db.organization.create({ data: { name: 'ACME-SECRETO' } }))) as DomainError
-    expect(JSON.stringify({ code: error.code, message: error.message, details: error.details })).not.toMatch(/organizations_name_key|ACME-SECRETO/)
+    expect(JSON.stringify({ code: error.code, message: error.message, details: error.details })).not.toMatch(
+      /organizations_name_key|ACME-SECRETO/,
+    )
     expect(error.cause).toBeDefined()
   })
 })

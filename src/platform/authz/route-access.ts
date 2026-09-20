@@ -26,7 +26,9 @@ function declare(access: RouteAccess): Decorator {
     const holder: Target = descriptor?.value ?? target
     if (Reflect.hasOwnMetadata(ROUTE_ACCESS, holder)) {
       const name = key ? String(key) : (target as { name?: string }).name
-      throw new Error(`"${name}" declara acceso más de una vez: solo puede tener uno de @Public, @Can o @NoAbilityRequired`)
+      throw new Error(
+        `"${name}" declara acceso más de una vez: solo puede tener uno de @Public, @Can o @NoAbilityRequired`,
+      )
     }
     Reflect.defineMetadata(ROUTE_ACCESS, access, holder)
   }

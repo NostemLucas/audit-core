@@ -49,7 +49,10 @@ class ItemsController {
   @Responds(ItemView, { kind: 'list' })
   @Get('many')
   many() {
-    return [{ id: ID, name: 'A', createdById: 's' }, { id: ID, name: 'B', createdById: 's' }]
+    return [
+      { id: ID, name: 'A', createdById: 's' },
+      { id: ID, name: 'B', createdById: 's' },
+    ]
   }
 
   @Responds(ItemView, { kind: 'page' })
@@ -113,7 +116,9 @@ describe('validación de entrada (Standard Schema nativo de Nest 12)', () => {
   })
 
   it('rechaza una query inválida', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__items/query?page=0').expect(400)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__items/query?page=0')
+      .expect(400)
     expect(res.body.error.code).toBe('VALIDATION_FAILED')
     expect(res.body.error.details.issues[0].path).toBe('page')
   })
@@ -128,23 +133,37 @@ describe('validación de entrada (Standard Schema nativo de Nest 12)', () => {
 
 describe('serialización de salida (nativa) + envelope', () => {
   it('recorta los campos que no están en el esquema de salida', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__items/one').expect(200)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__items/one')
+      .expect(200)
     expect(res.body).toEqual({ data: { id: ID, name: 'Uno' } })
     expect(JSON.stringify(res.body)).not.toContain('secreto')
   })
 
   it('serializa cada elemento de un array', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__items/many').expect(200)
-    expect(res.body.data).toEqual([{ id: ID, name: 'A' }, { id: ID, name: 'B' }])
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__items/many')
+      .expect(200)
+    expect(res.body.data).toEqual([
+      { id: ID, name: 'A' },
+      { id: ID, name: 'B' },
+    ])
   })
 
   it('un Page se serializa ítem por ítem y conserva meta', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__items/paged').expect(200)
-    expect(res.body).toEqual({ data: [{ id: ID, name: 'A' }], meta: { page: 1, pageSize: 10, total: 1, totalPages: 1 } })
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__items/paged')
+      .expect(200)
+    expect(res.body).toEqual({
+      data: [{ id: ID, name: 'A' }],
+      meta: { page: 1, pageSize: 10, total: 1, totalPages: 1 },
+    })
   })
 
   it('una respuesta que viola su propio esquema es INTERNAL (500) y no filtra el detalle', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__items/broken').expect(500)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__items/broken')
+      .expect(500)
     expect(res.body.error.code).toBe('INTERNAL')
     expect(JSON.stringify(res.body)).not.toMatch(/Serialization|uuid/i)
   })
@@ -162,11 +181,15 @@ describe('OpenAPI generado desde los mismos esquemas (@nestjs/swagger 12)', () =
     const query = doc.paths['/api/v1/__items/query']?.get?.parameters as Array<{ name: string; in: string }>
     expect(query.map((p) => p.name)).toEqual(expect.arrayContaining(['page', 'active']))
 
-    const one = doc.paths['/api/v1/__items/one']?.get?.responses?.['200'] as { content: Record<string, { schema: any }> }
+    const one = doc.paths['/api/v1/__items/one']?.get?.responses?.['200'] as {
+      content: Record<string, { schema: any }>
+    }
     const oneSchema = one.content['application/json']!.schema
     expect(oneSchema.properties.data.properties).toHaveProperty('name') // documenta el envelope { data: ítem }
 
-    const paged = doc.paths['/api/v1/__items/paged']?.get?.responses?.['200'] as { content: Record<string, { schema: any }> }
+    const paged = doc.paths['/api/v1/__items/paged']?.get?.responses?.['200'] as {
+      content: Record<string, { schema: any }>
+    }
     const pagedSchema = paged.content['application/json']!.schema
     expect(pagedSchema.properties.data.type).toBe('array')
     expect(pagedSchema.properties.meta.properties).toHaveProperty('totalPages')

@@ -73,29 +73,39 @@ afterEach(async () => {
 
 describe('HTTP: éxito', () => {
   it('envuelve la respuesta en { data }', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/ok').expect(200)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/ok')
+      .expect(200)
     expect(res.body).toEqual({ data: { a: 1 } })
   })
 
   it('una respuesta vacía es { data: null }', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/nothing').expect(200)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/nothing')
+      .expect(200)
     expect(res.body).toEqual({ data: null })
   })
 
   it('un Page se envuelve como { data, meta }', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/page').expect(200)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/page')
+      .expect(200)
     expect(res.body).toEqual({ data: ['x', 'y'], meta: { page: 2, pageSize: 2, total: 5, totalPages: 3 } })
   })
 
   it('health/live está fuera del prefijo y de la versión', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/health/live').expect(200)
+    const res = await request((await boot()).getHttpServer())
+      .get('/health/live')
+      .expect(200)
     expect(res.body).toEqual({ data: { status: 'ok' } })
   })
 })
 
 describe('HTTP: errores', () => {
   it('un DomainError sale con el código, HTTP y mensaje del catálogo, más details', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/domain').expect(409)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/domain')
+      .expect(409)
     expect(res.body.error).toMatchObject({
       code: 'ORGANIZATION_NAME_TAKEN',
       message: 'Ya existe una organización con ese nombre',
@@ -105,12 +115,16 @@ describe('HTTP: errores', () => {
   })
 
   it('una ruta inexistente es NOT_FOUND', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/no-existe').expect(404)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/no-existe')
+      .expect(404)
     expect(res.body.error.code).toBe('NOT_FOUND')
   })
 
   it('un HttpException 400 es VALIDATION_FAILED con el detalle original', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/bad-request').expect(400)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/bad-request')
+      .expect(400)
     expect(res.body.error.code).toBe('VALIDATION_FAILED')
     expect(res.body.error.details).toMatchObject({ message: ['campo requerido'] })
   })
@@ -125,7 +139,9 @@ describe('HTTP: errores', () => {
   })
 
   it('un error desconocido es INTERNAL (500) y NO filtra el mensaje', async () => {
-    const res = await request((await boot()).getHttpServer()).get('/api/v1/__test/boom').expect(500)
+    const res = await request((await boot()).getHttpServer())
+      .get('/api/v1/__test/boom')
+      .expect(500)
     expect(res.body.error.code).toBe('INTERNAL')
     expect(JSON.stringify(res.body)).not.toContain('hunter2')
     expect(res.body.error).not.toHaveProperty('details')

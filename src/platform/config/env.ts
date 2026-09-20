@@ -20,7 +20,10 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   /** Cadena de conexión de PostgreSQL. */
-  DATABASE_URL: z.string().min(1).refine((v) => /^postgres(ql)?:\/\//.test(v), 'debe ser una URL postgresql://'),
+  DATABASE_URL: z
+    .string()
+    .min(1)
+    .refine((v) => /^postgres(ql)?:\/\//.test(v), 'debe ser una URL postgresql://'),
   /** `iss` exacto que emite Authentik (con la barra final), p. ej. https://auth.ejemplo.com/application/o/audit/ */
   AUTHENTIK_ISSUER: z.url(),
   /** Client ID de la aplicación en Authentik: es el `aud` que debe traer el token. */

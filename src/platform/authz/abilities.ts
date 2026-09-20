@@ -32,7 +32,6 @@ interface Grant {
   readonly subjects: readonly Subject[]
 }
 
-
 /** Los permisos como DATO: leer la tabla es leer la política. */
 const GRANTS: Readonly<Record<Role, readonly Grant[]>> = {
   ADMIN: [{ actions: ['manage'], subjects: ['all'] }],
@@ -58,4 +57,3 @@ export function defineAbilityFor(roles: readonly Role[]): AppAbility {
   }
   return build()
 }
-

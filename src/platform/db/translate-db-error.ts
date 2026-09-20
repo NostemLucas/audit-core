@@ -35,10 +35,18 @@ export function translateDbError(error: unknown, operation: string): unknown {
 
   switch (error.code) {
     case 'P2002':
-      return new DomainError((constraint && errorRegistry.byUnique(constraint)) || PlatformErrors.CONFLICT, undefined, options)
+      return new DomainError(
+        (constraint && errorRegistry.byUnique(constraint)) || PlatformErrors.CONFLICT,
+        undefined,
+        options,
+      )
     case 'P2003':
       if (DELETE_OPERATIONS.has(operation)) {
-        return new DomainError((constraint && errorRegistry.byForeignKeyDelete(constraint)) || PlatformErrors.CONFLICT, undefined, options)
+        return new DomainError(
+          (constraint && errorRegistry.byForeignKeyDelete(constraint)) || PlatformErrors.CONFLICT,
+          undefined,
+          options,
+        )
       }
       return new DomainError(PlatformErrors.REFERENCE_INVALID, undefined, options)
     case 'P2025':

@@ -37,10 +37,18 @@ describe('sellos createdById / updatedById (extensión de Prisma)', () => {
     const rows = await db.organization.findMany({ where: { name: { in: ['M1', 'M2'] } } })
     expect(rows.every((r) => r.createdById === U1 && r.updatedById === U2)).toBe(true)
 
-    const created = await db.organization.upsert({ where: { name: 'UP' }, create: { name: 'UP' }, update: { isActive: false } })
+    const created = await db.organization.upsert({
+      where: { name: 'UP' },
+      create: { name: 'UP' },
+      update: { isActive: false },
+    })
     expect(created).toMatchObject({ createdById: U2, updatedById: U2 })
     currentUser = U1
-    const updated = await db.organization.upsert({ where: { name: 'UP' }, create: { name: 'UP' }, update: { isActive: false } })
+    const updated = await db.organization.upsert({
+      where: { name: 'UP' },
+      create: { name: 'UP' },
+      update: { isActive: false },
+    })
     expect(updated).toMatchObject({ createdById: U2, updatedById: U1 })
   })
 
@@ -73,7 +81,10 @@ describe('sellos createdById / updatedById (extensión de Prisma)', () => {
     const audit = await createAuditFixture(db, org.id)
     currentUser = U2
     // Audit y Report llevan sellos; el Report se crea ANIDADO dentro del update de la auditoría.
-    await db.audit.update({ where: { id: audit.id }, data: { name: 'Renombrada', reports: { create: { title: 'Informe', storageFileId: 'nc-1' } } } })
+    await db.audit.update({
+      where: { id: audit.id },
+      data: { name: 'Renombrada', reports: { create: { title: 'Informe', storageFileId: 'nc-1' } } },
+    })
     const parent = await db.audit.findUniqueOrThrow({ where: { id: audit.id } })
     const child = await db.report.findFirstOrThrow({ where: { auditId: audit.id } })
     expect(parent.updatedById).toBe(U2) // la operación de nivel superior sí se sella

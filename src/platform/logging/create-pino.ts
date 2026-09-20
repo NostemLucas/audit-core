@@ -39,7 +39,13 @@ export function createPino(options: CreatePinoOptions): PinoLogger {
   }
   if (options.pretty) {
     // Con `transport`, pino no admite `formatters.level`; la salida legible ya muestra el nombre del nivel.
-    return pino({ ...base, transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:HH:MM:ss.l', ignore: 'pid,hostname,service' } } })
+    return pino({
+      ...base,
+      transport: {
+        target: 'pino-pretty',
+        options: { colorize: true, translateTime: 'SYS:HH:MM:ss.l', ignore: 'pid,hostname,service' },
+      },
+    })
   }
   return pino({ ...base, formatters: { level: (label) => ({ level: label }) } })
 }

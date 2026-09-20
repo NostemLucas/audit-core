@@ -19,7 +19,10 @@ class SyncProbeController {
   @Post('org')
   @Can('create', 'Organization')
   createOrg() {
-    return this.db.organization.create({ data: { name: `org-${Math.random().toString(36).slice(2)}` }, select: { createdById: true, updatedById: true } })
+    return this.db.organization.create({
+      data: { name: `org-${Math.random().toString(36).slice(2)}` },
+      select: { createdById: true, updatedById: true },
+    })
   }
 }
 
@@ -30,7 +33,11 @@ let logs: Array<Record<string, any>> = []
 
 beforeAll(async () => {
   issuer = await createTestIssuer()
-  app = await createTestApp({ controllers: [SyncProbeController], jwtKeys: issuer.keys, logSink: (l) => void logs.push(l as Record<string, any>) })
+  app = await createTestApp({
+    controllers: [SyncProbeController],
+    jwtKeys: issuer.keys,
+    logSink: (l) => void logs.push(l as Record<string, any>),
+  })
   db = app.get<Db>(DB)
 })
 afterAll(() => app.close())
@@ -47,21 +54,38 @@ beforeEach(async () => {
 function login(options: Parameters<typeof issuer.sign>[0] = {}) {
   const token = issuer.sign(options)
   const send = async (status?: number) => {
-    const call = request(app.getHttpServer()).get('/api/v1/profile').set('authorization', `Bearer ${await token}`)
+    const call = request(app.getHttpServer())
+      .get('/api/v1/profile')
+      .set('authorization', `Bearer ${await token}`)
     return status === undefined ? call : call.expect(status)
   }
   return {
     expect: (status: number) => send(status),
-    then: (onFulfilled: (response: request.Response) => unknown, onRejected?: (reason: unknown) => unknown) => send().then(onFulfilled as never, onRejected),
+    then: (onFulfilled: (response: request.Response) => unknown, onRejected?: (reason: unknown) => unknown) =>
+      send().then(onFulfilled as never, onRejected),
   }
 }
 const users = () => db.user.findMany({ orderBy: { createdAt: 'asc' } })
 
 describe('primer login: se crea el usuario desde el token', () => {
   it('guarda lo del proveedor: email en minúsculas, username TAL CUAL, name y roles desde los grupos', async () => {
-    const res = await login({ subject: 'sub-1', claims: { email: 'Ana.Perez@Ejemplo.com', preferred_username: 'Ana.PEREZ', name: 'Ana Pérez', groups: ['auditor', 'gerente'] } }).expect(200)
+    const res = await login({
+      subject: 'sub-1',
+      claims: {
+        email: 'Ana.Perez@Ejemplo.com',
+        preferred_username: 'Ana.PEREZ',
+        name: 'Ana Pérez',
+        groups: ['auditor', 'gerente'],
+      },
+    }).expect(200)
     const [row] = await users()
-    expect(row).toMatchObject({ authentikId: 'sub-1', email: 'ana.perez@ejemplo.com', username: 'Ana.PEREZ', name: 'Ana Pérez', roles: ['GERENTE', 'AUDITOR'] })
+    expect(row).toMatchObject({
+      authentikId: 'sub-1',
+      email: 'ana.perez@ejemplo.com',
+      username: 'Ana.PEREZ',
+      name: 'Ana Pérez',
+      roles: ['GERENTE', 'AUDITOR'],
+    })
     expect(res.body.data.user).toMatchObject({ id: row!.id, username: 'Ana.PEREZ', roles: ['GERENTE', 'AUDITOR'] })
   })
 
@@ -124,16 +148,38 @@ describe('logins siguientes: solo se escribe si algo cambió', () => {
 
 describe('el sistema nunca se queda sin ADMIN por un cambio en Authentik', () => {
   it('se conserva el rol del ÚNICO administrador y se avisa', async () => {
-    await login({ subject: 'sub-admin', claims: { email: 'a@x.com', preferred_username: 'root', groups: ['admin'] } }).expect(200)
-    await login({ subject: 'sub-admin', claims: { email: 'a@x.com', preferred_username: 'root', groups: ['auditor'] } }).expect(200)
-    expect((await db.user.findUniqueOrThrow({ where: { authentikId: 'sub-admin' } })).roles).toEqual(['ADMIN', 'AUDITOR'])
-    expect(logs.some((l) => l['level'] === 'warn' && l['msg'] === 'Se conserva ADMIN: es el único administrador del sistema')).toBe(true)
+    await login({
+      subject: 'sub-admin',
+      claims: { email: 'a@x.com', preferred_username: 'root', groups: ['admin'] },
+    }).expect(200)
+    await login({
+      subject: 'sub-admin',
+      claims: { email: 'a@x.com', preferred_username: 'root', groups: ['auditor'] },
+    }).expect(200)
+    expect((await db.user.findUniqueOrThrow({ where: { authentikId: 'sub-admin' } })).roles).toEqual([
+      'ADMIN',
+      'AUDITOR',
+    ])
+    expect(
+      logs.some(
+        (l) => l['level'] === 'warn' && l['msg'] === 'Se conserva ADMIN: es el único administrador del sistema',
+      ),
+    ).toBe(true)
   })
 
   it('si hay OTRO administrador, sí se le quita', async () => {
-    await login({ subject: 'sub-admin-1', claims: { email: 'a1@x.com', preferred_username: 'root1', groups: ['admin'] } }).expect(200)
-    await login({ subject: 'sub-admin-2', claims: { email: 'a2@x.com', preferred_username: 'root2', groups: ['admin'] } }).expect(200)
-    await login({ subject: 'sub-admin-1', claims: { email: 'a1@x.com', preferred_username: 'root1', groups: ['auditor'] } }).expect(200)
+    await login({
+      subject: 'sub-admin-1',
+      claims: { email: 'a1@x.com', preferred_username: 'root1', groups: ['admin'] },
+    }).expect(200)
+    await login({
+      subject: 'sub-admin-2',
+      claims: { email: 'a2@x.com', preferred_username: 'root2', groups: ['admin'] },
+    }).expect(200)
+    await login({
+      subject: 'sub-admin-1',
+      claims: { email: 'a1@x.com', preferred_username: 'root1', groups: ['auditor'] },
+    }).expect(200)
     expect((await db.user.findUniqueOrThrow({ where: { authentikId: 'sub-admin-1' } })).roles).toEqual(['AUDITOR'])
   })
 })
@@ -142,14 +188,20 @@ describe('concurrencia e identidad', () => {
   // Humo, no prueba de la carrera: las peticiones se serializan antes de la BD y rara vez colisionan. El reintento se
   // prueba de forma determinista en `retry-identity-conflict.spec.ts` (una mutación sin reintento no lo rompía aquí).
   it('humo: 8 primeros logins simultáneos del mismo usuario → una sola fila y todos responden 200', async () => {
-    const responses = await Promise.all(Array.from({ length: 8 }, () => login({ subject: 'sub-race', claims: { email: 'race@x.com', preferred_username: 'race' } })))
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        login({ subject: 'sub-race', claims: { email: 'race@x.com', preferred_username: 'race' } }),
+      ),
+    )
     expect(responses.map((r) => r.status)).toEqual(Array(8).fill(200))
     expect(await db.user.count()).toBe(1)
   })
 
   it('OTRA cuenta (otro sub) con el mismo email → 409 USER_IDENTITY_CONFLICT; no se enlaza por email', async () => {
     await login({ subject: 'sub-original', claims: { email: 'dup@x.com', preferred_username: 'original' } }).expect(200)
-    const res = await login({ subject: 'sub-otra', claims: { email: 'dup@x.com', preferred_username: 'otra' } }).expect(409)
+    const res = await login({ subject: 'sub-otra', claims: { email: 'dup@x.com', preferred_username: 'otra' } }).expect(
+      409,
+    )
     expect(res.body.error.code).toBe('USER_IDENTITY_CONFLICT')
     expect(await db.user.count()).toBe(1) // ni se creó una segunda ni se secuestró la primera
     expect((await users())[0]?.authentikId).toBe('sub-original')
@@ -166,7 +218,9 @@ describe('GET /profile: el contrato con el frontend', () => {
     const res = await login({ claims: { groups: ['auditor', 'gerente'] } }).expect(200)
     const frontend = createMongoAbility(unpackRules(res.body.data.abilities) as never)
     const backend = defineAbilityFor(['GERENTE', 'AUDITOR'])
-    for (const action of ACTIONS) for (const subject of SUBJECTS) expect(frontend.can(action, subject), `${action} ${subject}`).toBe(backend.can(action, subject))
+    for (const action of ACTIONS)
+      for (const subject of SUBJECTS)
+        expect(frontend.can(action, subject), `${action} ${subject}`).toBe(backend.can(action, subject))
   })
 
   it('sin token → 401', async () => {
@@ -176,8 +230,14 @@ describe('GET /profile: el contrato con el frontend', () => {
 
 describe('de extremo a extremo: token → contexto → sellos de la base de datos', () => {
   it('lo que crea una petición autenticada queda sellado con SU usuario', async () => {
-    const token = await issuer.sign({ subject: 'sub-gerente', claims: { email: 'g@x.com', preferred_username: 'gerente', groups: ['gerente'] } })
-    const res = await request(app.getHttpServer()).post('/api/v1/__sync/org').set('authorization', `Bearer ${token}`).expect(201)
+    const token = await issuer.sign({
+      subject: 'sub-gerente',
+      claims: { email: 'g@x.com', preferred_username: 'gerente', groups: ['gerente'] },
+    })
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/__sync/org')
+      .set('authorization', `Bearer ${token}`)
+      .expect(201)
     const user = await db.user.findUniqueOrThrow({ where: { authentikId: 'sub-gerente' } })
     expect(res.body.data).toEqual({ createdById: user.id, updatedById: user.id })
   })

@@ -28,7 +28,13 @@ describe('formato de las líneas', () => {
     const { logger, lines } = capture()
     logger.for('Demo').info('Auditoría iniciada', { auditId: 'a-1' })
     const [line] = lines()
-    expect(line).toMatchObject({ level: 'info', msg: 'Auditoría iniciada', service: 'audit-core', context: 'Demo', auditId: 'a-1' })
+    expect(line).toMatchObject({
+      level: 'info',
+      msg: 'Auditoría iniciada',
+      service: 'audit-core',
+      context: 'Demo',
+      auditId: 'a-1',
+    })
     expect(line?.['time']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
     expect(line).not.toHaveProperty('pid')
     expect(line).not.toHaveProperty('hostname')
@@ -81,7 +87,8 @@ describe('redacción de secretos', () => {
     expect(line['headers'].authorization).toBe('[REDACTED]')
     expect(line['headers'].cookie).toBe('[REDACTED]')
     expect(line['user'].clientSecret).toBe('[REDACTED]')
-    for (const secret of ['hunter2', 'tok-secreto', 'abc.def.ghi', 'sid=zzz', 'cs-secreto']) expect(raw()).not.toContain(secret)
+    for (const secret of ['hunter2', 'tok-secreto', 'abc.def.ghi', 'sid=zzz', 'cs-secreto'])
+      expect(raw()).not.toContain(secret)
   })
 
   it('no censura lo que no es sensible', () => {
@@ -91,7 +98,8 @@ describe('redacción de secretos', () => {
   })
 
   it('la lista de campos sensibles cubre las cabeceras y credenciales habituales', () => {
-    for (const key of ['authorization', 'cookie', 'password', 'token', 'jwt', 'clientSecret']) expect(REDACTED_PATHS).toContain(key)
+    for (const key of ['authorization', 'cookie', 'password', 'token', 'jwt', 'clientSecret'])
+      expect(REDACTED_PATHS).toContain(key)
   })
 })
 
@@ -107,7 +115,11 @@ describe('errores', () => {
 
   it('un DomainError incluye code y details', () => {
     const error = new DomainError(Errors.LOGGING_TEST_CONFLICT, { name: 'ACME' })
-    expect(serializeError(error)).toMatchObject({ type: 'DomainError', code: 'LOGGING_TEST_CONFLICT', details: { name: 'ACME' } })
+    expect(serializeError(error)).toMatchObject({
+      type: 'DomainError',
+      code: 'LOGGING_TEST_CONFLICT',
+      details: { name: 'ACME' },
+    })
   })
 
   it('sigue la cadena de causas', () => {

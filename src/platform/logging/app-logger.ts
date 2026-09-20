@@ -23,8 +23,9 @@ export interface Log {
 }
 
 function toLog(pino: PinoLogger): Log {
-  const write = (level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace') => (message: string, fields?: Fields) =>
-    fields ? pino[level](fields, message) : pino[level](message)
+  const write =
+    (level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace') => (message: string, fields?: Fields) =>
+      fields ? pino[level](fields, message) : pino[level](message)
   return {
     fatal: write('fatal'),
     error: write('error'),
@@ -71,7 +72,11 @@ export class AppLogger implements LoggerService {
   }
 
   /** Nest llama `(mensaje, contexto?)` y, para errores, `(mensaje, stack?, contexto?)`. */
-  private nest(level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace', message: unknown, rest: unknown[]): void {
+  private nest(
+    level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace',
+    message: unknown,
+    rest: unknown[],
+  ): void {
     const strings = rest.filter((item): item is string => typeof item === 'string')
     let context: string | undefined
     let stack: string | undefined
@@ -81,7 +86,8 @@ export class AppLogger implements LoggerService {
     } else {
       context = strings[strings.length - 1]
     }
-    const text = typeof message === 'string' ? message : message instanceof Error ? message.message : JSON.stringify(message)
+    const text =
+      typeof message === 'string' ? message : message instanceof Error ? message.message : JSON.stringify(message)
     const target = context ? this.pino.child({ context }) : this.pino
     if (stack) target[level]({ err: Object.assign(new Error(text), { stack }) }, text)
     else target[level](text)

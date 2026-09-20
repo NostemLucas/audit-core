@@ -6,6 +6,8 @@ import { Page } from './page.js'
 @Injectable()
 export class EnvelopeInterceptor implements NestInterceptor {
   intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    return next.handle().pipe(map((value) => (value instanceof Page ? { data: value.items, meta: value.meta } : { data: value ?? null })))
+    return next
+      .handle()
+      .pipe(map((value) => (value instanceof Page ? { data: value.items, meta: value.meta } : { data: value ?? null })))
   }
 }

@@ -7,20 +7,44 @@ beforeEach(() => resetDb(db))
 describe('Escala: una lista de niveles, sin tipo ni presentación', () => {
   it('Scale guarda solo nombre y disponibilidad (sin code, type ni description)', async () => {
     const scale = await db.scale.create({ data: { name: 'COBIT 5' } })
-    expect(Object.keys(scale).sort()).toEqual(['createdAt', 'createdById', 'id', 'isActive', 'name', 'updatedAt', 'updatedById'])
+    expect(Object.keys(scale).sort()).toEqual([
+      'createdAt',
+      'createdById',
+      'id',
+      'isActive',
+      'name',
+      'updatedAt',
+      'updatedById',
+    ])
     expect(scale.isActive).toBe(true)
   })
 
   it('ScaleLevel guarda lo que la lógica y los informes leen: value, label y description opcional', async () => {
     const scale = await db.scale.create({ data: { name: 'Binaria' } })
     const level = await db.scaleLevel.create({ data: { scaleId: scale.id, value: 0, label: 'No cumple' } })
-    expect(Object.keys(level).sort()).toEqual(['createdAt', 'description', 'id', 'label', 'scaleId', 'updatedAt', 'value'])
+    expect(Object.keys(level).sort()).toEqual([
+      'createdAt',
+      'description',
+      'id',
+      'label',
+      'scaleId',
+      'updatedAt',
+      'value',
+    ])
     expect(level.description).toBeNull()
   })
 
   it('"binaria" no es un tipo: es tener 2 niveles (se deriva, no se guarda)', async () => {
     const scale = await db.scale.create({
-      data: { name: 'Binaria', levels: { create: [{ value: 0, label: 'No cumple' }, { value: 1, label: 'Cumple' }] } },
+      data: {
+        name: 'Binaria',
+        levels: {
+          create: [
+            { value: 0, label: 'No cumple' },
+            { value: 1, label: 'Cumple' },
+          ],
+        },
+      },
       include: { levels: true },
     })
     expect(scale.levels).toHaveLength(2)
@@ -43,7 +67,15 @@ describe('Escala: una lista de niveles, sin tipo ni presentación', () => {
 describe('Plantilla', () => {
   it('Template guarda nombre y estado (sin description)', async () => {
     const tpl = await db.template.create({ data: { name: 'ISO/IEC 27001:2022' } })
-    expect(Object.keys(tpl).sort()).toEqual(['createdAt', 'createdById', 'id', 'name', 'status', 'updatedAt', 'updatedById'])
+    expect(Object.keys(tpl).sort()).toEqual([
+      'createdAt',
+      'createdById',
+      'id',
+      'name',
+      'status',
+      'updatedAt',
+      'updatedById',
+    ])
     expect(tpl.status).toBe('DRAFT')
   })
 })
@@ -60,7 +92,12 @@ describe('Alcance: propio de la auditoría', () => {
   it('el alcance desaparece con su auditoría (cascada), sin dejar huérfanos', async () => {
     const org = await db.organization.create({ data: { name: 'ACME' } })
     const audit = await createAuditFixture(db, org.id)
-    await db.auditScopeItem.createMany({ data: [{ auditId: audit.id, name: 'ERP' }, { auditId: audit.id, name: 'CRM' }] })
+    await db.auditScopeItem.createMany({
+      data: [
+        { auditId: audit.id, name: 'ERP' },
+        { auditId: audit.id, name: 'CRM' },
+      ],
+    })
     await db.audit.delete({ where: { id: audit.id } })
     expect(await db.auditScopeItem.count()).toBe(0)
   })
@@ -84,7 +121,9 @@ describe('Equipo e informes: solo lo que se consume', () => {
   it('Report no copia el nombre ni el tamaño del archivo (son de Nextcloud)', async () => {
     const org = await db.organization.create({ data: { name: 'ACME' } })
     const audit = await createAuditFixture(db, org.id)
-    const report = await db.report.create({ data: { auditId: audit.id, title: 'Informe final', storageFileId: 'nc-123' } })
+    const report = await db.report.create({
+      data: { auditId: audit.id, title: 'Informe final', storageFileId: 'nc-123' },
+    })
     expect(report).not.toHaveProperty('fileName')
     expect(report).not.toHaveProperty('size')
   })

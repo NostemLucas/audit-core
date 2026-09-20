@@ -14,14 +14,26 @@ function fakeLog(): { log: Log; entries: Entry[] } {
   const entries: Entry[] = []
   const noop = () => undefined
   const log: Log = {
-    fatal: noop, error: noop, warn: noop, info: noop, debug: noop, trace: noop,
+    fatal: noop,
+    error: noop,
+    warn: noop,
+    info: noop,
+    debug: noop,
+    trace: noop,
     at: (level, message, fields) => void entries.push({ level, message, fields: fields ?? {} }),
   }
   return { log, entries }
 }
 
 /** Simula una petición que termina con `status`. `finished: false` simula una conexión cortada por el cliente. */
-function run(options: { url?: string; status?: number; finished?: boolean; user?: unknown; route?: string; ignore?: string[] }) {
+function run(options: {
+  url?: string
+  status?: number
+  finished?: boolean
+  user?: unknown
+  route?: string
+  ignore?: string[]
+}) {
   const { log, entries } = fakeLog()
   const res = Object.assign(new EventEmitter(), {
     statusCode: options.status ?? 200,
@@ -49,7 +61,14 @@ describe('log de acceso HTTP', () => {
     expect(entries[0]).toMatchObject({
       level: 'info',
       message: 'Petición HTTP',
-      fields: { method: 'GET', path: '/api/v1/audits/42', route: '/api/v1/audits/:id', status: 200, bytes: 128, correlationId: 'trace-abc-12345' },
+      fields: {
+        method: 'GET',
+        path: '/api/v1/audits/42',
+        route: '/api/v1/audits/:id',
+        status: 200,
+        bytes: 128,
+        correlationId: 'trace-abc-12345',
+      },
     })
     expect(typeof entries[0]?.fields['durationMs']).toBe('number')
   })

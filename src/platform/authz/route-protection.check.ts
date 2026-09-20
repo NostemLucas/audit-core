@@ -15,7 +15,9 @@ export class RouteProtectionCheck implements OnApplicationBootstrap {
   ) {}
 
   onApplicationBootstrap(): void {
-    const undeclared = listRoutes(this.discovery, this.scanner, this.reflector).filter((route) => route.access === undefined)
+    const undeclared = listRoutes(this.discovery, this.scanner, this.reflector).filter(
+      (route) => route.access === undefined,
+    )
     if (undeclared.length === 0) return
     const lines = undeclared.map((r) => `  - ${r.method} ${r.path}  (${r.handler})`)
     throw new Error(

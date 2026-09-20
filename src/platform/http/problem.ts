@@ -12,7 +12,12 @@ export interface Problem {
 function isExposedHttpError(error: unknown): error is { status: number } {
   if (typeof error !== 'object' || error === null) return false
   const candidate = error as { status?: unknown; expose?: unknown }
-  return typeof candidate.status === 'number' && candidate.status >= 400 && candidate.status < 500 && candidate.expose === true
+  return (
+    typeof candidate.status === 'number' &&
+    candidate.status >= 400 &&
+    candidate.status < 500 &&
+    candidate.expose === true
+  )
 }
 
 function byStatus(status: number): ErrorDef {

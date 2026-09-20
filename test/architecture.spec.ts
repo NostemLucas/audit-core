@@ -50,7 +50,9 @@ describe('arquitectura: logging y HTTP son contextos distintos', () => {
   })
 
   it('platform/http SÍ puede usar el logger (la dependencia va en ese sentido)', () => {
-    const usesLogger = sourceFiles(join(SRC, 'platform/http')).some((f) => importsOf(f).some((s) => s.includes('/logging/')))
+    const usesLogger = sourceFiles(join(SRC, 'platform/http')).some((f) =>
+      importsOf(f).some((s) => s.includes('/logging/')),
+    )
     expect(usesLogger).toBe(true)
   })
 })

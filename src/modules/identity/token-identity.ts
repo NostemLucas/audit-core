@@ -14,7 +14,8 @@ export interface TokenIdentity {
   readonly groups: string[]
 }
 
-const text = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() !== '' ? value : undefined)
+const text = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() !== '' ? value : undefined
 
 /**
  * Extrae la identidad de los claims verificados.
@@ -28,12 +29,16 @@ export function identityFromClaims(claims: TokenClaims): TokenIdentity {
   const email = text(claims['email'])
   const username = text(claims['preferred_username'])
 
-  const missing = [!email && 'email', !username && 'preferred_username'].filter((claim): claim is string => typeof claim === 'string')
+  const missing = [!email && 'email', !username && 'preferred_username'].filter(
+    (claim): claim is string => typeof claim === 'string',
+  )
   if (!email || !username || missing.length > 0) {
     throw new DomainError(IdentityErrors.TOKEN_CLAIMS_MISSING, { missing })
   }
 
-  const groups = Array.isArray(claims['groups']) ? claims['groups'].filter((g): g is string => typeof g === 'string') : []
+  const groups = Array.isArray(claims['groups'])
+    ? claims['groups'].filter((g): g is string => typeof g === 'string')
+    : []
   return {
     authentikId: claims.sub,
     email: email.trim().toLowerCase(),

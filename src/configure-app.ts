@@ -5,7 +5,14 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Response } from 'express'
 import helmet from 'helmet'
 import type { Env } from './platform/config/index.js'
-import { AllExceptionsFilter, ApiSerializerInterceptor, EnvelopeInterceptor, accessLog, createValidationPipe, requestId } from './platform/http/index.js'
+import {
+  AllExceptionsFilter,
+  ApiSerializerInterceptor,
+  EnvelopeInterceptor,
+  accessLog,
+  createValidationPipe,
+  requestId,
+} from './platform/http/index.js'
 import { AppLogger } from './platform/logging/index.js'
 
 /**

@@ -8,11 +8,21 @@ const can = (roles: Role[], action: Action, subject: Subject) => defineAbilityFo
 
 describe('permisos globales por rol', () => {
   it('ADMIN puede todo', () => {
-    for (const action of ACTIONS) for (const subject of SUBJECTS) expect(can(['ADMIN'], action, subject), `${action} ${subject}`).toBe(true)
+    for (const action of ACTIONS)
+      for (const subject of SUBJECTS) expect(can(['ADMIN'], action, subject), `${action} ${subject}`).toBe(true)
   })
 
   it('GERENTE gestiona auditorías, biblioteca y organizaciones; solo lee usuarios y dashboard', () => {
-    for (const subject of ['Audit', 'AuditMember', 'Evaluation', 'Evidence', 'Report', 'Template', 'Scale', 'Organization'] as const) {
+    for (const subject of [
+      'Audit',
+      'AuditMember',
+      'Evaluation',
+      'Evidence',
+      'Report',
+      'Template',
+      'Scale',
+      'Organization',
+    ] as const) {
       for (const action of ACTIONS) expect(can(['GERENTE'], action, subject), `${action} ${subject}`).toBe(true)
     }
     expect(can(['GERENTE'], 'read', 'User')).toBe(true)
@@ -49,11 +59,13 @@ describe('permisos globales por rol', () => {
   })
 
   it('el equipo de la auditoría: el AUDITOR tiene el permiso grueso; quién puede en ESTA auditoría lo decide la policy contextual', () => {
-    for (const action of ['create', 'update', 'delete'] as const) expect(can(['AUDITOR'], action, 'AuditMember')).toBe(true)
+    for (const action of ['create', 'update', 'delete'] as const)
+      expect(can(['AUDITOR'], action, 'AuditMember')).toBe(true)
   })
 
   it('sin roles no se puede nada', () => {
-    for (const action of ACTIONS) for (const subject of SUBJECTS) expect(can([], action, subject), `${action} ${subject}`).toBe(false)
+    for (const action of ACTIONS)
+      for (const subject of SUBJECTS) expect(can([], action, subject), `${action} ${subject}`).toBe(false)
   })
 
   it('varios roles suman permisos', () => {
@@ -69,7 +81,11 @@ describe('contrato con el frontend: reglas empaquetadas', () => {
     (roles) => {
       const backend = defineAbilityFor(roles)
       const frontend = createMongoAbility(unpackRules(packRules(backend.rules)))
-      for (const action of ACTIONS) for (const subject of SUBJECTS) expect(frontend.can(action, subject), `${roles.join('+')}: ${action} ${subject}`).toBe(backend.can(action, subject))
+      for (const action of ACTIONS)
+        for (const subject of SUBJECTS)
+          expect(frontend.can(action, subject), `${roles.join('+')}: ${action} ${subject}`).toBe(
+            backend.can(action, subject),
+          )
     },
   )
 

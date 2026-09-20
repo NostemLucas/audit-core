@@ -3,7 +3,13 @@ import { DomainError } from '../../platform/errors/index.js'
 import '../../app-errors.js'
 import { identityFromClaims } from './token-identity.js'
 
-const base = { sub: 'sub-1', email: 'Ana.Perez@Ejemplo.com', preferred_username: 'Ana.Perez', name: 'Ana Pérez', groups: ['auditor'] }
+const base = {
+  sub: 'sub-1',
+  email: 'Ana.Perez@Ejemplo.com',
+  preferred_username: 'Ana.Perez',
+  name: 'Ana Pérez',
+  groups: ['auditor'],
+}
 
 function failure(claims: Record<string, unknown>): DomainError {
   try {
@@ -41,11 +47,18 @@ describe('identityFromClaims', () => {
 
   it('sin preferred_username NO inventa uno (el proyecto anterior usaba email.split("@")[0]): rechaza', () => {
     const error = failure({ ...base, preferred_username: undefined })
-    expect(error).toMatchObject({ code: 'TOKEN_CLAIMS_MISSING', http: 401, details: { missing: ['preferred_username'] } })
+    expect(error).toMatchObject({
+      code: 'TOKEN_CLAIMS_MISSING',
+      http: 401,
+      details: { missing: ['preferred_username'] },
+    })
   })
 
   it('sin email rechaza', () => {
-    expect(failure({ ...base, email: undefined })).toMatchObject({ code: 'TOKEN_CLAIMS_MISSING', details: { missing: ['email'] } })
+    expect(failure({ ...base, email: undefined })).toMatchObject({
+      code: 'TOKEN_CLAIMS_MISSING',
+      details: { missing: ['email'] },
+    })
   })
 
   it('lista TODOS los claims que faltan', () => {

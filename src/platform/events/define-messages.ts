@@ -12,11 +12,15 @@ export type MessageMap<T extends Record<string, EventDef>> = {
 
 const renderers = new Map<string, (payload: never) => string>()
 
-export function defineMessages<const T extends Record<string, EventDef>>(events: T, messages: MessageMap<T>): MessageMap<T> {
+export function defineMessages<const T extends Record<string, EventDef>>(
+  events: T,
+  messages: MessageMap<T>,
+): MessageMap<T> {
   for (const name of Object.keys(events)) {
     if (renderers.has(name)) throw new Error(`Ya hay un mensaje registrado para el evento ${name}`)
   }
-  for (const name of Object.keys(events)) renderers.set(name, messages[name as keyof T & string] as (payload: never) => string)
+  for (const name of Object.keys(events))
+    renderers.set(name, messages[name as keyof T & string] as (payload: never) => string)
   return messages
 }
 
@@ -34,5 +38,8 @@ export function renderEventMessage(name: string, payload: unknown): string | und
 
 /** Eventos registrados que no tienen mensaje (lo usa un test del catálogo). */
 export function eventsWithoutMessage(): readonly string[] {
-  return eventRegistry.all().map((e) => e.name).filter((name) => !renderers.has(name))
+  return eventRegistry
+    .all()
+    .map((e) => e.name)
+    .filter((name) => !renderers.has(name))
 }

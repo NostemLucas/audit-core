@@ -19,7 +19,8 @@ import { LOG_DESTINATION, PINO } from './tokens.js'
           level: env.LOG_LEVEL,
           pretty: env.LOG_PRETTY,
           destination: destination ?? undefined,
-          getContext: () => (cls.isActive() ? { correlationId: cls.get('correlationId'), userId: cls.get('userId') } : {}),
+          getContext: () =>
+            cls.isActive() ? { correlationId: cls.get('correlationId'), userId: cls.get('userId') } : {},
         }),
     },
     AppLogger,

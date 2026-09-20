@@ -134,13 +134,19 @@ describe('de extremo a extremo por HTTP', () => {
     const server = app.getHttpServer()
     await request(server).post('/api/v1/__db/org').expect(201)
     const res = await request(server).post('/api/v1/__db/org').expect(409)
-    expect(res.body.error).toMatchObject({ code: 'ORGANIZATION_NAME_TAKEN', message: 'Ya existe una organización con ese nombre' })
+    expect(res.body.error).toMatchObject({
+      code: 'ORGANIZATION_NAME_TAKEN',
+      message: 'Ya existe una organización con ese nombre',
+    })
     expect(res.body.error.traceId).toBe(res.headers['x-request-id'])
     expect(JSON.stringify(res.body)).not.toContain('organizations_name_key')
   })
 
   it('el x-request-id de la petición queda como correlationId en el contexto ambiental (CLS)', async () => {
-    const res = await request(app.getHttpServer()).get('/api/v1/__db/correlation').set('x-request-id', 'trace-cls-12345').expect(200)
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/__db/correlation')
+      .set('x-request-id', 'trace-cls-12345')
+      .expect(200)
     expect(res.body.data.correlationId).toBe('trace-cls-12345')
   })
 

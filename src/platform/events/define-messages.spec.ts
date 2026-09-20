@@ -15,7 +15,9 @@ defineMessages(Events, {
 
 describe('mensajes de eventos', () => {
   it('genera el texto al leer, a partir del tipo y el payload guardados', () => {
-    expect(renderEventMessage('MsgMemberAssigned', { member: 'Ana', role: 'LEAD' })).toBe('Asignó a Ana como auditor líder')
+    expect(renderEventMessage('MsgMemberAssigned', { member: 'Ana', role: 'LEAD' })).toBe(
+      'Asignó a Ana como auditor líder',
+    )
     expect(renderEventMessage('MsgAuditClosed', { code: 'AUD-1' })).toBe('Cerró la auditoría AUD-1')
   })
 
@@ -34,7 +36,9 @@ describe('mensajes de eventos', () => {
   })
 
   it('no permite registrar dos veces el mensaje de un evento', () => {
-    expect(() => defineMessages(Events, { MsgMemberAssigned: () => 'x', MsgAuditClosed: () => 'y' })).toThrow(/Ya hay un mensaje/)
+    expect(() => defineMessages(Events, { MsgMemberAssigned: () => 'x', MsgAuditClosed: () => 'y' })).toThrow(
+      /Ya hay un mensaje/,
+    )
   })
 
   it('un mapa incompleto no compila (exhaustividad)', () => {

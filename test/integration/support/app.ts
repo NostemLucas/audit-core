@@ -23,7 +23,10 @@ export async function createTestApp(
   } = {},
 ): Promise<NestExpressApplication> {
   // En test el nivel por defecto es `silent`; si el test quiere capturar logs, se sube.
-  const env = testEnv({ DATABASE_URL: extra.databaseUrl ?? databaseUrl(), ...(extra.logSink && { LOG_LEVEL: 'debug' }) })
+  const env = testEnv({
+    DATABASE_URL: extra.databaseUrl ?? databaseUrl(),
+    ...(extra.logSink && { LOG_LEVEL: 'debug' }),
+  })
   let builder = Test.createTestingModule({
     imports: [AppModule],
     controllers: extra.controllers ?? [],
@@ -33,7 +36,8 @@ export async function createTestApp(
     .useValue(env)
   if (extra.jwtKeys) builder = builder.overrideProvider(JWT_KEYS).useValue(extra.jwtKeys)
   const sink = extra.logSink
-  if (sink) builder = builder.overrideProvider(LOG_DESTINATION).useValue({ write: (line: string) => sink(JSON.parse(line)) })
+  if (sink)
+    builder = builder.overrideProvider(LOG_DESTINATION).useValue({ write: (line: string) => sink(JSON.parse(line)) })
   const moduleRef = await builder.compile()
 
   const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false })

@@ -41,7 +41,10 @@ export const LibraryErrors = defineErrors({
     onForeignKeyDelete: 'audits_templateId_fkey',
   },
   /** Solo DRAFT admite cambios de estructura o contenido; PUBLISHED es inmutable (clonar para corregir). */
-  TEMPLATE_NOT_EDITABLE: { http: 409, message: 'Solo una plantilla en borrador puede modificarse; clónala para corregirla' },
+  TEMPLATE_NOT_EDITABLE: {
+    http: 409,
+    message: 'Solo una plantilla en borrador puede modificarse; clónala para corregirla',
+  },
   /** Publicar/archivar desde un estado que no lo permite. Lo decide el ciclo de vida de la plantilla (docs/03). */
   TEMPLATE_INVALID_STATE: { http: 409, message: 'La plantilla no admite esa operación en su estado actual' },
   /** Para auditar hay que usar una plantilla PUBLISHED. */
@@ -67,5 +70,8 @@ export const LibraryErrors = defineErrors({
 
   // ── Hallazgos sugeridos ────────────────────────────────────────────────────
   /** Solo los controles hoja (evaluables) admiten hallazgos sugeridos. */
-  SUGGESTED_FINDING_CONTROL_NOT_LEAF: { http: 422, message: 'Solo los controles evaluables admiten hallazgos sugeridos' },
+  SUGGESTED_FINDING_CONTROL_NOT_LEAF: {
+    http: 422,
+    message: 'Solo los controles evaluables admiten hallazgos sugeridos',
+  },
 })

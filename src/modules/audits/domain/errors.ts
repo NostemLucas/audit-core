@@ -8,7 +8,10 @@ export const AuditErrors = defineErrors({
   /** Capacidad `editable` (docs/03): solo una auditoría en borrador se edita o se elimina. */
   AUDIT_NOT_EDITABLE: { http: 409, message: 'Solo una auditoría en borrador puede modificarse o eliminarse' },
   AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un miembro para iniciarse' },
-  AUDIT_HAS_PENDING_EVALUATIONS: { http: 422, message: 'Hay evaluaciones sin aprobar; no se puede cerrar la auditoría' },
+  AUDIT_HAS_PENDING_EVALUATIONS: {
+    http: 422,
+    message: 'Hay evaluaciones sin aprobar; no se puede cerrar la auditoría',
+  },
   AUDIT_CANNOT_FOLLOW_UP: { http: 409, message: 'Solo una auditoría cerrada admite seguimiento' },
   /** Dos seguimientos de la misma auditoría se crearon a la vez y chocaron en el correlativo. */
   AUDIT_FOLLOW_UP_CONFLICT: {
@@ -30,7 +33,8 @@ export const AuditErrors = defineErrors({
   /** Un seguimiento hereda el alcance de la auditoría que sigue; incluir algo distinto es otra auditoría. */
   AUDIT_SCOPE_INHERITED: {
     http: 409,
-    message: 'Un seguimiento hereda el alcance de la auditoría original; para incluir otros elementos crea una auditoría nueva',
+    message:
+      'Un seguimiento hereda el alcance de la auditoría original; para incluir otros elementos crea una auditoría nueva',
   },
 
   // ── Equipo ─────────────────────────────────────────────────────────────────

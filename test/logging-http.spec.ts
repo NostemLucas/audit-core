@@ -43,7 +43,11 @@ let output: Array<Record<string, any>> = []
 async function boot(envOverrides: Record<string, string> = {}) {
   output = []
   const env = testEnv({ LOG_LEVEL: 'debug', ...envOverrides })
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule], controllers: [LogProbeController], providers: [ProbeService] })
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+    controllers: [LogProbeController],
+    providers: [ProbeService],
+  })
     .overrideProvider(ENV)
     .useValue(env)
     .overrideProvider(LOG_DESTINATION)
@@ -91,7 +95,10 @@ describe('log de acceso HTTP (de extremo a extremo)', () => {
 
   it('NO registra el query string ni el valor de la cabecera Authorization', async () => {
     const server = (await boot()).getHttpServer()
-    await request(server).get('/api/v1/__log/ok?token=QUERY-SECRETO').set('authorization', 'Bearer JWT-SECRETO').expect(200)
+    await request(server)
+      .get('/api/v1/__log/ok?token=QUERY-SECRETO')
+      .set('authorization', 'Bearer JWT-SECRETO')
+      .expect(200)
     await new Promise((r) => setTimeout(r, 30))
     const everything = JSON.stringify(output)
     expect(everything).not.toContain('QUERY-SECRETO')
@@ -126,7 +133,13 @@ describe('errores: quién registra qué', () => {
     expect(JSON.stringify(res.body)).not.toContain('CLAVE-SECRETA')
 
     const [failure] = linesFor('ExceptionFilter')
-    expect(failure).toMatchObject({ level: 'error', msg: 'Error no controlado', code: 'INTERNAL', status: 500, correlationId: 'trace-err-12345' })
+    expect(failure).toMatchObject({
+      level: 'error',
+      msg: 'Error no controlado',
+      code: 'INTERNAL',
+      status: 500,
+      correlationId: 'trace-err-12345',
+    })
     expect(failure?.['err']).toMatchObject({ type: 'Error' })
     expect(failure?.['err'].stack).toContain('boom')
 

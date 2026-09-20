@@ -22,7 +22,8 @@ export function defineEvents<const T extends Record<string, z.ZodType>>(
 ): { readonly [K in keyof T & string]: EventDef<K, z.output<T[K]>> } {
   // Se valida todo antes de registrar nada: un fallo no deja el catálogo a medias.
   for (const name of Object.keys(schemas)) {
-    if (!NAME_FORMAT.test(name)) throw new Error(`Nombre de evento inválido: "${name}" (PascalCase, p. ej. AuditStarted)`)
+    if (!NAME_FORMAT.test(name))
+      throw new Error(`Nombre de evento inválido: "${name}" (PascalCase, p. ej. AuditStarted)`)
     if (byName.has(name)) throw new Error(`Evento duplicado: ${name}`)
   }
   const result: Record<string, EventDef> = {}

@@ -74,7 +74,10 @@ describe('catálogo de errores', () => {
   it('todo UNIQUE de la migración tiene un error asignado o una excepción justificada', () => {
     const mapped = new Set(errorRegistry.referencedConstraints().unique)
     const missing = [...loadConstraints().unique].filter((name) => !mapped.has(name) && !(name in UNMAPPED_UNIQUES))
-    expect(missing, 'UNIQUE sin error ni excepción: agrega onUnique a un error o justifícalo en UNMAPPED_UNIQUES').toEqual([])
+    expect(
+      missing,
+      'UNIQUE sin error ni excepción: agrega onUnique a un error o justifícalo en UNMAPPED_UNIQUES',
+    ).toEqual([])
   })
 
   it('las excepciones de UNIQUE no quedaron obsoletas', () => {

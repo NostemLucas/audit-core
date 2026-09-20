@@ -6,7 +6,8 @@ import { Role } from '../../shared/enums.js'
 import { retryOnceOnIdentityConflict } from './retry-identity-conflict.js'
 import { identityFromClaims, type TokenIdentity } from './token-identity.js'
 
-const sameRoles = (a: readonly Role[], b: readonly Role[]): boolean => a.length === b.length && a.every((role, i) => role === b[i])
+const sameRoles = (a: readonly Role[], b: readonly Role[]): boolean =>
+  a.length === b.length && a.every((role, i) => role === b[i])
 
 const ROLE_ORDER: readonly Role[] = [Role.ADMIN, Role.GERENTE, Role.AUDITOR]
 const sortRoles = (roles: readonly Role[]): Role[] => ROLE_ORDER.filter((role) => roles.includes(role))
@@ -18,7 +19,13 @@ interface UserRow {
   name: string
   roles: Role[]
 }
-const toAuthenticated = (row: UserRow): AuthenticatedUser => ({ id: row.id, email: row.email, username: row.username, name: row.name, roles: sortRoles(row.roles) })
+const toAuthenticated = (row: UserRow): AuthenticatedUser => ({
+  id: row.id,
+  email: row.email,
+  username: row.username,
+  name: row.name,
+  roles: sortRoles(row.roles),
+})
 
 /**
  * Implementa el puerto `UserResolver`: convierte un token verificado en el usuario local, sincronizándolo con Authentik.
@@ -52,7 +59,13 @@ export class AuthentikUserResolver implements UserResolver {
 
     if (!existing) {
       const created = await this.tx.user.create({
-        data: { authentikId: identity.authentikId, email: identity.email, username: identity.username, name: identity.name, roles: identity.roles },
+        data: {
+          authentikId: identity.authentikId,
+          email: identity.email,
+          username: identity.username,
+          name: identity.name,
+          roles: identity.roles,
+        },
       })
       this.log.info('Usuario creado desde Authentik', { userId: created.id, roles: created.roles })
       if (created.roles.length === 0) this.warnNoRole(created.id, identity.groups)
@@ -61,7 +74,10 @@ export class AuthentikUserResolver implements UserResolver {
 
     const roles = await this.protectLastAdmin(existing, identity.roles)
     const unchanged =
-      existing.email === identity.email && existing.username === identity.username && existing.name === identity.name && sameRoles(sortRoles(existing.roles), roles)
+      existing.email === identity.email &&
+      existing.username === identity.username &&
+      existing.name === identity.name &&
+      sameRoles(sortRoles(existing.roles), roles)
     if (unchanged) return toAuthenticated(existing)
 
     const updated = await this.tx.user.update({
@@ -89,6 +105,9 @@ export class AuthentikUserResolver implements UserResolver {
   }
 
   private warnNoRole(userId: string, groups: readonly string[]): void {
-    this.log.warn('Usuario sin ningún rol reconocido; asígnale un grupo (admin, gerente/manager o auditor) en Authentik', { userId, groups })
+    this.log.warn(
+      'Usuario sin ningún rol reconocido; asígnale un grupo (admin, gerente/manager o auditor) en Authentik',
+      { userId, groups },
+    )
   }
 }

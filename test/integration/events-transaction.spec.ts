@@ -81,7 +81,9 @@ describe('los eventos se publican dentro de la transacción del caso de uso', ()
   })
 
   it('el caso de uso falla DESPUÉS de publicar: lo que escribió el handler se revierte con él', async () => {
-    await expect(inContext(() => useCase.register('ACME', { failAfterPublish: true }))).rejects.toThrow('falló después de publicar')
+    await expect(inContext(() => useCase.register('ACME', { failAfterPublish: true }))).rejects.toThrow(
+      'falló después de publicar',
+    )
     expect(recorder.seen).toHaveLength(1) // el handler sí se ejecutó...
     expect(await counts()).toEqual({ orgs: 0, history: 0 }) // ...pero su escritura no sobrevivió: era la misma transacción
   })

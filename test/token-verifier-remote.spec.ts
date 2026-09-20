@@ -43,7 +43,11 @@ async function keyPair(kid = 'k1') {
 }
 
 const verifierFor = (url: string) =>
-  new TokenVerifier(testEnv(), createRemoteJWKSet(new URL(url), { cooldownDuration: 0, timeoutDuration: 1_500 }), logger)
+  new TokenVerifier(
+    testEnv(),
+    createRemoteJWKSet(new URL(url), { cooldownDuration: 0, timeoutDuration: 1_500 }),
+    logger,
+  )
 
 async function outcome(verifier: TokenVerifier, token: string) {
   try {
@@ -57,14 +61,19 @@ async function outcome(verifier: TokenVerifier, token: string) {
 describe('TokenVerifier con el JWKS remoto real', () => {
   it('descarga el JWKS por HTTP y elige la clave por kid', async () => {
     const { jwk, sign } = await keyPair('k1')
-    const url = await serve((_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [jwk] })))
+    const url = await serve(
+      (_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [jwk] })),
+    )
     expect(await outcome(verifierFor(url), await sign())).toBe('ok')
   })
 
   it('elige la clave correcta entre varias (rotación de claves)', async () => {
     const old = await keyPair('vieja')
     const current = await keyPair('nueva')
-    const url = await serve((_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [old.jwk, current.jwk] })))
+    const url = await serve(
+      (_req, res) =>
+        void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [old.jwk, current.jwk] })),
+    )
     const verifier = verifierFor(url)
     expect(await outcome(verifier, await old.sign())).toBe('ok')
     expect(await outcome(verifier, await current.sign())).toBe('ok')
@@ -73,7 +82,9 @@ describe('TokenVerifier con el JWKS remoto real', () => {
   it('un kid que NO está en el JWKS es un token inválido: 401', async () => {
     const other = await keyPair('desconocida')
     const listed = await keyPair('listada')
-    const url = await serve((_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [listed.jwk] })))
+    const url = await serve(
+      (_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [listed.jwk] })),
+    )
     expect(await outcome(verifierFor(url), await other.sign())).toBe('401 TOKEN_INVALID')
   })
 
@@ -115,8 +126,14 @@ describe('TokenVerifier con el JWKS remoto real', () => {
 
   it('con el JWKS ya en caché, una clave conocida sigue valiendo aunque Authentik caiga', async () => {
     const { jwk, sign } = await keyPair('k1')
-    const url = await serve((_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [jwk] })))
-    const verifier = new TokenVerifier(testEnv(), createRemoteJWKSet(new URL(url), { cooldownDuration: 30_000 }), logger)
+    const url = await serve(
+      (_req, res) => void res.setHeader('content-type', 'application/json').end(JSON.stringify({ keys: [jwk] })),
+    )
+    const verifier = new TokenVerifier(
+      testEnv(),
+      createRemoteJWKSet(new URL(url), { cooldownDuration: 30_000 }),
+      logger,
+    )
     expect(await outcome(verifier, await sign())).toBe('ok')
     await new Promise<void>((resolve) => server!.close(() => resolve())) // Authentik cae
     server = undefined

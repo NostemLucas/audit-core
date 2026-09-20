@@ -8,7 +8,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { AppModule } from '../src/app.module.js'
 import { configureApp } from '../src/configure-app.js'
 import { rolesFromGroups } from '../src/modules/identity/roles-from-groups.js'
-import { CurrentUser, JWT_KEYS, USER_RESOLVER, type AuthenticatedUser, type TokenClaims } from '../src/platform/auth/index.js'
+import {
+  CurrentUser,
+  JWT_KEYS,
+  USER_RESOLVER,
+  type AuthenticatedUser,
+  type TokenClaims,
+} from '../src/platform/auth/index.js'
 import { Can, NoAbilityRequired, Public } from '../src/platform/authz/index.js'
 import { ENV } from '../src/platform/config/index.js'
 import { LOG_DESTINATION } from '../src/platform/logging/index.js'
@@ -62,10 +68,14 @@ async function boot(keys: JWTVerifyGetKey) {
   logs = []
   const env = testEnv({ LOG_LEVEL: 'debug' })
   const moduleRef = await Test.createTestingModule({ imports: [AppModule], controllers: [AuthzProbeController] })
-    .overrideProvider(ENV).useValue(env)
-    .overrideProvider(JWT_KEYS).useValue(keys)
-    .overrideProvider(USER_RESOLVER).useValue(fakeResolver)
-    .overrideProvider(LOG_DESTINATION).useValue({ write: (line: string) => void logs.push(JSON.parse(line)) })
+    .overrideProvider(ENV)
+    .useValue(env)
+    .overrideProvider(JWT_KEYS)
+    .useValue(keys)
+    .overrideProvider(USER_RESOLVER)
+    .useValue(fakeResolver)
+    .overrideProvider(LOG_DESTINATION)
+    .useValue({ write: (line: string) => void logs.push(JSON.parse(line)) })
     .compile()
   app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false })
   configureApp(app, env)
@@ -84,7 +94,10 @@ describe('autenticación: verificación del token', () => {
   it('un token válido pasa, y el usuario queda en request.user y en el contexto ambiental', async () => {
     const issuer = await createTestIssuer()
     const server = await boot(issuer.keys)
-    const res = await request(server).get('/api/v1/__authz/me').set(bearer(await issuer.sign())).expect(200)
+    const res = await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await issuer.sign()))
+      .expect(200)
     expect(res.body.data.user).toMatchObject({ username: 'Ana.Perez', roles: ['AUDITOR'] })
     expect(res.body.data.cls).toBe('00000000-0000-7000-8000-00000000abcd') // los sellos, el logger y los eventos lo leen de aquí
   })
@@ -95,10 +108,13 @@ describe('autenticación: verificación del token', () => {
     expect(res.body.error.code).toBe('TOKEN_INVALID')
   })
 
-  it.each([['Basic dXNlcjpwYXNz'], ['Bearer'], ['Bearer '], ['Token abc'], ['bearer'], ['']])('cabecera "%s" → 401', async (header) => {
-    const server = await boot((await createTestIssuer()).keys)
-    await request(server).get('/api/v1/__authz/me').set('authorization', header).expect(401)
-  })
+  it.each([['Basic dXNlcjpwYXNz'], ['Bearer'], ['Bearer '], ['Token abc'], ['bearer'], ['']])(
+    'cabecera "%s" → 401',
+    async (header) => {
+      const server = await boot((await createTestIssuer()).keys)
+      await request(server).get('/api/v1/__authz/me').set('authorization', header).expect(401)
+    },
+  )
 
   it('un texto cualquiera como token → 401', async () => {
     const server = await boot((await createTestIssuer()).keys)
@@ -118,7 +134,10 @@ describe('autenticación: verificación del token', () => {
   ])('token %s → 401 TOKEN_INVALID', async (_name, make) => {
     const issuer = await createTestIssuer()
     const server = await boot(issuer.keys)
-    const res = await request(server).get('/api/v1/__authz/me').set(bearer(await make(issuer))).expect(401)
+    const res = await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await make(issuer)))
+      .expect(401)
     expect(res.body.error.code).toBe('TOKEN_INVALID')
   })
 
@@ -126,18 +145,29 @@ describe('autenticación: verificación del token', () => {
     const issuer = await createTestIssuer()
     const server = await boot(issuer.keys)
     const bodies = await Promise.all(
-      [issuer.sign({ expiresIn: -60 }), issuer.sign({ withOtherKey: true }), issuer.sign({ audience: 'x' })].map(async (token) =>
-        (await request(server).get('/api/v1/__authz/me').set(bearer(await token))).body.error,
+      [issuer.sign({ expiresIn: -60 }), issuer.sign({ withOtherKey: true }), issuer.sign({ audience: 'x' })].map(
+        async (token) =>
+          (
+            await request(server)
+              .get('/api/v1/__authz/me')
+              .set(bearer(await token))
+          ).body.error,
       ),
     )
-    for (const error of bodies) expect({ code: error.code, message: error.message }).toEqual({ code: 'TOKEN_INVALID', message: 'Token ausente, inválido o vencido' })
+    for (const error of bodies)
+      expect({ code: error.code, message: error.message }).toEqual({
+        code: 'TOKEN_INVALID',
+        message: 'Token ausente, inválido o vencido',
+      })
     expect(bodies.every((e) => !('details' in e))).toBe(true)
   })
 
   it('el motivo real queda en el log (debug), no en la respuesta', async () => {
     const issuer = await createTestIssuer()
     const server = await boot(issuer.keys)
-    await request(server).get('/api/v1/__authz/me').set(bearer(await issuer.sign({ expiresIn: -60 })))
+    await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await issuer.sign({ expiresIn: -60 })))
     const rejected = logs.find((l) => l['msg'] === 'Token rechazado')
     expect(rejected).toMatchObject({ context: 'TokenVerifier', reason: 'ERR_JWT_EXPIRED' })
   })
@@ -147,7 +177,10 @@ describe('autenticación: verificación del token', () => {
     const server = await boot(async () => {
       throw new errors.JWKSNoMatchingKey()
     })
-    await request(server).get('/api/v1/__authz/me').set(bearer(await issuer.sign())).expect(401)
+    await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await issuer.sign()))
+      .expect(401)
   })
 
   it('si NO se puede comprobar (Authentik/JWKS caído) es 502 UPSTREAM_UNAVAILABLE, no 401: no deslogueamos a todos', async () => {
@@ -155,7 +188,10 @@ describe('autenticación: verificación del token', () => {
     const server = await boot(async () => {
       throw new TypeError('fetch failed')
     })
-    const res = await request(server).get('/api/v1/__authz/me').set(bearer(await issuer.sign())).expect(502)
+    const res = await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await issuer.sign()))
+      .expect(502)
     expect(res.body.error).toMatchObject({ code: 'UPSTREAM_UNAVAILABLE', details: { service: 'authentik' } })
     expect(JSON.stringify(res.body)).not.toContain('fetch failed')
   })
@@ -165,7 +201,10 @@ describe('autenticación: verificación del token', () => {
     const server = await boot(async () => {
       throw new errors.JWKSTimeout()
     })
-    await request(server).get('/api/v1/__authz/me').set(bearer(await issuer.sign())).expect(502)
+    await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await issuer.sign()))
+      .expect(502)
   })
 })
 
@@ -229,11 +268,15 @@ describe('el log de acceso conoce al usuario solo si está autenticado', () => {
   it('incluye userId en una petición autenticada y no en una pública', async () => {
     const issuer = await createTestIssuer()
     const server = await boot(issuer.keys)
-    await request(server).get('/api/v1/__authz/me').set(bearer(await issuer.sign()))
+    await request(server)
+      .get('/api/v1/__authz/me')
+      .set(bearer(await issuer.sign()))
     await request(server).get('/api/v1/__authz/open')
     await new Promise((r) => setTimeout(r, 30))
     const access = logs.filter((l) => l['context'] === 'Http')
-    expect(access.find((l) => l['path'] === '/api/v1/__authz/me')).toMatchObject({ userId: '00000000-0000-7000-8000-00000000abcd' })
+    expect(access.find((l) => l['path'] === '/api/v1/__authz/me')).toMatchObject({
+      userId: '00000000-0000-7000-8000-00000000abcd',
+    })
     expect(access.find((l) => l['path'] === '/api/v1/__authz/open')).not.toHaveProperty('userId')
   })
 })

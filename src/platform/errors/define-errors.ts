@@ -51,7 +51,9 @@ function toList(value: string | readonly string[] | undefined): readonly string[
 function assertFree(map: Map<string, ErrorDef>, kind: string, name: string, code: string): void {
   const existing = map.get(name)
   if (existing) {
-    throw new Error(`Restricción ${kind} "${name}" ya está asignada a ${existing.code}; no puede asignarse también a ${code}`)
+    throw new Error(
+      `Restricción ${kind} "${name}" ya está asignada a ${existing.code}; no puede asignarse también a ${code}`,
+    )
   }
 }
 

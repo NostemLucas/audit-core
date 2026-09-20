@@ -19,7 +19,16 @@ async function catchError(work: Promise<unknown>): Promise<unknown> {
 describe('User: espejo mínimo de Authentik', () => {
   it('guarda solo lo del proveedor: sin ci, phone, apellidos separados ni sellos', async () => {
     const user = await db.user.create({ data: base })
-    expect(Object.keys(user).sort()).toEqual(['authentikId', 'createdAt', 'email', 'id', 'name', 'roles', 'updatedAt', 'username'])
+    expect(Object.keys(user).sort()).toEqual([
+      'authentikId',
+      'createdAt',
+      'email',
+      'id',
+      'name',
+      'roles',
+      'updatedAt',
+      'username',
+    ])
   })
 
   it('el username se guarda TAL CUAL (es el usuario de Nextcloud y distingue mayúsculas)', async () => {
@@ -36,12 +45,15 @@ describe('User: espejo mínimo de Authentik', () => {
     ['authentikId', { authentikId: 'sub-1', email: 'otra@x.com', username: 'otra' }],
     ['email', { authentikId: 'sub-2', email: 'ana@x.com', username: 'otra' }],
     ['username', { authentikId: 'sub-2', email: 'otra@x.com', username: 'Ana.Perez' }],
-  ])('un choque de %s es USER_IDENTITY_CONFLICT (lo que la sincronización atrapa para reintentar)', async (_campo, data) => {
-    await db.user.create({ data: base })
-    const error = await catchError(db.user.create({ data: { ...data, name: 'Otra' } }))
-    expect(error).toBeInstanceOf(DomainError)
-    expect(error).toMatchObject({ code: 'USER_IDENTITY_CONFLICT', http: 409 })
-  })
+  ])(
+    'un choque de %s es USER_IDENTITY_CONFLICT (lo que la sincronización atrapa para reintentar)',
+    async (_campo, data) => {
+      await db.user.create({ data: base })
+      const error = await catchError(db.user.create({ data: { ...data, name: 'Otra' } }))
+      expect(error).toBeInstanceOf(DomainError)
+      expect(error).toMatchObject({ code: 'USER_IDENTITY_CONFLICT', http: 409 })
+    },
+  )
 
   it('roles es un arreglo de enums, vacío por defecto', async () => {
     const user = await db.user.create({ data: base })

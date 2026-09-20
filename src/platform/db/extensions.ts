@@ -37,7 +37,9 @@ export function stampsExtension(getUserId: () => string | undefined) {
               break
             case 'createMany':
             case 'createManyAndReturn':
-              a.data = Array.isArray(a.data) ? a.data.map((row) => stampCreate(row, userId)) : stampCreate(a.data as Data, userId)
+              a.data = Array.isArray(a.data)
+                ? a.data.map((row) => stampCreate(row, userId))
+                : stampCreate(a.data as Data, userId)
               break
             case 'update':
             case 'updateMany':
