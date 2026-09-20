@@ -62,7 +62,7 @@ Prisma convierte `P2003` en el código de error del catálogo. Así `organizatio
 | Rutas de Nextcloud | `audits/domain/storage-paths.ts` | Provisioning, evidencias, informes |
 | Variables de entorno | `platform/config/env.ts` | Todo el proyecto |
 | Paginación, orden, búsqueda | `platform/http/list-query.ts` | Todos los listados |
-| Traducción de errores de Prisma | `platform/db/prisma-errors.ts` | Filtro HTTP |
+| Traducción de errores de la BD | `onUnique` / `onForeignKeyDelete` en cada definición de error + `platform/db/translate-db-error.ts` (una extensión de Prisma la aplica a toda operación) | Casos de uso y filtro HTTP: reciben ya un `DomainError` |
 
 Consecuencias concretas:
 
@@ -197,7 +197,7 @@ Convenciones fijas:
 | Un módulo solo importa el `index.ts` de otro; sin ciclos; respeta el grafo de §2 | `dependency-cruiser` |
 | `status ===` fuera de `*.lifecycle.ts` | ESLint `no-restricted-syntax` sobre comparaciones con `.status` |
 | Prohibido `process.env` fuera de `config/env.ts` | ESLint `no-restricted-properties` |
-| El cliente generado de Prisma (`src/platform/db/generated`) solo lo importan `platform/db`, `infrastructure/` y `shared/enums.ts` | `dependency-cruiser` |
+| El cliente generado de Prisma (`src/generated/prisma`) solo lo importan `platform/db`, `infrastructure/` y `shared/enums.ts` | `dependency-cruiser` |
 | Prohibido `any`, `@ts-ignore` sin motivo | TS `strict` + ESLint type-checked |
 | Toda ruta declara `@Public`, `@Can` o `@NoAbilityRequired` | Test que recorre las rutas registradas |
 | Códigos de error únicos y todos en el catálogo | Test sobre el registro |
@@ -275,4 +275,49 @@ desconocido responde `INTERNAL` (500) **sin** mensaje ni stack; se registra en e
 Total propio: ~60 líneas en `platform/http`. Verificado con 10 tests (validación de body/query/param, recorte de
 campos, array, `Page`, respuesta que viola su esquema → 500 sin filtrar detalle, y OpenAPI generado) y con el
 build compilado corriendo en Node real.
+
+## 11. Base de datos, transacciones y pruebas (Fase 1d, verificado contra Postgres real)
+
+**Cliente.** `createDb()` = `PrismaClient` con el adaptador `@prisma/adapter-pg` + dos extensiones: **sellos**
+(`createdById`/`updatedById`) y **traducción de errores**. El cliente generado vive en `src/generated/prisma`
+(carpeta neutral, fuera de git; `postinstall` lo genera) y solo lo importan `platform/db`, `infrastructure/` y
+`shared/enums.ts`. Conecta de forma perezosa: la app arranca aunque la BD no responda; `GET /health/ready` (503) lo
+informa y `/health/live` no depende de la BD.
+
+**Cómo escribe un caso de uso:**
+```ts
+constructor(@InjectTx() private readonly tx: Tx) {}
+
+@Transactional()                          // solo en los métodos que escriben
+async execute(actor: Actor, input: Input) {
+  await this.tx.organization.create({ data: input })   // transaccional si hay transacción; normal si no
+}
+```
+`@Transactional()` (de `@nestjs-cls/transactional`) sustituye al `TransactionDiscoveryService` con monkey-patching del
+proyecto viejo. Probado: confirma, revierte todo si el método lanza, un método transaccional dentro de otro se une a
+la externa, y sin la anotación no hay rollback (autocommit).
+
+**Errores de la BD — lo que se comprobó al provocarlos (Prisma 7.10 + `pg`):**
+- El **nombre exacto de la restricción llega** en `meta.driverAdapterError.cause.constraint.index`, tanto para UNIQUE
+  (`P2002`) como para FK (`P2003`). Por eso el catálogo puede declararlas por nombre.
+- `P2003` no dice si fue al insertar o al borrar: se decide por la **operación** (`delete`/`deleteMany`), no por el
+  texto del mensaje (depende del idioma del servidor). Borrar → error "en uso"; escribir → `REFERENCE_INVALID`.
+- Un CHECK llega como `P2039` con SQLSTATE `23514` en `cause`; el nombre de la restricción solo está en el mensaje.
+  Se traduce a `INTEGRITY_VIOLATION` (422), sin exponer nombre ni datos de la fila.
+- Un error dentro de `$transaction` se propaga y hace rollback; la carrera de dos transacciones con el mismo nombre
+  deja una ganadora y la otra recibe el error del catálogo (probado con `Promise.allSettled`).
+- `details` nunca lleva la restricción ni datos de la fila; el error original queda en `cause` (solo log).
+
+**Sellos: límite conocido.** Solo se sella la operación de nivel superior; una escritura anidada
+(`organization.create({ data: { assets: { create: … } } })`) **no** sella al hijo. Está fijado en un test. Regla:
+las raíces de agregado se crean con su propia llamada.
+
+**Guardas del catálogo (CI):** todo nombre de restricción referenciado existe en la migración; y **todo UNIQUE de la
+migración tiene un error asignado o una excepción justificada por escrito** (`UNMAPPED_UNIQUES`). Agregar un UNIQUE
+sin decidir qué le pasa al usuario rompe el build. `shared/enums.ts` tiene un test que exige reexportar todos los
+enums del schema.
+
+**Pruebas.** `npm test` (rápidas, sin BD) y `npm run test:integration` (Postgres 17 real en contenedor con
+testcontainers, migraciones reales, en serie). Toda regla de esta sección tiene al menos una mutación verificada:
+si se rompe el código, el test falla.
 

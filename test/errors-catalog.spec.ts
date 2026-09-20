@@ -18,6 +18,21 @@ function loadConstraints() {
   }
 }
 
+/**
+ * UNIQUE de la migración que a propósito NO tienen error propio. Cada excepción lleva su razón; un UNIQUE nuevo
+ * sin error ni excepción rompe el CI, para que alguien decida qué le pasa al usuario cuando choca.
+ * (Un choque no mapeado igual llega al cliente como CONFLICT 409, nunca como 500.)
+ */
+const UNMAPPED_UNIQUES: Readonly<Record<string, string>> = {
+  assets_id_organizationId_key: 'destino de la FK compuesta de audit_assets; incluye el id, no puede colisionar',
+  audits_id_organizationId_key: 'destino de la FK compuesta de audit_assets; incluye el id, no puede colisionar',
+  controls_id_templateId_key: 'destino de la FK compuesta del árbol; incluye el id, no puede colisionar',
+  audits_code_key: 'el código sale de la secuencia audit_code_seq; un choque es un bug, no un caso de usuario',
+  evaluations_auditId_controlId_key: 'las evaluaciones las crea el inicializador de la auditoría; un choque es un bug',
+  suggested_findings_controlId_levelId_key: 'siempre se escribe con upsert; un choque es un bug',
+  reports_storageFileId_key: 'el archivo lo genera y sube el propio sistema; un choque es un bug',
+}
+
 describe('catálogo de errores', () => {
   it('todos los códigos son MAYUSCULAS_CON_GUION_BAJO', () => {
     for (const def of errorRegistry.all()) expect(def.code).toMatch(/^[A-Z][A-Z0-9_]+$/)
@@ -57,5 +72,20 @@ describe('catálogo de errores', () => {
     expect(errorRegistry.byForeignKeyDelete('assets_organizationId_fkey')?.code).toBe('ORGANIZATION_IN_USE')
     expect(errorRegistry.byForeignKeyDelete('audits_organizationId_fkey')?.code).toBe('ORGANIZATION_IN_USE')
     expect(errorRegistry.byUnique('organizations_name_key')?.code).toBe('ORGANIZATION_NAME_TAKEN')
+  })
+
+  it('todo UNIQUE de la migración tiene un error asignado o una excepción justificada', () => {
+    const mapped = new Set(errorRegistry.referencedConstraints().unique)
+    const missing = [...loadConstraints().unique].filter((name) => !mapped.has(name) && !(name in UNMAPPED_UNIQUES))
+    expect(missing, 'UNIQUE sin error ni excepción: agrega onUnique a un error o justifícalo en UNMAPPED_UNIQUES').toEqual([])
+  })
+
+  it('las excepciones de UNIQUE no quedaron obsoletas', () => {
+    const real = loadConstraints().unique
+    const mapped = new Set(errorRegistry.referencedConstraints().unique)
+    for (const name of Object.keys(UNMAPPED_UNIQUES)) {
+      expect(real, `${name} ya no existe en la migración`).toContain(name)
+      expect(mapped.has(name), `${name} ya tiene error: quítalo de UNMAPPED_UNIQUES`).toBe(false)
+    }
   })
 })

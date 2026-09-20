@@ -5,7 +5,8 @@ import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppModule } from '../src/app.module.js'
 import { configureApp } from '../src/configure-app.js'
-import { ENV, loadEnv } from '../src/platform/config/index.js'
+import { ENV } from '../src/platform/config/index.js'
+import { testEnv } from './support/env.js'
 import { DomainError } from '../src/platform/errors/index.js'
 import { page } from '../src/platform/http/index.js'
 import { OrganizationErrors } from '../src/modules/organizations/errors.js'
@@ -52,7 +53,7 @@ class ProbeController {
 let app: NestExpressApplication | undefined
 
 async function boot(envOverrides: Record<string, string> = {}): Promise<NestExpressApplication> {
-  const env = loadEnv({ NODE_ENV: 'test', ...envOverrides })
+  const env = testEnv(envOverrides)
   const moduleRef = await Test.createTestingModule({ imports: [AppModule], controllers: [ProbeController] })
     .overrideProvider(ENV)
     .useValue(env)

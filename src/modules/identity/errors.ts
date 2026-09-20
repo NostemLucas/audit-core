@@ -7,4 +7,13 @@ import { defineErrors } from '../../platform/errors/index.js'
  */
 export const IdentityErrors = defineErrors({
   USER_NOT_FOUND: { http: 404, message: 'Usuario no encontrado' },
+  /**
+   * Otra petición creó o actualizó al mismo usuario (authentikId, email o username) al mismo tiempo. Es la carrera
+   * normal de dos logins simultáneos: la sincronización con Authentik atrapa este código y reintenta.
+   */
+  USER_IDENTITY_CONFLICT: {
+    http: 409,
+    message: 'Otro proceso está sincronizando a este usuario; reintenta',
+    onUnique: ['users_authentikId_key', 'users_email_key', 'users_username_key'],
+  },
 })

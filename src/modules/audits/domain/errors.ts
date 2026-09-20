@@ -10,6 +10,12 @@ export const AuditErrors = defineErrors({
   AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un miembro para iniciarse' },
   AUDIT_HAS_PENDING_EVALUATIONS: { http: 422, message: 'Hay evaluaciones sin aprobar; no se puede cerrar la auditoría' },
   AUDIT_CANNOT_FOLLOW_UP: { http: 409, message: 'Solo una auditoría cerrada admite seguimiento' },
+  /** Dos seguimientos de la misma auditoría se crearon a la vez y chocaron en el correlativo. */
+  AUDIT_FOLLOW_UP_CONFLICT: {
+    http: 409,
+    message: 'Se creó otro seguimiento al mismo tiempo; vuelve a intentarlo',
+    onUnique: 'audits_parentAuditId_followUpNumber_key',
+  },
   /** Permiso contextual: el actor no es miembro (con el rol necesario) de esta auditoría. */
   AUDIT_ACCESS_DENIED: { http: 403, message: 'No participas en esta auditoría con el rol necesario' },
 
@@ -44,6 +50,12 @@ export const AuditErrors = defineErrors({
 
   // ── Evidencia ──────────────────────────────────────────────────────────────
   EVIDENCE_NOT_FOUND: { http: 404, message: 'Evidencia no encontrada' },
+  /** El mismo archivo de Nextcloud ya está registrado (p. ej. un webhook entregado dos veces): se trata como idempotente. */
+  EVIDENCE_ALREADY_REGISTERED: {
+    http: 409,
+    message: 'Ese archivo ya está registrado como evidencia',
+    onUnique: 'evidences_storageFileId_key',
+  },
   /** No se adjunta ni se elimina evidencia de una evaluación cerrada (aprobada) o de una ronda anterior. */
   EVIDENCE_LOCKED: { http: 409, message: 'La evidencia de esta evaluación no admite cambios en su estado actual' },
 

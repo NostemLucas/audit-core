@@ -7,7 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { AppModule } from '../src/app.module.js'
 import { configureApp } from '../src/configure-app.js'
-import { ENV, loadEnv } from '../src/platform/config/index.js'
+import { ENV } from '../src/platform/config/index.js'
+import { testEnv } from './support/env.js'
 import { Responds, page } from '../src/platform/http/index.js'
 
 // Esquemas de ejemplo: una sola definición da validación, tipo y documentación.
@@ -65,7 +66,7 @@ class ItemsController {
 let app: NestExpressApplication | undefined
 
 async function boot(): Promise<NestExpressApplication> {
-  const env = loadEnv({ NODE_ENV: 'test' })
+  const env = testEnv()
   const moduleRef = await Test.createTestingModule({ imports: [AppModule], controllers: [ItemsController] })
     .overrideProvider(ENV)
     .useValue(env)
