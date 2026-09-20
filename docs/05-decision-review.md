@@ -197,3 +197,30 @@ institución o su regulador (p. ej. ASFI) pueden diferir: por eso §8 lista qué
 3. ¿Los hallazgos se clasifican (mayor, menor, observación)? ¿El informe los cuenta?
 4. ¿Se audita ISO 27001 como conformidad, como madurez, o las dos cosas según la sección?
 
+## 9. Contraste con una segunda opinión (texto pegado por el usuario)
+
+Se comparó con una explicación independiente. **Verificado** en fuente pública (ISO/IEC 15504, base de COBIT PAM): cada
+*atributo de proceso* se califica N/P/L/F con rangos 0–15 %, >15–50 %, >50–85 % y >85–100 %, según la evidencia contra
+indicadores de práctica; el nivel de capacidad se determina a partir de esas calificaciones, no se promedia.
+
+| Punto de esa opinión | Evaluación |
+|---|---|
+| ISO 27001 no define "Cumple = 100 %"; eso es una metodología propia | **De acuerdo** (igual que §7) |
+| El 100/50/0 es el puntaje de la opción de la escala, no el peso del control | **De acuerdo** (igual que §7) |
+| El nivel COBIT 0–5 es resultado de evaluar atributos de un **proceso**; no se promedian niveles para decir "nivel 3,4" | **De acuerdo, y afecta a §6**: el promedio de niveles es una **convención de reporte**, no una medida de capacidad. Debe llamarse "puntaje/madurez promedio (indicativo)", nunca "nivel COBIT" |
+| Hay tres cosas distintas: puntaje de la opción, peso del criterio y nivel COBIT | **De acuerdo** en que son conceptos distintos |
+| "No eliminaría `weight` todavía" | **Sin convencer**: probar que son conceptos distintos no prueba que el producto necesite el peso; es una pregunta de hecho (¿ponderan sus auditores?) y costo bajo en ambos sentidos (columna con valor 1). Se mantiene eliminado, provisional; queda en las preguntas de §8 |
+| Modelar `EvaluationMethod` (ISO conformidad / COBIT PAM) como metodologías distintas | **Prematuro.** El producto anterior usaba 0–5 como **escala de calificación de controles** (madurez por control), no un assessment PAM de procesos × atributos. Ver decisión D-PAM |
+| N/A como opción de escala con valor `NULL` | **No**: aquí es un indicador aparte con justificación obligatoria (equivale a excluir un control de la Declaración de Aplicabilidad) |
+
+**Decisión pendiente D-PAM.** ¿El producto debe hacer una evaluación de capacidad **conforme a COBIT PAM** (procesos ×
+atributos × evidencia, con reglas para determinar el nivel), o usar una escala 0–5 como **madurez por control**?
+- *Madurez por control* (recomendada, lo que ya existía): se conserva el modelo. Se llama así y no "COBIT 5", y el informe
+  dice "madurez promedio (indicativa)".
+- *PAM conforme*: es un método de evaluación distinto (la unidad es proceso-atributo, no la hoja). Se agrega después como
+  `audits.method` (aditivo); no se contorsiona el modelo actual para acomodarlo ahora.
+
+**Ajuste a §6.** Además de los promedios, el resultado de un dominio incluye la **distribución por opción** (cuántos criterios
+en cada opción: p. ej. 12 cumple / 3 parcial / 2 no cumple). En una auditoría de conformidad es el resultado más natural y
+no depende de tratar categorías ordinales como números; el promedio queda como resumen.
+
