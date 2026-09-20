@@ -1,41 +1,18 @@
-import type { NestExpressApplication } from '@nestjs/platform-express'
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core'
-import request from 'supertest'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { listRoutes } from '../../src/platform/authz/index.js'
-import { DB, type Db } from '../../src/platform/db/index.js'
-import { createTestIssuer } from '../support/identity.js'
-import { createTestApp } from './support/app.js'
-import { createAuditFixture, resetDb } from './support/db.js'
+import { useTestApi, type TestRole } from './support/api.js'
+import { createAuditFixture } from './support/db.js'
 
 const BASE = '/api/v1/organizations'
 const UNKNOWN_ID = '0199c0de-0000-7000-8000-000000000001'
 
-let app: NestExpressApplication
-let db: Db
-let issuer: Awaited<ReturnType<typeof createTestIssuer>>
+const t = useTestApi()
+const api = t.api
+const as = t.as
+const db = t.db
 
-beforeAll(async () => {
-  issuer = await createTestIssuer()
-  app = await createTestApp({ jwtKeys: issuer.keys })
-  db = app.get<Db>(DB)
-})
-afterAll(() => app.close())
-beforeEach(() => resetDb(db))
-
-const ROLES = { admin: 'admin', manager: 'gerente', auditor: 'auditor' } as const
-
-/** Cada rol es un usuario distinto (su propio `sub`, email y username). */
-async function as(role: keyof typeof ROLES) {
-  const token = await issuer.sign({
-    subject: `sub-${role}`,
-    claims: { email: `${role}@ejemplo.com`, preferred_username: role, name: role, groups: [ROLES[role]] },
-  })
-  return `Bearer ${token}`
-}
-
-const api = () => request(app.getHttpServer())
-async function create(name: string, role: keyof typeof ROLES = 'manager') {
+async function create(name: string, role: TestRole = 'manager') {
   return api()
     .post(BASE)
     .set('authorization', await as(role))
@@ -60,7 +37,7 @@ describe('permisos', () => {
   })
 
   it('cada endpoint declara la acción que le corresponde (los roles actuales no permiten observarlo por HTTP)', () => {
-    const declared = listRoutes(app.get(DiscoveryService), app.get(MetadataScanner), app.get(Reflector))
+    const declared = listRoutes(t.app().get(DiscoveryService), t.app().get(MetadataScanner), t.app().get(Reflector))
       .filter((route) => route.handler.startsWith('OrganizationsController.'))
       .map((route) => {
         const access = route.access

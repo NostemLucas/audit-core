@@ -19,7 +19,7 @@ export async function resetDb(db: Db): Promise<void> {
 }
 
 /** Lo mínimo para poder crear una auditoría. */
-export async function createAuditFixture(db: Db, organizationId: string, code = 'AUD-TEST-1') {
+export async function createAuditFixture(db: Db, organizationId: string, code = 'AUD-TEST-1', scaleId?: string) {
   const user = await db.user.create({
     data: {
       authentikId: `ak-${code}`,
@@ -29,7 +29,9 @@ export async function createAuditFixture(db: Db, organizationId: string, code = 
     },
   })
   const template = await db.template.create({ data: { name: `T-${code}` } })
-  const scale = await db.scale.create({ data: { name: `S-${code}`, dimension: 'MATURITY' } })
+  const scale = scaleId
+    ? { id: scaleId }
+    : await db.scale.create({ data: { name: `S-${code}`, dimension: 'MATURITY' } })
   return db.audit.create({
     data: { code, name: 'Auditoría', templateId: template.id, organizationId, scaleId: scale.id, managerId: user.id },
   })

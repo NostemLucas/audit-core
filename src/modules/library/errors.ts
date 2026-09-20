@@ -11,15 +11,19 @@ export const LibraryErrors = defineErrors({
     onForeignKeyDelete: 'audits_scaleId_fkey',
   },
   /**
-   * La escala viola una invariante (`details.rule`): MIN_LEVELS (al menos 2 opciones), DUPLICATE_VALUE,
-   * DUPLICATE_LABEL (sin distinguir mayúsculas ni espacios) o MAX_MUST_BE_POSITIVE (el puntaje máximo debe ser > 0).
-   * Es lo único que queda de los antiguos tipos RANGE/BINARY/QUALITATIVE.
+   * La escala viola una invariante (`details.rule`): MIN_LEVELS (al menos 2 opciones), DUPLICATE_VALUE o
+   * DUPLICATE_LABEL (sin distinguir mayúsculas ni espacios). Es lo único que queda de los antiguos tipos
+   * RANGE/BINARY/QUALITATIVE.
    */
   SCALE_LEVELS_INVALID: { http: 422, message: 'Las opciones de la escala no son válidas' },
-  /** Una vez usada en una auditoría, el puntaje de una opción no se edita: cambiaría el significado de lo ya evaluado. */
-  SCALE_LEVEL_VALUE_LOCKED: {
+  /**
+   * Una vez usada en una auditoría, la estructura de la escala (agregar o quitar opciones, cambiar un puntaje) queda
+   * congelada: cambiaría el significado de lo ya evaluado. Solo se corrigen etiquetas y descripciones; para otra
+   * estructura se crea otra escala (igual que una plantilla publicada: clonar para corregir).
+   */
+  SCALE_STRUCTURE_LOCKED: {
     http: 409,
-    message: 'La escala ya se usó en una auditoría; el puntaje de sus opciones no puede modificarse',
+    message: 'La escala ya se usó en una auditoría; solo pueden editarse las etiquetas y descripciones de sus opciones',
   },
   SCALE_LEVEL_NOT_FOUND: { http: 404, message: 'Nivel de escala no encontrado' },
   SCALE_LEVEL_VALUE_TAKEN: {

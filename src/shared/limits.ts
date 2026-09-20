@@ -7,6 +7,8 @@ export const LIMITS = {
   name: 200,
   /** Textos cortos: etiqueta de una opción, título de un control, referencia. */
   title: 500,
+  /** Máximo de opciones de una escala (un tope contra abusos; el mínimo lo fija la invariante de la escala). */
+  scaleLevels: 20,
   /** Textos largos sin formato: descripciones, hallazgos, notas. */
   text: 20_000,
 } as const

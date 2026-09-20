@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import './app-errors.js' // registra el catálogo de errores completo (lo necesita el traductor de errores de la BD)
 import './app-events.js' // registra el catálogo de eventos completo
 import { IdentityModule } from './modules/identity/index.js'
+import { LibraryModule } from './modules/library/index.js'
 import { OrganizationsModule } from './modules/organizations/index.js'
 import { AuthGuard, AuthModule } from './platform/auth/index.js'
 import { AbilitiesGuard, AuthzModule } from './platform/authz/index.js'
@@ -25,6 +26,7 @@ import { LoggingModule } from './platform/logging/index.js'
     AuthzModule,
     IdentityModule,
     OrganizationsModule,
+    LibraryModule,
     ThrottlerModule.forRootAsync({
       imports: [], // EnvModule es global
       inject: [ENV],

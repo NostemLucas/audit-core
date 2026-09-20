@@ -138,7 +138,16 @@ escala válida cumple una sola lista (función de dominio en `library`, `SCALE_L
 | Al menos 2 opciones | `MIN_LEVELS` |
 | Valores únicos (la BD lo garantiza con UNIQUE) | `DUPLICATE_VALUE` |
 | Etiquetas únicas, sin distinguir mayúsculas ni espacios | `DUPLICATE_LABEL` |
-| El puntaje máximo es > 0 | `MAX_MUST_BE_POSITIVE` |
+
+No hay regla de "máximo > 0" (existía en el código anterior porque el score dividía entre el valor objetivo): con al
+menos 2 puntajes distintos y ninguno negativo (CHECK) el máximo siempre lo es, así que sería código muerto.
+
+Las reglas se evalúan sobre el conjunto que quedaría **después** del cambio (alta, edición o baja de una opción). Además:
+- **Estructura congelada al usarse.** Si alguna auditoría usa la escala, ya no se agregan ni se quitan opciones ni se
+  cambia un puntaje (`SCALE_STRUCTURE_LOCKED`); solo se corrigen etiquetas y descripciones. Otra estructura = otra escala.
+- **La dimensión no se edita** (`scales.dimension` fija el significado de la escala).
+- Las operaciones sobre opciones bloquean la fila de la escala (`FOR UPDATE`): dos bajas simultáneas no pueden dejarla con
+  menos de 2 opciones.
 
 "Binaria" es simplemente `niveles.length === 2`; el frontend decide cómo dibujarla. La regla antigua "un nivel
 debe valer 0" no se conserva: no protege ningún cálculo.
