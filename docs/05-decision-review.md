@@ -164,3 +164,36 @@ Lo que se describió como práctica de sus auditores reemplaza a la fórmula her
 - `01` (modelo de datos) todavía describe `weight`, `score` y `finalScore`; se actualizará junto con el schema al empezar la
   Fase 2, una vez confirmado esto.
 
+## 7. Cómo funciona una auditoría real (referencia general, NO verificada contra la institución del usuario)
+
+Conocimiento general de las normas de referencia (ISO 19011, ISO/IEC 17021-1, ISO/IEC 33020 con COBIT PAM, CMMI/SCAMPI). Su
+institución o su regulador (p. ej. ASFI) pueden diferir: por eso §8 lista qué comprobar.
+
+| | Auditoría de **conformidad** | Evaluación de **madurez/capacidad** |
+|---|---|---|
+| Ejemplos | ISO 27001 (certificación, interna), gap assessment | COBIT (PAM), CMMI |
+| Se califica, en cada requisito | cumple / parcialmente / no cumple / no aplica | cumplimiento de atributos: N (0–15 %), P (>15–50 %), L (>50–85 %), F (>85–100 %) |
+| Origen del número | ISO 27001 **no define puntuación**; un % es una convención de reporte | el **nivel 0–5 se deriva** de esas calificaciones y se asigna al **proceso**, no a cada pregunta |
+| Salida | hallazgos: no conformidad mayor / menor, observación, oportunidad de mejora | nivel de capacidad por proceso frente a un objetivo |
+
+**Consecuencias para el modelo.**
+- En una hoja de ISO 27001 lo que se califica es **cumplimiento**. Asignar un "nivel 0–5" a cada pregunta mezclaba las dos familias.
+- El número de una opción de escala **no es una medida sino un puntaje de categoría** (una regla de crédito: p. ej. Cumple 100 /
+  Parcial 50 / No cumple 0), decidido por la función de auditoría y por eso configurable por escala. Distinto de la
+  **importancia de un criterio**, que se eliminó (§6).
+- **El modelo ya cubre ambas familias**: la escala es una lista ordenada de opciones con etiqueta y puntaje. Con una escala de
+  cumplimiento, el promedio de dominio es un % de cumplimiento; con una de madurez, un nivel medio; la misma fórmula (§6).
+- El nivel esperado en una escala de cumplimiento será casi siempre "Cumple"; sigue pudiendo ser "Parcial" con su motivo.
+- **No aplicable** equivale a excluir un control de la Declaración de Aplicabilidad (ISO 27001, 6.1.3), con su justificación.
+- **Falta modelar la clasificación del hallazgo** (conformidad / no conformidad mayor o menor / observación / oportunidad de
+  mejora): es la salida real de una auditoría de conformidad. Propuesta: enum en la evaluación, separado del puntaje.
+- **El seguimiento** verifica el cierre de las no conformidades de la auditoría anterior: respalda elegir los criterios a revisar.
+- El campo `value` de una opción se llamará **puntaje** en la interfaz y en la documentación (la columna puede mantener su nombre).
+
+## 8. Qué comprobar con la auditoría real
+
+1. ¿Las hojas se califican como cumple / parcial / no cumple, o con niveles de madurez? ¿Cuántas categorías y cómo se llaman?
+2. ¿Qué puntaje da cada categoría al calcular un % (100/50/0, otro)? ¿O no se calcula ningún %?
+3. ¿Los hallazgos se clasifican (mayor, menor, observación)? ¿El informe los cuenta?
+4. ¿Se audita ISO 27001 como conformidad, como madurez, o las dos cosas según la sección?
+
