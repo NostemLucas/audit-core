@@ -1,6 +1,6 @@
 # Audit Core — Análisis de la biblioteca de plantillas (propuesta)
 
-Estado: **propuesta para decidir**, sin implementar. Pregunta de origen: ¿el árbol recursivo de controles sirve para
+Estado: **decidido** (ver §4); sin implementar todavía. Pregunta de origen: ¿el árbol recursivo de controles sirve para
 normas de formatos distintos y para los informes, o es una abstracción que no se ajusta? El `code` es arbitrario;
 lo que importa de verdad son el nombre, la descripción y sobre todo los **criterios/actividades de evaluación**.
 
@@ -69,65 +69,60 @@ Costos honestos de la recursión: mover y reordenar nodos es más delicado que e
 (ya lo hace la FK compuesta y una regla de dominio) y conviene limitar la profundidad. La lectura no es un problema:
 una norma completa son cientos o pocos miles de nodos, y se carga entera por plantilla y se arma en memoria.
 
-## 4. Propuesta
+## 4. Decisión (tras la discusión)
 
-### 4.1 El `code` deja de ser identidad
-- `code` → **`reference`**: texto **opcional**, **sin unicidad**, que se muestra tal cual ("A.5.1", "APO01.01", "Art. 5")
-  y que **ninguna lógica usa**. Se elimina `UNIQUE(templateId, code)` y el error `CONTROL_CODE_TAKEN`.
-- La identidad es el `id`. El orden es `position` entre hermanos.
-- Lo que hoy se deduce del código pasa a deducirse **del árbol**, en un solo lugar (`library/domain/control-tree.ts`, una
-  función pura probada) que devuelve por nodo: `depth`, `root` (el dominio), `path`, `number` posicional (`2.1.3`) y
-  permite `rollup` de cualquier valor por subárbol. Gráficos, análisis de brechas, informes y exportación la usan; se
-  eliminan `extractDomain` y el `startsWith`.
+### 4.1 Lo que se decide
 
-### 4.2 El criterio es lo primordial
-- En una hoja, `description` **es el criterio de evaluación**; en un agrupador, el objetivo. Los datos lo respaldan
-  (0 hojas sin descripción en 33 hojas). Regla nueva al **publicar**: toda hoja debe tener criterio
-  (`TEMPLATE_INCOMPLETE`, con la lista de controles que faltan), además de "tiene al menos un control".
-- La numeración del informe sale de la posición; la `reference` se imprime al lado, si existe.
+1. **La referencia es manual.** `code` pasa a **`reference`**: texto libre y **opcional** que se escribe tal cual lo usa la
+   norma (`A.5.1`, `a)`, `APO01.01`, `Art. 5`, `II`…). Sin unicidad y **sin ninguna lógica encima**: ni para agrupar, ni
+   para ordenar, ni como clave de importación. Se elimina `UNIQUE(templateId, code)` y `CONTROL_CODE_TAKEN`.
+2. **El orden es explícito** (`position` entre hermanos). En algunas normas el orden sigue al del padre y en otras es
+   arbitrario, así que no se puede deducir de ningún texto. Se reordena subiendo o bajando entre hermanos y la
+   importación conserva el orden de las filas.
+3. **Sin niveles definidos.** El árbol tiene la profundidad que cada rama necesite (de 2 a 4 niveles, y una rama puede ser
+   más profunda que otra). No hay etiquetas ni prefijos por nivel.
+4. **Lo que se evalúa y se pondera es el último nodo** (la hoja): el criterio/actividad, que es la pregunta ("¿la empresa
+   tiene control de backups?"). Un nodo con hijos es un agrupador y no se evalúa. Si una pregunta tuviera sub-preguntas,
+   la pregunta original pasa a ser el primer hijo.
+5. **Solo el primer nivel se mide.** Los nodos raíz son los "dominios" (en ISO 27001, `A.5`, `A.6`…) y sirven para las
+   gráficas de araña y los subtotales del informe. Todo lo que hay debajo son criterios/actividades organizados para leer.
+   No se calculan subtotales en niveles intermedios.
+6. **La jerarquía sale del árbol, en un solo lugar.** Una función pura (`library/domain/control-tree.ts`) da, para cada
+   hoja, su dominio (el nodo raíz) y su ruta. Reemplaza al `startsWith` de los gráficos y al `extractDomain` del análisis de
+   brechas, que daban dominios vacíos o inconsistentes (§2).
+7. **Importación con una columna `nivel`** y las filas en orden de lectura: el padre de una fila es la fila anterior de nivel
+   menor. Es lo único que no depende de códigos, que aquí son arbitrarios. Se sigue aceptando `código padre` (archivos
+   existentes) resolviéndolo solo dentro del archivo. La exportación escribe el mismo formato (ida y vuelta estable).
+8. **Publicar exige criterio:** toda hoja debe tener descripción (`TEMPLATE_INCOMPLETE`, con la lista de los que faltan) y la
+   plantilla al menos un control. En los datos sembrados ninguna de las 33 hojas carece de ella.
 
-### 4.3 Importación por niveles
-Formato canónico: filas en orden de lectura con una columna `nivel` (1, 2, 3…); el padre de una fila es la fila anterior
-de nivel menor. No hace falta ningún código ni que sean únicos, así que sirve para cualquier norma. Se sigue aceptando
-`código padre` (archivos existentes) resolviéndolo **solo dentro del archivo**, como clave local de la importación, no
-como restricción de la base. Validaciones: la primera fila es de nivel 1, sin saltos de más de un nivel, título
-obligatorio. La exportación escribe el mismo formato, de modo que importar → exportar → importar es estable. Otros
-formatos de origen (esquema en Markdown, JSON) serían adaptadores hacia el mismo árbol canónico; no se construyen hasta
-que haya un caso real.
+### 4.2 Lo que se propuso y se DESCARTÓ (para no reabrirlo)
 
-El Excel de hallazgos sugeridos hoy empareja por `code`; pasaría a llevar una columna `id` técnica (o emparejar por
-posición del árbol), porque un `reference` opcional y repetible no sirve de clave.
+- **Niveles definidos en la plantilla con etiqueta, prefijo, "inicia en" y estilo de numeración** (numérico, letras,
+  romanos) y numeración automática por posición. Descartado por sobreingeniería: cada norma numera a su manera y algunas
+  no siguen ninguna regla. Cualquier esquema automático dejaría fuera casos reales, y una excepción manual acabaría siendo
+  la norma. Solo habría reproducido bien ISO 27001, que no es el problema.
+- **Subtotales en cualquier nivel del árbol** como argumento a favor de la recursión: no se necesita. Solo se mide el
+  primer nivel. La recursión se justifica por la **profundidad variable**, no por los subtotales.
 
-## 5. Decisiones abiertas (necesito tu respuesta)
+### 4.3 Cómo quedan las decisiones abiertas
 
-**D-A. Qué se puntúa.** Es la más importante y no puedo resolverla desde el código:
-- **A (recomendada): se puntúa el control (la hoja).** Las actividades/criterios que lo componen viven en su
-  descripción como lista (una línea por actividad) y el auditor las verifica mientras evalúa. Es lo habitual en una
-  auditoría ISO 19011: los hallazgos se registran por requisito, no por cada viñeta.
-- **B: se puntúa cada actividad.** Tablas nuevas `control_criteria` y `evaluation_criteria(resultado, nota)`; el nivel
-  del control se deriva o se sugiere del porcentaje cumplido. Da hallazgos por actividad en el informe. Costo: con ~93
-  controles de ISO 27001:2022 y ~5 actividades cada uno son ~450 resultados por auditoría, más pantallas y más peso en la
-  repartición de pesos (que deben sumar 100).
-- **C: cada actividad es una hoja de un árbol más profundo.** No agrega tablas, pero multiplica las evaluaciones y los
-  pesos igual que B, sin distinguir "actividad" de "control".
+| | Respuesta |
+|---|---|
+| D-A. Qué se puntúa | **La hoja** (opción A). Actividad, criterio y control son lo mismo: la pregunta del nivel más bajo. |
+| D-B. "Múltiples formatos" | **Estructuras de distinta profundidad** (2 a 4 niveles, ramas desiguales): cubierto por el árbol. No se pidió una escala distinta por sección. |
+| D-C. Referencia | **Manual**, opcional, sin lógica encima. |
+| D-D. Material real | Pendiente: las plantillas de ISO y ASFI reales servirían para probar la importación. |
 
-**D-B. ¿Qué querías decir con "múltiples formatos"?** Lo puedo leer de tres maneras y cambia la solución:
-1. normas con estructuras distintas (profundidad, nombres): cubierto por el árbol;
-2. distintos **archivos** de origen (Excel, Word, PDF): cubierto por el importador canónico + adaptadores;
-3. distintas **formas de evaluar según la sección** (p. ej. las cláusulas 4–10 de ISO 27001 se juzgan como
-   cumple/no cumple y el Anexo A como madurez): hoy la escala es **una por auditoría**. Soportarlo exige una escala por
-   agrupador. Es el cambio más grande y solo lo haría si lo necesitas.
+Supuesto a confirmar: el **dominio es siempre el primer nivel**. Si alguna norma tuviera un nodo paraguas único (p. ej.
+"Anexo A") con los dominios debajo, el radar tendría un solo eje; en ese caso se agregaría una profundidad de gráfica
+por plantilla (aditivo, sin migración de datos). No se construye hasta que exista el caso.
 
-**D-C.** ¿Renombrar `code` → `reference` (opcional, sin unicidad) y pasar a importación por `nivel`?
-
-**D-D.** Si tienes el material real (los Excel o documentos de ISO y ASFI que usan), pásamelo: lo que hay sembrado son
-24 y 30 nodos de demostración y no me permite validar las normas completas.
-
-## 6. Qué cambiaría en el modelo si se aprueba (A + C + D-B.1/2)
+## 5. Qué cambia en el modelo
 
 - `controls`: `code` → `reference` (nullable, sin `UNIQUE`); resto igual.
 - Se elimina `CONTROL_CODE_TAKEN`; se agrega `TEMPLATE_INCOMPLETE` (422).
-- Nuevo `library/domain/control-tree.ts` (pura) y su suite de pruebas con los códigos de COBIT, NIST, ASFI y las
-  numeraciones sin puntos que hoy fallan.
+- Nuevo `library/domain/control-tree.ts` (pura): dominio y ruta de cada hoja, con su suite de pruebas usando los códigos que
+  hoy fallan (COBIT, NIST, ASFI, numeraciones sin puntos) y ramas de distinta profundidad.
 - Importación/exportación por `nivel`, con ida y vuelta probada.
 - Migración inicial regenerada (no hay BD desplegada).
