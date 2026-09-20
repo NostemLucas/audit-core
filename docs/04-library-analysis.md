@@ -51,7 +51,7 @@ Todo esto es la misma causa: **se usó una etiqueta de presentación como clave 
 
 ## 3. ¿Es el árbol recursivo la estructura adecuada?
 
-Honestamente: **la estructura sí, la implementación actual no**.
+Honestamente: **la estructura sí, la implementación actual no**. (La justificación real de la recursión es la profundidad variable; ver §4.2.)
 
 Lo que la recursión resuelve y una estructura fija no:
 - **Profundidad variable.** ISO 27001:2022 Anexo A son 2 niveles (tema → control); ISO 27001:2013 son 3; COBIT 5 son 4
@@ -59,11 +59,10 @@ Lo que la recursión resuelve y una estructura fija no:
   sección → artículo → inciso. Un modelo de 3 niveles fijos obliga a deformar la norma.
 - **Hojas a distintas profundidades** dentro de una misma norma (una cláusula con incisos junto a otra sin ellos).
 
-Lo que aporta a los **informes** (esto es lo que el proyecto anterior desperdiciaba, al agregar solo por el nivel 1):
-- **Subtotales en cualquier nivel**: el puntaje de un agrupador es el de sus descendientes, y se puede mostrar el radar
-  por dominio y bajar a "objetivo" o "capítulo" sin código nuevo.
-- **Índice y numeración automáticos** (`1`, `1.2`, `1.2.3`) calculados por posición, sin depender del `code`.
-- Un informe con la misma forma que la norma, sea cual sea su profundidad.
+Lo que aporta a los **informes**: un informe con la misma forma que la norma, sea cual sea su profundidad, y los subtotales
+por **dominio** (el primer nivel) para las gráficas de araña. Se llegó a proponer también subtotales en cualquier nivel y
+numeración automática por posición; ambas cosas se **descartaron** (§4.2): solo se mide el primer nivel y cada norma numera
+a su manera.
 
 Costos honestos de la recursión: mover y reordenar nodos es más delicado que en una lista, hay que impedir ciclos
 (ya lo hace la FK compuesta y una regla de dominio) y conviene limitar la profundidad. La lectura no es un problema:
