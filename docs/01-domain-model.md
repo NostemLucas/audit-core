@@ -55,10 +55,11 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
   distingue mayúsculas), `name` (claim `name`; Authentik no entrega apellidos por separado de forma fiable), `roles
   Role[]` (desde los grupos). Sin `ci`/`phone` (nadie los consumía), sin `isActive` (`03` §4) y sin sellos de
   auditoría (nadie "crea" a un usuario: lo crea su propio login). Nunca se borran (el resto del sistema los referencia).
-- **organizations** (a quién auditamos): `name` UQ, `description?`, `isActive`. Solo una etiqueta de referencia para agrupar
-  auditorías y activos. Sin dirección, teléfono ni email: ninguna función los consumía (los informes usan solo el nombre)
-  y son datos de contacto que viven en el contrato o el CRM. Un contacto útil es una **persona con rol**; se modelará
-  (`contacts`) cuando exista la función que lo pida. No se borran si tienen auditorías.
+- **organizations** (a quién auditamos): `name` UQ, `isActive`. Solo la referencia del auditado, para agrupar auditorías y
+  activos. Sin dirección, teléfono, email ni descripción: ninguna función los consumía (los informes usan solo el nombre) y
+  el sistema es de auditorías, no de datos de organizaciones. Si eso se necesita, lo gestionará otro sistema y aquí se
+  enlazará con un `externalId` (columna nueva, migración aditiva; no se agrega antes de que exista esa integración). Un
+  contacto útil es una **persona con rol** (`contacts`), no columnas de la organización. No se borran si tienen auditorías.
 - **assets**: `organizationId` FK, `name`, `type` (`APPLICATION | SYSTEM | INFRASTRUCTURE | PROCESS | FACILITY |
   DEPARTMENT | OTHER`), `description?`, `isActive`. UQ(`organizationId`, `name`).
 

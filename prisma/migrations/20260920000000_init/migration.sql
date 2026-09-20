@@ -49,7 +49,6 @@ CREATE TABLE "users" (
 CREATE TABLE "organizations" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
-    "description" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,

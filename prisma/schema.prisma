@@ -126,15 +126,15 @@ model User {
   @@map("users")
 }
 
-/// A quién auditamos (no es un tenant): una etiqueta de referencia para agrupar auditorías y activos.
-/// Sin dirección, teléfono ni email: el sistema no es dueño de datos de contacto (viven en el contrato o el CRM) y
-/// hoy ninguna función los consume. Un contacto útil es una PERSONA con rol; se modelará cuando exista quien lo pida.
-/// No se borra si tiene auditorías (FK Restrict): se desactiva.
+/// A quién auditamos (no es un tenant): la referencia del auditado, para agrupar auditorías y activos.
+/// Solo el nombre y si se puede elegir para auditorías nuevas. El sistema es de auditorías: no gestiona datos de
+/// organizaciones (dirección, contactos, descripción…). Si eso se necesita, lo gestionará otro sistema y aquí se
+/// enlazará con un identificador externo (columna nueva, migración aditiva). No se borra si tiene auditorías
+/// (FK Restrict): se desactiva.
 model Organization {
-  id          String  @id @default(uuid(7)) @db.Uuid
-  name        String  @unique
-  description String?
-  isActive    Boolean @default(true)
+  id       String  @id @default(uuid(7)) @db.Uuid
+  name     String  @unique
+  isActive Boolean @default(true)
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
