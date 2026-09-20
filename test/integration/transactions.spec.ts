@@ -16,7 +16,7 @@ class DemoService {
   @Transactional()
   async orgWithScale(name: string, failAfter = false): Promise<string> {
     const org = await this.tx.organization.create({ data: { name } })
-    await this.tx.scale.create({ data: { name: `escala-${name}` } })
+    await this.tx.scale.create({ data: { name: `escala-${name}`, dimension: 'MATURITY' } })
     if (failAfter) throw new Error('boom')
     return org.id
   }

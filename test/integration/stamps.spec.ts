@@ -70,7 +70,7 @@ describe('sellos createdById / updatedById (extensión de Prisma)', () => {
 
   it('un modelo sin sellos (ScaleLevel) funciona igual, sin errores', async () => {
     currentUser = U1
-    const scale = await db.scale.create({ data: { name: 'S' } })
+    const scale = await db.scale.create({ data: { name: 'S', dimension: 'MATURITY' } })
     const level = await db.scaleLevel.create({ data: { scaleId: scale.id, value: 1, label: 'x' } })
     expect(level).not.toHaveProperty('createdById')
   })

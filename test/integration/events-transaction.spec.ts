@@ -25,7 +25,7 @@ class DemoRecorder implements OnModuleInit {
     this.bus.on(DemoEvents.OrganizationRegistered, async (event) => {
       this.seen.push(event)
       if (this.failNext) throw new Error('el handler falló')
-      await this.tx.scale.create({ data: { name: `historial-${event.payload.name}` } })
+      await this.tx.scale.create({ data: { name: `historial-${event.payload.name}`, dimension: 'MATURITY' } })
     })
   }
 }

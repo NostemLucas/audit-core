@@ -11,11 +11,16 @@ export const LibraryErrors = defineErrors({
     onForeignKeyDelete: 'audits_scaleId_fkey',
   },
   /**
-   * La escala viola una invariante (`details.rule`): MIN_LEVELS (al menos 2 niveles), DUPLICATE_VALUE,
-   * DUPLICATE_LABEL (sin distinguir mayúsculas ni espacios) o MAX_MUST_BE_POSITIVE (el score divide entre el valor
-   * objetivo). Es lo único que queda de los antiguos tipos RANGE/BINARY/QUALITATIVE.
+   * La escala viola una invariante (`details.rule`): MIN_LEVELS (al menos 2 opciones), DUPLICATE_VALUE,
+   * DUPLICATE_LABEL (sin distinguir mayúsculas ni espacios) o MAX_MUST_BE_POSITIVE (el puntaje máximo debe ser > 0).
+   * Es lo único que queda de los antiguos tipos RANGE/BINARY/QUALITATIVE.
    */
-  SCALE_LEVELS_INVALID: { http: 422, message: 'Los niveles de la escala no son válidos' },
+  SCALE_LEVELS_INVALID: { http: 422, message: 'Las opciones de la escala no son válidas' },
+  /** Una vez usada en una auditoría, el puntaje de una opción no se edita: cambiaría el significado de lo ya evaluado. */
+  SCALE_LEVEL_VALUE_LOCKED: {
+    http: 409,
+    message: 'La escala ya se usó en una auditoría; el puntaje de sus opciones no puede modificarse',
+  },
   SCALE_LEVEL_NOT_FOUND: { http: 404, message: 'Nivel de escala no encontrado' },
   SCALE_LEVEL_VALUE_TAKEN: {
     http: 409,
@@ -50,15 +55,16 @@ export const LibraryErrors = defineErrors({
   /** Para auditar hay que usar una plantilla PUBLISHED. */
   TEMPLATE_NOT_PUBLISHED: { http: 409, message: 'Solo se puede auditar con una plantilla publicada' },
   TEMPLATE_EMPTY: { http: 422, message: 'La plantilla no tiene controles' },
+  /**
+   * No se puede publicar: `details.rule` = NO_LEAF (ningún control evaluable), UNTITLED (control sin título) o
+   * ROOT_WITHOUT_CHILDREN (un capítulo de primer nivel sin hijos: el primer nivel es el dominio que se mide y una
+   * plantilla plana no tiene dominios).
+   */
+  TEMPLATE_INVALID_STRUCTURE: { http: 422, message: 'La estructura de la plantilla no permite publicarla' },
   TEMPLATE_IMPORT_INVALID: { http: 422, message: 'El archivo de importación contiene errores' },
 
   // ── Controles ──────────────────────────────────────────────────────────────
   CONTROL_NOT_FOUND: { http: 404, message: 'Control no encontrado' },
-  CONTROL_CODE_TAKEN: {
-    http: 409,
-    message: 'La plantilla ya tiene un control con ese código',
-    onUnique: 'controls_templateId_code_key',
-  },
   CONTROL_HAS_CHILDREN: { http: 409, message: 'El control tiene subcontroles; elimínalos primero' },
   /** Padre de otra plantilla o movimiento que crea un ciclo. */
   CONTROL_PARENT_INVALID: { http: 422, message: 'El control padre no es válido' },

@@ -58,7 +58,7 @@ describe('traducción de errores de la BD (Prisma 7 + adaptador pg, contra Postg
   })
 
   it('CHECK de la BD → INTEGRITY_VIOLATION', async () => {
-    const scale = await db.scale.create({ data: { name: 'S' } })
+    const scale = await db.scale.create({ data: { name: 'S', dimension: 'MATURITY' } })
     const error = await catchError(db.scaleLevel.create({ data: { scaleId: scale.id, value: -1, label: 'negativo' } }))
     expect(error).toMatchObject({ code: 'INTEGRITY_VIOLATION', http: 422 })
   })

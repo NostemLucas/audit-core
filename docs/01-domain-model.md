@@ -29,13 +29,13 @@ Estado: **propuesta para revisión**. Nada de esto está implementado. Reemplaza
 | D5 | Se mantiene una tabla `templates` mínima (cabecera) en vez de un nodo raíz en el árbol. Los capítulos de primer nivel tienen `parentId = NULL`. | La cabecera lleva el `status`. En un nodo raíz, ese campo quedaría nulo en todos los demás nodos y haría falta un trigger para asegurar que la auditoría apunte a una raíz. |
 | D6 | `AuditResponse` + `AuditEvaluation` se fusionan en **`evaluations`**: la evaluación de un control dentro de una auditoría. El estado vigente vive en la fila; el historial es un log append-only `evaluation_reviews`. | Hoy hay dos fuentes de verdad (`isCurrent` y `currentEvaluationId`) y un servicio solo para sincronizarlas. "Response" además no dice qué es. |
 | D7 | "Revisión" se separa en dos: **seguimiento** (`audits.parentAuditId`, nueva auditoría sobre una cerrada) y **ronda** (`evaluations.round`, ciclo devolver/corregir). | Hoy una sola palabra nombra ambas cosas. |
-| D8 | `frameworks`/`framework_levels` pasan a **`scales`/`scale_levels`**, y quedan **mínimas**: `name` + `isActive`; niveles con `value`, `label`, `description?`. Sin `type`, `code`, `description`, `color`, `shortName` ni `position`. | "Framework" se confundía con la norma. Y lo que quedaba era presentación o derivable: el `type` solo lo leía un validador (`BINARY` = 2 niveles; `RANGE` = enteros consecutivos, que no cambia ningún cálculo); el orden es el del `value`; el color lo deriva el frontend. Los informes solo leen `name`, `label`, `value` y `description`. Ver §2.2. |
+| D8 | `frameworks`/`framework_levels` pasan a **`scales`/`scale_levels`**, y quedan **mínimas**: `name` + `dimension` (`CONFORMITY | MATURITY`) + `isActive`; opciones con `value` (su **puntaje**), `label`, `description?`. Sin `type`, `code`, `description`, `color`, `shortName` ni `position`. La escala es donde vive el concepto de "cómo se puntúa" (`05` §11). | "Framework" se confundía con la norma. Y lo que quedaba era presentación o derivable: el `type` solo lo leía un validador (`BINARY` = 2 niveles; `RANGE` = enteros consecutivos, que no cambia ningún cálculo); el orden es el del `value`; el color lo deriva el frontend. Los informes solo leen `name`, `label`, `value` y `description`. Ver §2.2. |
 | D9 | **Alcance propio de la auditoría**: `audit_scope_items` (solo un nombre) dentro de cada auditoría. Sin catálogo de activos por organización, sin `scopeMode`. | Se define **en el momento** de la auditoría qué se audita. Un seguimiento hereda una **copia** del alcance y no puede ampliarlo: incluir algo distinto ya no es seguimiento, es otra auditoría. Con un catálogo reutilizable ese rechazo no tendría fundamento. Ver §3. |
 | D10 | **Se eliminan `global_feed` y `notifications`** del alcance inicial. Queda **`audit_events`**, el historial de cada auditoría. | Definir qué notificar y a quién es una decisión de producto que hoy no está tomada; las tablas solo agregan peso. El historial de auditoría sí se usa (19 puntos de escritura). Se agregan después vía §6. |
 | D11 | Los eventos se guardan como **`type + payload`**, sin texto. El mensaje se genera al leer. | Congelar prosa en español impide cambiar redacción o idioma. |
 | D12 | **Textos predefinidos → `suggested_findings`** (hallazgo sugerido por control y nivel). Solo existen filas con texto real. | Ver §4. |
 | D13 | Se elimina `audits.description` (no aparece en informes). **La guía del auditor se elimina de la plantilla** y no se reintroduce por auditoría: lo institucional es el nivel esperado y su motivo (`evaluations.expectedLevelReason`). Ver `04` §4.4, que corrige el razonamiento original de este punto. | Una guía en la plantilla hay que reescribirla o limpiarla en cada auditoría porque depende de la institución. |
-| D14 | Los valores derivables no se guardan: `achievedEvaluationLevel`, `expectedEvaluationLevel`, `WorkPaper.type`, `fileSizeFormatted`, `nextcloudFolderPath`, `level`, `actorName`. El `score` **sí** se guarda. | Menos columnas que puedan divergir. El `score` lo agregan los dashboards y queda congelado al cerrar. |
+| D14 | Los valores derivables no se guardan: `achievedEvaluationLevel`, `expectedEvaluationLevel`, `WorkPaper.type`, `fileSizeFormatted`, `nextcloudFolderPath`, `level`, `actorName`. **Tampoco `weight`, `score` ni `finalScore`** (revisado en la fase 2; antes el `score` sí se guardaba). | Menos columnas que puedan divergir. No hay pesos manuales (`05` §6): cada hoja evaluable y aplicable cuenta igual, y los resultados se derivan de nivel esperado y alcanzado cuando se piden. Un resultado congelado al cerrar vendrá del informe generado, no de una columna. |
 | D15 | **Sin campos sin lector.** Se quitaron: `Template.description`, `Audit.startedAt` (solo la escribía la máquina de estados; el momento queda en el evento `AuditStarted`), `AuditMember.notes`, `Report.fileName`/`size` (de Nextcloud; el nombre de descarga se deriva del título) y las columnas de `Scale`/`ScaleLevel` citadas en D8. | Verificado contra el proyecto anterior campo por campo (lectores reales, no DTOs ni Swagger). Ver el principio de §0. |
 
 ## 2. Modelo de datos objetivo
@@ -62,12 +62,14 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
   enlazará con un `externalId` (columna nueva, migración aditiva; no se agrega antes de que exista esa integración). Un
   contacto útil es una **persona con rol** (`contacts`), no columnas de la organización. No se borran si tienen auditorías.
 ### Biblioteca
-- **scales**: `name` UQ, `dimension` (`CONFORMITY | MATURITY`, propuesta pendiente de confirmar: `05` §11), `isActive`. Una lista ordenada
-  de opciones con etiqueta y **puntaje** (ver §2.2).
-- **scale_levels**: `scaleId` FK, `value Decimal(5,2)`, `label`, `description?`. UQ(`scaleId`, `value`). Orden = orden del `value`.
+- **scales**: `name` UQ, `dimension` (`CONFORMITY | MATURITY`: solo cambia la etiqueta y la vista principal del resultado y el nivel
+  esperado sugerido, no el cálculo; `05` §11), `isActive`. Una lista ordenada de opciones con etiqueta y **puntaje** (ver §2.2).
+- **scale_levels** (las opciones): `scaleId` FK, `value Decimal(5,2)` (el puntaje), `label`, `description?`. UQ(`scaleId`, `value`).
+  Orden = orden del `value`. El puntaje no se edita una vez usada la escala en una auditoría (regla de dominio, `SCALE_LEVEL_VALUE_LOCKED`).
 - **templates**: `name` UQ, `status` (`DRAFT | PUBLISHED | ARCHIVED`).
-- **controls**: `templateId` FK (cascade), `parentId?` FK→controls (cascade), `code`, `title`, `description?`,
-  `position`. UQ(`templateId`, `code`). Índice (`templateId`, `parentId`, `position`).
+- **controls**: `templateId` FK (cascade), `parentId?` FK→controls (cascade), `reference?` (numeración de la norma tal como la
+  escribe la plantilla; texto libre, **no único, sin lógica**), `title` (en una hoja ES el criterio), `description?`, `position`
+  (el orden es explícito). Índice (`templateId`, `parentId`, `position`). Sin `code` ni `guidance` (`04` §4).
   **FK compuesta** (`parentId`, `templateId`) → controls(`id`, `templateId`): la BD garantiza que el padre es de
   la misma plantilla.
   Se carga completo por plantilla (cientos de nodos) y el árbol se arma en memoria.
@@ -77,22 +79,22 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **audits**: `code` UQ (secuencia de Postgres, sin `findByCode` + reintento), `name`, `introduction?`,
   `scopeNotes?`, `objectives?`, `templateId` FK, `organizationId` FK, `scaleId` FK, `managerId` FK→users,
   `parentAuditId?` FK→audits, `followUpNumber` (0 = inicial), `status` (`DRAFT|IN_PROGRESS|CLOSED|ARCHIVED`),
-  `plannedStart?`, `plannedEnd?`, `closedAt?`, `finalScore? Decimal` (snapshot al cerrar; en curso se calcula),
+  `plannedStart?`, `plannedEnd?`, `closedAt?`,
   `storageFolderId?` (la ruta se deriva del `code`; se revisa en la fase de evidencia), `version` (bloqueo optimista).
-  Se eliminan `description`, `publishedAt`, `archivedAt`, `startedAt`, `scopeMode`, `overallScore` mutable y
+  Se eliminan `description`, `publishedAt`, `archivedAt`, `startedAt`, `scopeMode`, `overallScore`, `finalScore` y
   `nextcloudFolderPath`.
 - **audit_scope_items**: `auditId` FK (cascade), `name`. UQ(`auditId`, `name`). Sin elementos = toda la organización.
 - **audit_members**: `auditId`, `userId`, `role` (`LEAD_AUDITOR | INSPECTOR`). UQ(`auditId`, `userId`).
   Quitar un miembro es un borrado; queda en `audit_events`.
-- **evaluations** (una por auditoría × control **hoja**): `auditId` FK, `controlId` FK, `weight Decimal(5,2)`,
-  `expectedLevelId?` FK (nulo = aún sin fijar; por criterio, no por auditoría) y `expectedLevelReason?` (por qué ese nivel en esta auditoría), `assignedUserId?` FK, `status`
+- **evaluations** (una por auditoría × control **hoja**): `auditId` FK, `controlId` FK,
+  `expectedLevelId?` FK (nulo solo en DRAFT: iniciar la auditoría lo exige en cada hoja; por criterio, no por auditoría) y `expectedLevelReason?` (por qué ese nivel en esta auditoría), `assignedUserId?` FK, `status`
   (`NOT_STARTED|IN_PROGRESS|COMPLETED|RETURNED|APPROVED`), `round` (desde 1), `achievedLevelId?` FK,
-  `score? Decimal`, `findings?`, `notes?`, `isNotApplicable`, `notApplicableReason?`, `version`.
+  `findings?`, `notes?`, `isNotApplicable`, `notApplicableReason?`, `version`.
   UQ(`auditId`, `controlId`). Índices (`auditId`, `status`) y (`assignedUserId`, `status`).
-  `score = achieved.value / expected.value × 100` (tope 100), calculado por el dominio en cada cambio.
+  Sin `weight` ni `score`: los resultados se derivan (`05` §6, §11).
   CHECK: `isNotApplicable` ⇒ `notApplicableReason` no nulo.
 - **evaluation_reviews** (log append-only): `evaluationId` FK, `round`, `action`
-  (`APPROVE|RETURN|REASSIGN|REOPEN|RESTORE`), `actorId` FK, `comments?`, `snapshot jsonb` (nivel, score,
+  (`APPROVE|RETURN|REASSIGN|REOPEN|RESTORE`), `actorId` FK, `comments?`, `snapshot jsonb` (nivel,
   hallazgos, notas, N/A, ids de evidencia; tipado con Zod), `createdAt`. Restaurar una ronda lee el snapshot.
 - **evidences** (antes `work_papers`): `evaluationId` FK, `round`, `title`, `description?`, `fileName`, `mimeType`,
   `size BigInt`, `storageFileId` UQ NOT NULL (fuente de verdad en Nextcloud), `deletedAt?` (único soft-delete del
@@ -112,13 +114,13 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 | El padre de un control es de la misma plantilla | FK compuesta en `controls` |
 | No se borra una organización / plantilla / escala / control en uso | FK `onDelete: Restrict` (la cascada plantilla → controles también se bloquea si hay evaluaciones) |
 | Una evaluación por control y auditoría; un miembro por auditoría | UNIQUE |
-| N/A exige motivo; peso y score en 0–100; `round ≥ 1` | CHECK en `evaluations` |
+| N/A exige motivo; `round ≥ 1` | CHECK en `evaluations` |
 | Seguimiento coherente: `parentAuditId` nulo ⇔ `followUpNumber = 0`; no es su propio padre; fechas ordenadas | CHECK en `audits` |
 | `email` y `username` en minúsculas | CHECK en `users` |
-| Valor de nivel ≥ 0; `payload` y `snapshot` son objetos JSON | CHECK |
+| Puntaje de una opción ≥ 0; `payload` y `snapshot` son objetos JSON | CHECK |
 | Código de auditoría correlativo sin carreras | Secuencia `audit_code_seq` |
 
-Lo que **no** se puede expresar en la BD y queda como regla de dominio: pesos que suman 100 por auditoría; el
+Lo que **no** se puede expresar en la BD y queda como regla de dominio: el
 nivel elegido pertenece a la escala de la auditoría; las invariantes de la escala (§2.2); el alcance solo se edita en `DRAFT` y un seguimiento no puede modificarlo;
 solo se evalúan hojas.
 
@@ -127,15 +129,15 @@ solo se evalúan hojas.
 El código anterior validaba los niveles según un `type`: comunes a todos (≥ 1 nivel, valores y etiquetas únicos),
 `BINARY` = exactamente 2 niveles incluyendo el 0, `QUALITATIVE` = ≥ 2 niveles de cualquier valor y `RANGE` =
 enteros consecutivos. Como `QUALITATIVE` ya admite cualquier conjunto, la única diferencia real era la
-consecutividad, y eso **no interviene en ningún cálculo** (`score = alcanzado / objetivo × 100`). Sin `type`, una
+consecutividad, y eso **no interviene en ningún cálculo**. Sin `type`, una
 escala válida cumple una sola lista (función de dominio en `library`, `SCALE_LEVELS_INVALID` con `details.rule`):
 
 | Regla | `rule` |
 |-------|--------|
-| Al menos 2 niveles | `MIN_LEVELS` |
+| Al menos 2 opciones | `MIN_LEVELS` |
 | Valores únicos (la BD lo garantiza con UNIQUE) | `DUPLICATE_VALUE` |
 | Etiquetas únicas, sin distinguir mayúsculas ni espacios | `DUPLICATE_LABEL` |
-| El valor máximo es > 0 (el score divide entre el valor objetivo) | `MAX_MUST_BE_POSITIVE` |
+| El puntaje máximo es > 0 | `MAX_MUST_BE_POSITIVE` |
 
 "Binaria" es simplemente `niveles.length === 2`; el frontend decide cómo dibujarla. La regla antigua "un nivel
 debe valer 0" no se conserva: no protege ningún cálculo.
@@ -170,8 +172,7 @@ Qué se cambia:
 
 ## 5. Qué se conserva del proyecto actual
 
-Fórmulas de scoring y gap analysis; reglas de transición de auditoría y evaluación (ahora como tabla tipada `defineLifecycle`, sin XState; ver `03`); regla de pesos = 100
-(reparto inicial uniforme con `createMany`; hoy son N+1 inserts); clonado de plantillas; CASL con su test de
+El análisis de brechas (con la fórmula de resultados rediseñada: `05` §6 y §11, sin pesos); reglas de transición de auditoría y evaluación (ahora como tabla tipada `defineLifecycle`, sin XState; ver `03`); clonado de plantillas; CASL con su test de
 cobertura de rutas; sincronización con Authentik (`protectLastAdmin`, reintentos por unique); provisioning y
 shares de Nextcloud (`READ_ONLY=1`, `UPLOAD_ONLY=7`, `EDIT=15`), webhooks y OnlyOffice; contenido de los seeds
 (ISO 27001, ASFI, COBIT 5, CMMI, binaria, cualitativa); informes docx; import/export Excel; Sentry y throttling.
@@ -246,7 +247,7 @@ Sin Redis ni colas mientras los informes sean síncronos.
 | Antes | Ahora |
 |-------|-------|
 | `templates` (`code`,`version`,`publishedAt`,`archivedAt`) | `templates` (`name`,`status`) |
-| `standards` | `controls` (sin `level`, sin `isAuditable`) |
+| `standards` | `controls` (`code` → `reference` libre y opcional; sin `level`, `isAuditable`, `guidance`) |
 | `predefined_texts` | `suggested_findings` |
 | `evaluation_frameworks` / `evaluation_levels` | `scales` / `scale_levels` |
 | `audit_responses` + `audit_evaluations` | `evaluations` + `evaluation_reviews` |

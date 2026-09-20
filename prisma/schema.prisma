@@ -3,7 +3,7 @@
 // Convenciones
 //  - Texto libre = `String` (text en Postgres). Las longitudes máximas viven SOLO en src/shared/limits.ts (Zod).
 //  - Instantes = Timestamptz(3). Fechas de calendario (plazos) = Date.
-//  - Puntajes, pesos y valores de nivel = Decimal(5,2). Se convierten a `number` en los mappers, nunca en el dominio.
+//  - Puntajes de las opciones de una escala = Decimal(5,2). Se convierten a `number` en los mappers, nunca en el dominio.
 //  - Sellos `createdById` / `updatedById`: ids planos (sin FK) rellenados por una Prisma client extension.
 //    El nombre se hidrata con UserDirectory. Solo las raíces de agregado los llevan (no `User`).
 //  - Sin soft-delete genérico. Único `deletedAt`: Evidence.
@@ -27,6 +27,13 @@ enum Role {
   ADMIN
   GERENTE
   AUDITOR
+}
+
+/// Qué mide una escala. No cambia el cálculo: solo cómo se etiqueta y presenta el resultado y qué nivel esperado se
+/// sugiere (docs/05 §11).
+enum ScaleDimension {
+  CONFORMITY
+  MATURITY
 }
 
 enum TemplateStatus {
@@ -128,14 +135,17 @@ model Organization {
 // Biblioteca
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Escala de valoración (COBIT 5, CMMI, binaria, cualitativa…): una lista ordenada de niveles con valor numérico.
-/// Sin `type`: "binaria" es simplemente tener 2 niveles; cómo se dibuja es cosa del frontend. Sin `code`: `name` la
-/// identifica (igual que Template). Invariantes (dominio, ver docs/01): al menos 2 niveles, valores únicos, etiquetas
-/// únicas sin distinguir mayúsculas, y el valor máximo > 0 (el score divide entre el valor objetivo).
+/// Escala de valoración: es donde vive el concepto de "cómo se puntúa" (docs/05 §11). Una lista ordenada de opciones,
+/// cada una con su etiqueta y su puntaje (p. ej. "ISO 27001 – Conformidad": Cumple 100 · Parcial 50 · No cumple 0;
+/// o "Madurez 0–5"). La plantilla no conoce puntajes: la auditoría elige plantilla y escala. `dimension` dice qué mide.
+/// Sin `type`: "binaria" es simplemente tener 2 opciones. Sin `code`: `name` la identifica (igual que Template).
+/// Invariantes (dominio, ver docs/01): al menos 2 opciones, puntajes únicos, etiquetas únicas sin distinguir
+/// mayúsculas, y el puntaje máximo > 0. El puntaje de una opción no se edita una vez usada en una auditoría.
 model Scale {
-  id       String  @id @default(uuid(7)) @db.Uuid
-  name     String  @unique
-  isActive Boolean @default(true)
+  id        String         @id @default(uuid(7)) @db.Uuid
+  name      String         @unique
+  dimension ScaleDimension
+  isActive  Boolean        @default(true)
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
@@ -148,8 +158,9 @@ model Scale {
   @@map("scales")
 }
 
-/// Nivel de una escala. El orden es el del `value` (no hay `position`). Sin `color` ni `shortName`: son cosa de
-/// presentación y el frontend los deriva del valor normalizado. Los informes usan `label`, `value` y `description`.
+/// Opción de una escala. `value` es su PUNTAJE (convención de la función de auditoría: ni un nivel medido ni un peso).
+/// El orden es el del `value` (no hay `position`). Sin `color` ni `shortName`: son cosa de presentación y el frontend
+/// los deriva del valor normalizado. Los informes usan `label`, `value` y `description`.
 model ScaleLevel {
   id          String  @id @default(uuid(7)) @db.Uuid
   scaleId     String  @db.Uuid
@@ -193,12 +204,13 @@ model Control {
   id          String  @id @default(uuid(7)) @db.Uuid
   templateId  String  @db.Uuid
   parentId    String? @db.Uuid
-  /// Numeración de la norma, p. ej. "A.5.1"
-  code        String
+  /// Numeración de la norma tal como la escribe la plantilla ("A.5.1", "APO01.01", "Art. 5"…). Texto libre, opcional,
+  /// NO único y sin lógica sobre él: el orden es `position` y la jerarquía es `parentId`.
+  reference   String?
+  /// El texto del control. En una hoja ES el criterio que se evalúa.
   title       String
+  /// Texto explicativo de la norma, opcional en cualquier nodo.
   description String?
-  /// Guía para el auditor. Única guía del sistema (no hay override por auditoría).
-  guidance    String?
   position    Int
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -210,7 +222,6 @@ model Control {
   suggestedFindings SuggestedFinding[]
   evaluations       Evaluation[]
 
-  @@unique([templateId, code])
   // Destino de la FK compuesta del árbol: el padre debe ser de la misma plantilla.
   @@unique([id, templateId])
   @@index([templateId, parentId, position])
@@ -267,8 +278,6 @@ model Audit {
   plannedStart DateTime? @db.Date
   plannedEnd   DateTime? @db.Date
   closedAt     DateTime? @db.Timestamptz(3)
-  /// Snapshot congelado al cerrar. En curso se calcula con scoring.ts
-  finalScore   Decimal?  @db.Decimal(5, 2)
 
   /// Id de la carpeta en Nextcloud. La ruta se deriva de `code` (storage-paths.ts)
   storageFolderId String?
@@ -343,19 +352,17 @@ model Evaluation {
   auditId   String @db.Uuid
   controlId String @db.Uuid
 
-  /// Suma de pesos por auditoría = 100 (regla de dominio)
-  weight          Decimal @default(0) @db.Decimal(5, 2)
-  /// Nivel objetivo. Nulo = máximo de la escala de la auditoría
-  expectedLevelId String? @db.Uuid
-  assignedUserId  String? @db.Uuid
+  /// Opción esperada para ESTE control (varía por control). Obligatoria antes de iniciar la auditoría; nulo solo en DRAFT.
+  expectedLevelId     String? @db.Uuid
+  /// Por qué se espera esa opción (p. ej. "criticidad alta según el análisis de riesgos"). Opcional.
+  expectedLevelReason String?
+  assignedUserId      String? @db.Uuid
 
   status EvaluationStatus @default(NOT_STARTED)
   /// Ronda devolver/corregir, desde 1
   round  Int              @default(1)
 
-  achievedLevelId String?  @db.Uuid
-  /// achieved.value / expected.value × 100, tope 100. Calculado por scoring.ts en cada cambio
-  score           Decimal? @db.Decimal(5, 2)
+  achievedLevelId String? @db.Uuid
   findings        String?
   notes           String?
 

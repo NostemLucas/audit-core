@@ -11,5 +11,6 @@ export {
   ReportType,
   ReviewAction,
   Role,
+  ScaleDimension,
   TemplateStatus,
 } from '../generated/prisma/enums.js'

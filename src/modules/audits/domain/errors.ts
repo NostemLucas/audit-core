@@ -7,6 +7,8 @@ export const AuditErrors = defineErrors({
   AUDIT_INVALID_STATE: { http: 409, message: 'La auditoría no admite esa operación en su estado actual' },
   /** Capacidad `editable` (docs/03): solo una auditoría en borrador se edita o se elimina. */
   AUDIT_NOT_EDITABLE: { http: 409, message: 'Solo una auditoría en borrador puede modificarse o eliminarse' },
+  /** Iniciar exige nivel esperado en cada control evaluable. `details.missing` = cuántos faltan. */
+  AUDIT_EXPECTED_LEVELS_MISSING: { http: 422, message: 'Faltan niveles esperados en algunos controles' },
   AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un miembro para iniciarse' },
   AUDIT_HAS_PENDING_EVALUATIONS: {
     http: 422,
@@ -54,12 +56,10 @@ export const AuditErrors = defineErrors({
   /** Capacidad `editable`: solo en IN_PROGRESS o RETURNED se modifican nivel, hallazgos y notas. */
   EVALUATION_NOT_EDITABLE: { http: 409, message: 'La evaluación no puede modificarse en su estado actual' },
   EVALUATION_NOT_ASSIGNED: { http: 403, message: 'La evaluación no está asignada a este usuario' },
-  /** Completar exige nivel alcanzado y score (o marcarla no aplicable). */
+  /** Completar exige el nivel alcanzado (o marcarla no aplicable). */
   EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para completar la evaluación' },
   EVALUATION_LEVEL_NOT_IN_SCALE: { http: 422, message: 'El nivel no pertenece a la escala de la auditoría' },
   NOT_APPLICABLE_REASON_REQUIRED: { http: 422, message: 'Marcar como no aplicable requiere un motivo' },
-  /** Los pesos de una auditoría deben sumar 100. `details.sum` trae el total recibido. */
-  WEIGHTS_SUM_INVALID: { http: 422, message: 'Los pesos deben sumar 100' },
   REVIEW_SNAPSHOT_NOT_FOUND: { http: 404, message: 'No existe esa ronda en el historial de la evaluación' },
 
   // ── Evidencia ──────────────────────────────────────────────────────────────

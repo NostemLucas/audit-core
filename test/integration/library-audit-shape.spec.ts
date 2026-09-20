@@ -4,12 +4,13 @@ import { createAuditFixture, directDb, resetDb } from './support/db.js'
 const db = directDb()
 beforeEach(() => resetDb(db))
 
-describe('Escala: una lista de niveles, sin tipo ni presentación', () => {
-  it('Scale guarda solo nombre y disponibilidad (sin code, type ni description)', async () => {
-    const scale = await db.scale.create({ data: { name: 'COBIT 5' } })
+describe('Escala: opciones con puntaje y una dimensión, sin tipo ni presentación', () => {
+  it('Scale guarda nombre, dimensión y disponibilidad (sin code, type ni description)', async () => {
+    const scale = await db.scale.create({ data: { name: 'COBIT 5', dimension: 'MATURITY' } })
     expect(Object.keys(scale).sort()).toEqual([
       'createdAt',
       'createdById',
+      'dimension',
       'id',
       'isActive',
       'name',
@@ -19,8 +20,8 @@ describe('Escala: una lista de niveles, sin tipo ni presentación', () => {
     expect(scale.isActive).toBe(true)
   })
 
-  it('ScaleLevel guarda lo que la lógica y los informes leen: value, label y description opcional', async () => {
-    const scale = await db.scale.create({ data: { name: 'Binaria' } })
+  it('ScaleLevel guarda lo que la lógica y los informes leen: value (puntaje), label y description opcional', async () => {
+    const scale = await db.scale.create({ data: { name: 'Binaria', dimension: 'CONFORMITY' } })
     const level = await db.scaleLevel.create({ data: { scaleId: scale.id, value: 0, label: 'No cumple' } })
     expect(Object.keys(level).sort()).toEqual([
       'createdAt',
@@ -38,6 +39,7 @@ describe('Escala: una lista de niveles, sin tipo ni presentación', () => {
     const scale = await db.scale.create({
       data: {
         name: 'Binaria',
+        dimension: 'CONFORMITY',
         levels: {
           create: [
             { value: 0, label: 'No cumple' },
@@ -51,7 +53,7 @@ describe('Escala: una lista de niveles, sin tipo ni presentación', () => {
   })
 
   it('el orden de los niveles es el del valor (no hay position)', async () => {
-    const scale = await db.scale.create({ data: { name: 'CMMI' } })
+    const scale = await db.scale.create({ data: { name: 'CMMI', dimension: 'MATURITY' } })
     await db.scaleLevel.createMany({
       data: [
         { scaleId: scale.id, value: 3, label: 'Definido' },
@@ -126,5 +128,47 @@ describe('Equipo e informes: solo lo que se consume', () => {
     })
     expect(report).not.toHaveProperty('fileName')
     expect(report).not.toHaveProperty('size')
+  })
+})
+
+describe('Control: la numeración es texto libre, no una clave', () => {
+  it('Control guarda reference opcional (sin code ni guidance)', async () => {
+    const tpl = await db.template.create({ data: { name: 'ISO/IEC 27001:2022' } })
+    const control = await db.control.create({ data: { templateId: tpl.id, title: 'Copias de seguridad', position: 1 } })
+    expect(Object.keys(control).sort()).toEqual([
+      'createdAt',
+      'description',
+      'id',
+      'parentId',
+      'position',
+      'reference',
+      'templateId',
+      'title',
+      'updatedAt',
+    ])
+    expect(control.reference).toBeNull()
+  })
+
+  it('la referencia no es única: dos controles pueden compartirla (o repetirla vacía) sin que la BD lo impida', async () => {
+    const tpl = await db.template.create({ data: { name: 'ASFI' } })
+    await db.control.create({ data: { templateId: tpl.id, reference: 'Art. 5', title: 'a', position: 1 } })
+    await expect(
+      db.control.create({ data: { templateId: tpl.id, reference: 'Art. 5', title: 'b', position: 2 } }),
+    ).resolves.toBeDefined()
+  })
+})
+
+describe('Evaluación y auditoría: nada calculado se guarda', () => {
+  it('Evaluation no guarda peso ni score y sí el motivo del nivel esperado; Audit no guarda finalScore', async () => {
+    const org = await db.organization.create({ data: { name: 'ACME' } })
+    const audit = await createAuditFixture(db, org.id)
+    const control = await db.control.create({
+      data: { templateId: audit.templateId, title: 'Copias de seguridad', position: 1 },
+    })
+    const evaluation = await db.evaluation.create({ data: { auditId: audit.id, controlId: control.id } })
+    expect(evaluation).not.toHaveProperty('weight')
+    expect(evaluation).not.toHaveProperty('score')
+    expect(evaluation.expectedLevelReason).toBeNull()
+    expect(audit).not.toHaveProperty('finalScore')
   })
 })

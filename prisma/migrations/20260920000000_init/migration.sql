@@ -5,6 +5,9 @@ CREATE SCHEMA IF NOT EXISTS "public";
 CREATE TYPE "Role" AS ENUM ('ADMIN', 'GERENTE', 'AUDITOR');
 
 -- CreateEnum
+CREATE TYPE "ScaleDimension" AS ENUM ('CONFORMITY', 'MATURITY');
+
+-- CreateEnum
 CREATE TYPE "TemplateStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
 
 -- CreateEnum
@@ -53,6 +56,7 @@ CREATE TABLE "organizations" (
 CREATE TABLE "scales" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
+    "dimension" "ScaleDimension" NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
@@ -93,10 +97,9 @@ CREATE TABLE "controls" (
     "id" UUID NOT NULL,
     "templateId" UUID NOT NULL,
     "parentId" UUID,
-    "code" TEXT NOT NULL,
+    "reference" TEXT,
     "title" TEXT NOT NULL,
     "description" TEXT,
-    "guidance" TEXT,
     "position" INTEGER NOT NULL,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
@@ -134,7 +137,6 @@ CREATE TABLE "audits" (
     "plannedStart" DATE,
     "plannedEnd" DATE,
     "closedAt" TIMESTAMPTZ(3),
-    "finalScore" DECIMAL(5,2),
     "storageFolderId" TEXT,
     "version" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -172,13 +174,12 @@ CREATE TABLE "evaluations" (
     "id" UUID NOT NULL,
     "auditId" UUID NOT NULL,
     "controlId" UUID NOT NULL,
-    "weight" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "expectedLevelId" UUID,
+    "expectedLevelReason" TEXT,
     "assignedUserId" UUID,
     "status" "EvaluationStatus" NOT NULL DEFAULT 'NOT_STARTED',
     "round" INTEGER NOT NULL DEFAULT 1,
     "achievedLevelId" UUID,
-    "score" DECIMAL(5,2),
     "findings" TEXT,
     "notes" TEXT,
     "isNotApplicable" BOOLEAN NOT NULL DEFAULT false,
@@ -282,9 +283,6 @@ CREATE INDEX "controls_templateId_parentId_position_idx" ON "controls"("template
 
 -- CreateIndex
 CREATE INDEX "controls_parentId_idx" ON "controls"("parentId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "controls_templateId_code_key" ON "controls"("templateId", "code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "controls_id_templateId_key" ON "controls"("id", "templateId");
@@ -453,7 +451,7 @@ CREATE SEQUENCE "audit_code_seq" START WITH 1 INCREMENT BY 1;
 ALTER TABLE "users"
   ADD CONSTRAINT "users_email_lowercase" CHECK ("email" = lower("email"));
 
--- scale_levels: el valor no puede ser negativo (que el máximo sea > 0 y que haya >= 2 niveles lo valida el dominio).
+-- scale_levels: el puntaje no puede ser negativo (que el máximo sea > 0 y que haya >= 2 opciones lo valida el dominio).
 ALTER TABLE "scale_levels"
   ADD CONSTRAINT "scale_levels_value_nonneg" CHECK ("value" >= 0);
 
@@ -461,13 +459,10 @@ ALTER TABLE "scale_levels"
 ALTER TABLE "audits"
   ADD CONSTRAINT "audits_followup_consistency" CHECK (("parentAuditId" IS NULL) = ("followUpNumber" = 0)),
   ADD CONSTRAINT "audits_not_own_parent"       CHECK ("parentAuditId" IS NULL OR "parentAuditId" <> "id"),
-  ADD CONSTRAINT "audits_planned_dates"        CHECK ("plannedStart" IS NULL OR "plannedEnd" IS NULL OR "plannedEnd" >= "plannedStart"),
-  ADD CONSTRAINT "audits_final_score_range"   CHECK ("finalScore" IS NULL OR ("finalScore" >= 0 AND "finalScore" <= 100));
+  ADD CONSTRAINT "audits_planned_dates"        CHECK ("plannedStart" IS NULL OR "plannedEnd" IS NULL OR "plannedEnd" >= "plannedStart");
 
 -- evaluations
 ALTER TABLE "evaluations"
-  ADD CONSTRAINT "evaluations_weight_range"  CHECK ("weight" >= 0 AND "weight" <= 100),
-  ADD CONSTRAINT "evaluations_score_range"   CHECK ("score" IS NULL OR ("score" >= 0 AND "score" <= 100)),
   ADD CONSTRAINT "evaluations_round_min"     CHECK ("round" >= 1),
   ADD CONSTRAINT "evaluations_na_reason"     CHECK (NOT "isNotApplicable" OR "notApplicableReason" IS NOT NULL);
 
