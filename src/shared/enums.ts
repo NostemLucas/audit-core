@@ -5,14 +5,11 @@
  * Un test verifica que aquí estén TODOS los enums del schema.
  */
 export {
-  AssetType,
   AuditRole,
   AuditStatus,
   EvaluationStatus,
   ReportType,
   ReviewAction,
   Role,
-  ScaleType,
-  ScopeMode,
   TemplateStatus,
 } from '../generated/prisma/enums.js'

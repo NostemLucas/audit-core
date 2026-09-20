@@ -29,18 +29,19 @@ Estado: **propuesta para revisión**. Nada de esto está implementado. Reemplaza
 | D5 | Se mantiene una tabla `templates` mínima (cabecera) en vez de un nodo raíz en el árbol. Los capítulos de primer nivel tienen `parentId = NULL`. | La cabecera lleva el `status`. En un nodo raíz, ese campo quedaría nulo en todos los demás nodos y haría falta un trigger para asegurar que la auditoría apunte a una raíz. |
 | D6 | `AuditResponse` + `AuditEvaluation` se fusionan en **`evaluations`**: la evaluación de un control dentro de una auditoría. El estado vigente vive en la fila; el historial es un log append-only `evaluation_reviews`. | Hoy hay dos fuentes de verdad (`isCurrent` y `currentEvaluationId`) y un servicio solo para sincronizarlas. "Response" además no dice qué es. |
 | D7 | "Revisión" se separa en dos: **seguimiento** (`audits.parentAuditId`, nueva auditoría sobre una cerrada) y **ronda** (`evaluations.round`, ciclo devolver/corregir). | Hoy una sola palabra nombra ambas cosas. |
-| D8 | `frameworks`/`framework_levels` pasan a **`scales`/`scale_levels`** (escala de valoración: COBIT 5, CMMI, binaria, cualitativa). | "Framework" se confunde con la norma (ISO también lo es). Lo que son es una escala con niveles. |
-| D9 | **Alcance**: catálogo `assets` por organización + `audits.scopeMode` + `audit_assets`. | Permite auditar "solo el ERP" de una organización y consultar el historial por activo. Ver §3. |
+| D8 | `frameworks`/`framework_levels` pasan a **`scales`/`scale_levels`**, y quedan **mínimas**: `name` + `isActive`; niveles con `value`, `label`, `description?`. Sin `type`, `code`, `description`, `color`, `shortName` ni `position`. | "Framework" se confundía con la norma. Y lo que quedaba era presentación o derivable: el `type` solo lo leía un validador (`BINARY` = 2 niveles; `RANGE` = enteros consecutivos, que no cambia ningún cálculo); el orden es el del `value`; el color lo deriva el frontend. Los informes solo leen `name`, `label`, `value` y `description`. Ver §2.2. |
+| D9 | **Alcance propio de la auditoría**: `audit_scope_items` (solo un nombre) dentro de cada auditoría. Sin catálogo de activos por organización, sin `scopeMode`. | Se define **en el momento** de la auditoría qué se audita. Un seguimiento hereda una **copia** del alcance y no puede ampliarlo: incluir algo distinto ya no es seguimiento, es otra auditoría. Con un catálogo reutilizable ese rechazo no tendría fundamento. Ver §3. |
 | D10 | **Se eliminan `global_feed` y `notifications`** del alcance inicial. Queda **`audit_events`**, el historial de cada auditoría. | Definir qué notificar y a quién es una decisión de producto que hoy no está tomada; las tablas solo agregan peso. El historial de auditoría sí se usa (19 puntos de escritura). Se agregan después vía §6. |
 | D11 | Los eventos se guardan como **`type + payload`**, sin texto. El mensaje se genera al leer. | Congelar prosa en español impide cambiar redacción o idioma. |
 | D12 | **Textos predefinidos → `suggested_findings`** (hallazgo sugerido por control y nivel). Solo existen filas con texto real. | Ver §4. |
 | D13 | Se eliminan `guidanceOverride` (la guía por auditoría, sin uso) y `audits.description` (no aparece en informes). La guía vive solo en el control. | Solo entra lo que se usa. |
 | D14 | Los valores derivables no se guardan: `achievedEvaluationLevel`, `expectedEvaluationLevel`, `WorkPaper.type`, `fileSizeFormatted`, `nextcloudFolderPath`, `level`, `actorName`. El `score` **sí** se guarda. | Menos columnas que puedan divergir. El `score` lo agregan los dashboards y queda congelado al cerrar. |
+| D15 | **Sin campos sin lector.** Se quitaron: `Template.description`, `Audit.startedAt` (solo la escribía la máquina de estados; el momento queda en el evento `AuditStarted`), `AuditMember.notes`, `Report.fileName`/`size` (de Nextcloud; el nombre de descarga se deriva del título) y las columnas de `Scale`/`ScaleLevel` citadas en D8. | Verificado contra el proyecto anterior campo por campo (lectores reales, no DTOs ni Swagger). Ver el principio de §0. |
 
 ## 2. Modelo de datos objetivo
 
 Todas las tablas llevan `id uuid` (UUIDv7, ordenable por tiempo), `createdAt` y `updatedAt` (`Timestamptz`),
-salvo puentes y logs. Las **raíces de agregado** (`organizations`, `assets`, `scales`, `templates`,
+salvo puentes y logs. Las **raíces de agregado** (`organizations`, `scales`, `templates`,
 `audits`, `evaluations`, `evidences`, `reports`) llevan además los sellos `createdById` / `updatedById`: ids
 planos **sin FK**, que rellena una Prisma client extension; el nombre se hidrata con un `UserDirectory`. Es la
 única excepción a "toda referencia a un usuario lleva FK". Con esto `evidences.createdById` **es** quien subió el
@@ -60,15 +61,10 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
   el sistema es de auditorías, no de datos de organizaciones. Si eso se necesita, lo gestionará otro sistema y aquí se
   enlazará con un `externalId` (columna nueva, migración aditiva; no se agrega antes de que exista esa integración). Un
   contacto útil es una **persona con rol** (`contacts`), no columnas de la organización. No se borran si tienen auditorías.
-- **assets**: `organizationId` FK, `name`, `type` (`APPLICATION | SYSTEM | INFRASTRUCTURE | PROCESS | FACILITY |
-  DEPARTMENT | OTHER`), `description?`, `isActive`. UQ(`organizationId`, `name`).
-
 ### Biblioteca
-- **scales**: `code` UQ, `name` UQ, `type` (`RANGE | BINARY | QUALITATIVE`, solo afecta al widget), `description?`,
-  `isActive`.
-- **scale_levels**: `scaleId` FK, `value Decimal(5,2)`, `label`, `shortName?`, `description`, `color`, `position`.
-  UQ(`scaleId`, `value`).
-- **templates**: `name` UQ, `description?`, `status` (`DRAFT | PUBLISHED | ARCHIVED`).
+- **scales**: `name` UQ, `isActive`. Una lista ordenada de niveles; nada más (ver §2.2).
+- **scale_levels**: `scaleId` FK, `value Decimal(5,2)`, `label`, `description?`. UQ(`scaleId`, `value`). Orden = orden del `value`.
+- **templates**: `name` UQ, `status` (`DRAFT | PUBLISHED | ARCHIVED`).
 - **controls**: `templateId` FK (cascade), `parentId?` FK→controls (cascade), `code`, `title`, `description?`,
   `guidance?`, `position`. UQ(`templateId`, `code`). Índice (`templateId`, `parentId`, `position`).
   **FK compuesta** (`parentId`, `templateId`) → controls(`id`, `templateId`): la BD garantiza que el padre es de
@@ -80,14 +76,13 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **audits**: `code` UQ (secuencia de Postgres, sin `findByCode` + reintento), `name`, `introduction?`,
   `scopeNotes?`, `objectives?`, `templateId` FK, `organizationId` FK, `scaleId` FK, `managerId` FK→users,
   `parentAuditId?` FK→audits, `followUpNumber` (0 = inicial), `status` (`DRAFT|IN_PROGRESS|CLOSED|ARCHIVED`),
-  `scopeMode` (`FULL_ORGANIZATION | SELECTED_ASSETS`), `plannedStart?`, `plannedEnd?`, `startedAt?`, `closedAt?`,
-  `finalScore? Decimal` (snapshot al cerrar; en curso se calcula), `storageFolderId?` (la ruta se deriva del
-  `code`), `version` (bloqueo optimista). Se eliminan `description`, `publishedAt`, `archivedAt`,
-  `overallScore` mutable y `nextcloudFolderPath`.
-- **audit_assets**: PK(`auditId`, `assetId`) + `organizationId` en ambas FK compuestas → la BD garantiza que el
-  activo pertenece a la organización auditada.
-- **audit_members**: `auditId`, `userId`, `role` (`LEAD_AUDITOR | INSPECTOR`), `notes?`.
-  UQ(`auditId`, `userId`). Quitar un miembro es un borrado; queda en `audit_events`.
+  `plannedStart?`, `plannedEnd?`, `closedAt?`, `finalScore? Decimal` (snapshot al cerrar; en curso se calcula),
+  `storageFolderId?` (la ruta se deriva del `code`; se revisa en la fase de evidencia), `version` (bloqueo optimista).
+  Se eliminan `description`, `publishedAt`, `archivedAt`, `startedAt`, `scopeMode`, `overallScore` mutable y
+  `nextcloudFolderPath`.
+- **audit_scope_items**: `auditId` FK (cascade), `name`. UQ(`auditId`, `name`). Sin elementos = toda la organización.
+- **audit_members**: `auditId`, `userId`, `role` (`LEAD_AUDITOR | INSPECTOR`). UQ(`auditId`, `userId`).
+  Quitar un miembro es un borrado; queda en `audit_events`.
 - **evaluations** (una por auditoría × control **hoja**): `auditId` FK, `controlId` FK, `weight Decimal(5,2)`,
   `expectedLevelId?` FK (nulo = máximo de la escala), `assignedUserId?` FK, `status`
   (`NOT_STARTED|IN_PROGRESS|COMPLETED|RETURNED|APPROVED`), `round` (desde 1), `achievedLevelId?` FK,
@@ -102,9 +97,8 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
   `size BigInt`, `storageFileId` UQ NOT NULL (fuente de verdad en Nextcloud), `deletedAt?` (único soft-delete del
   sistema: la evidencia eliminada debe seguir siendo trazable). Quién la subió: `createdById`.
   Ya no existen `source='legacy'`, `status`, `type`, `remotePath`, `uploadedBy`, `auditId` ni `standardId`.
-- **reports**: `auditId` FK, `type`, `title`, `storageFileId`, `fileName`, `size`. Solo se guarda si la
-  generación tuvo éxito (hoy se persisten también los FAILED con `errorMessage`).
-
+- **reports**: `auditId` FK, `type`, `title`, `storageFileId` UQ. Solo se guarda si la generación tuvo éxito (hoy se
+  persisten también los FAILED con `errorMessage`). Nombre y tamaño del archivo no se copian: son de Nextcloud.
 ### Historial
 - **audit_events** (log append-only): `auditId` FK NOT NULL, `type`, `actorId?` FK, `targetUserId?` FK,
   `subjectType`, `subjectId`, `payload jsonb` (Zod discriminado por `type`), `createdAt`.
@@ -114,32 +108,50 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 
 | Regla | Mecanismo |
 |-------|-----------|
-| El activo del alcance pertenece a la organización auditada | FK compuestas en `audit_assets` (ambas comparten `organizationId`) |
 | El padre de un control es de la misma plantilla | FK compuesta en `controls` |
-| No se borra una organización / plantilla / escala / activo / control en uso | FK `onDelete: Restrict` (la cascada plantilla → controles también se bloquea si hay evaluaciones) |
+| No se borra una organización / plantilla / escala / control en uso | FK `onDelete: Restrict` (la cascada plantilla → controles también se bloquea si hay evaluaciones) |
 | Una evaluación por control y auditoría; un miembro por auditoría | UNIQUE |
 | N/A exige motivo; peso y score en 0–100; `round ≥ 1` | CHECK en `evaluations` |
 | Seguimiento coherente: `parentAuditId` nulo ⇔ `followUpNumber = 0`; no es su propio padre; fechas ordenadas | CHECK en `audits` |
 | `email` y `username` en minúsculas | CHECK en `users` |
-| Color hexadecimal de nivel; `payload` y `snapshot` son objetos JSON | CHECK |
+| Valor de nivel ≥ 0; `payload` y `snapshot` son objetos JSON | CHECK |
 | Código de auditoría correlativo sin carreras | Secuencia `audit_code_seq` |
 
 Lo que **no** se puede expresar en la BD y queda como regla de dominio: pesos que suman 100 por auditoría; el
-nivel elegido pertenece a la escala de la auditoría; "al menos un activo" cuando `scopeMode = SELECTED_ASSETS`;
+nivel elegido pertenece a la escala de la auditoría; las invariantes de la escala (§2.2); el alcance solo se edita en `DRAFT` y un seguimiento no puede modificarlo;
 solo se evalúan hojas.
+
+### 2.2 Escalas: invariantes (reemplazan a los antiguos tipos RANGE / BINARY / QUALITATIVE)
+
+El código anterior validaba los niveles según un `type`: comunes a todos (≥ 1 nivel, valores y etiquetas únicos),
+`BINARY` = exactamente 2 niveles incluyendo el 0, `QUALITATIVE` = ≥ 2 niveles de cualquier valor y `RANGE` =
+enteros consecutivos. Como `QUALITATIVE` ya admite cualquier conjunto, la única diferencia real era la
+consecutividad, y eso **no interviene en ningún cálculo** (`score = alcanzado / objetivo × 100`). Sin `type`, una
+escala válida cumple una sola lista (función de dominio en `library`, `SCALE_LEVELS_INVALID` con `details.rule`):
+
+| Regla | `rule` |
+|-------|--------|
+| Al menos 2 niveles | `MIN_LEVELS` |
+| Valores únicos (la BD lo garantiza con UNIQUE) | `DUPLICATE_VALUE` |
+| Etiquetas únicas, sin distinguir mayúsculas ni espacios | `DUPLICATE_LABEL` |
+| El valor máximo es > 0 (el score divide entre el valor objetivo) | `MAX_MUST_BE_POSITIVE` |
+
+"Binaria" es simplemente `niveles.length === 2`; el frontend decide cómo dibujarla. La regla antigua "un nivel
+debe valer 0" no se conserva: no protege ningún cálculo.
 
 ## 3. Alcance de la auditoría (D9)
 
-- `organizations` = el auditado; puede tener N auditorías.
-- `assets` = catálogo reutilizable de lo auditable dentro de esa organización (un sistema, un proceso, una
-  sede…). Se crea una vez y se reutiliza.
-- `scopeMode = FULL_ORGANIZATION` → sin filas en `audit_assets`. `SELECTED_ASSETS` → al menos un activo (regla
-  de dominio) de la misma organización (regla de BD).
-- `scopeNotes` sigue siendo texto libre para el redactado del informe.
-- Consulta resultante: "todas las auditorías donde se evaluó el activo X".
+- Se define **dentro de la auditoría, en el momento de crearla**: `audit_scope_items`, cada uno solo un nombre
+  ("ERP", "Sede Sur", "Proceso de compras"). `scopeNotes` sigue siendo el texto libre para el redactado del informe.
+- **Sin elementos = toda la organización.** No hay un `scopeMode`: se deriva de los elementos (estándar `03` §1).
+- Solo se edita con la auditoría en `DRAFT` (capacidad `editable`).
+- **Un seguimiento hereda una copia del alcance** de la auditoría a la que sigue y **no puede modificarlo**
+  (`AUDIT_SCOPE_INHERITED`). Si el cliente quiere incluir algo que no estaba, ya no es un seguimiento: es otra auditoría.
+- No hay catálogo de activos por organización. La consulta "todas las auditorías donde se evaluó el activo X" deja de
+  existir; el historial de un alcance se sigue por la cadena de seguimientos (`parentAuditId`).
 
-**Fuera de alcance a propósito:** evaluar un mismo control por separado para cada activo dentro de una misma
-auditoría. Añade una dimensión a `evaluations` y a los pesos. Si se necesita, una auditoría por activo.
+**Fuera de alcance a propósito:** evaluar un mismo control por separado para cada elemento dentro de una misma
+auditoría. Añade una dimensión a `evaluations` y a los pesos. Si se necesita, una auditoría por elemento.
 
 ## 4. Textos predefinidos → `suggested_findings` (D12)
 
@@ -241,14 +253,14 @@ Sin Redis ni colas mientras los informes sean síncronos.
 | `audit_reports` | `reports` |
 | `audit_activity` | `audit_events` |
 | `global_feed`, `notifications` | (fuera; vuelven por §6.4) |
-| — | `assets`, `audit_assets` |
+| — | `audit_scope_items` |
 
 ## 9. Fases
 
 0. Este documento → `schema.prisma` → catálogo de errores → contrato OpenAPI base.
 1. Esqueleto y plataforma (config, auth, CASL, transacciones, bus de eventos, errores, logging, CI, tests con
    Postgres real).
-2. `identity` → `organizations/assets` → `library` (scales, templates, controls, suggested_findings).
+2. `identity` → `organizations` → `library` (scales, templates, controls, suggested_findings).
 3. `audits`: lifecycle, scope, team, evaluation (ciclos de vida + scoring).
 4. Evidencia y `reporting`.
 5. `dashboard` y seeds.

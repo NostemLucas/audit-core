@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { directDb, resetDb } from './support/db.js'
+import { createAuditFixture, directDb, resetDb } from './support/db.js'
 
 const U1 = '00000000-0000-7000-8000-0000000000a1'
 const U2 = '00000000-0000-7000-8000-0000000000a2'
@@ -62,16 +62,24 @@ describe('sellos createdById / updatedById (extensión de Prisma)', () => {
 
   it('un modelo sin sellos (ScaleLevel) funciona igual, sin errores', async () => {
     currentUser = U1
-    const scale = await db.scale.create({ data: { code: 'S', name: 'S' } })
-    const level = await db.scaleLevel.create({ data: { scaleId: scale.id, value: 1, label: 'x', description: 'd', color: '#00FF00', position: 1 } })
+    const scale = await db.scale.create({ data: { name: 'S' } })
+    const level = await db.scaleLevel.create({ data: { scaleId: scale.id, value: 1, label: 'x' } })
     expect(level).not.toHaveProperty('createdById')
   })
 
   it('LÍMITE CONOCIDO: una escritura anidada no se sella (solo la operación de nivel superior)', async () => {
     currentUser = U1
-    const org = await db.organization.create({ data: { name: 'A', assets: { create: { name: 'ERP' } } } })
-    const asset = await db.asset.findFirstOrThrow({ where: { organizationId: org.id } })
-    expect(org.createdById).toBe(U1)
-    expect(asset.createdById).toBeNull()
+    const org = await db.organization.create({ data: { name: 'A' } })
+    const audit = await createAuditFixture(db, org.id)
+    currentUser = U2
+    // Audit y Report llevan sellos; el Report se crea ANIDADO dentro del update de la auditoría.
+    await db.audit.update({ where: { id: audit.id }, data: { name: 'Renombrada', reports: { create: { title: 'Informe', storageFileId: 'nc-1' } } } })
+    const parent = await db.audit.findUniqueOrThrow({ where: { id: audit.id } })
+    const child = await db.report.findFirstOrThrow({ where: { auditId: audit.id } })
+    expect(parent.updatedById).toBe(U2) // la operación de nivel superior sí se sella
+    expect(child.createdById).toBeNull() // el hijo anidado NO
+    // La forma correcta: crear el hijo con su propia llamada.
+    const sealed = await db.report.create({ data: { auditId: audit.id, title: 'Otro', storageFileId: 'nc-2' } })
+    expect(sealed.createdById).toBe(U2)
   })
 })

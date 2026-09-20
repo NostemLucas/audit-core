@@ -83,8 +83,8 @@ Consecuencias concretas:
 ```ts
 ORGANIZATION_IN_USE: {
   http: 409,
-  message: 'La organización tiene auditorías o activos; desactívala en lugar de eliminarla',
-  onForeignKeyDelete: ['audits_organizationId_fkey', 'assets_organizationId_fkey'],
+  message: 'La organización tiene auditorías; desactívala en lugar de eliminarla',
+  onForeignKeyDelete: 'audits_organizationId_fkey',
 }
 ```
 
@@ -94,8 +94,9 @@ descubiertas al probar contra Postgres:
 - `onForeignKeyDelete` solo aplica a **borrados**. Un fallo de FK al insertar significa "referencia inválida"; lo
   valida el dominio con un error específico y, si se le escapa, sale `REFERENCE_INVALID`. La misma FK puede fallar
   por causas distintas según la operación.
-- Postgres informa **la primera FK que falla**, no la más relevante (borrar una organización con auditorías y
-  activos reportó `assets_…`). Por eso un error agrupa varias restricciones.
+- Postgres informa **la primera FK que falla**, no la más relevante: si varias tablas referencian a una entidad, cuál
+  aparece en el error depende del orden interno. Por eso un error puede agrupar varias restricciones
+  (`onForeignKeyDelete` acepta una lista) y un test comprueba cada caso.
 - Un test compara cada nombre de restricción referenciado contra la migración: si se renombra una columna y no
   el error, el CI falla (verificado con una mutación).
 
@@ -104,7 +105,7 @@ descubiertas al probar contra Postgres:
 | Tier | Cuándo | Módulos | Estructura permitida |
 |------|--------|---------|----------------------|
 | **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits`, `library/templates` | `domain/` + `application/` + `infrastructure/` + `presentation/` |
-| **B · CRUD** | Sin reglas más allá de validar y guardar | `identity`, `organizations` (+`assets`), `library/scales`, `audits/scope`, `audits/team`, `audits/evidence` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
+| **B · CRUD** | Sin reglas más allá de validar y guardar | `identity`, `organizations`, `library/scales`, `audits/scope`, `audits/team`, `audits/evidence` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
 | **C · Lectura** | Agregaciones, listados, informes; nunca escribe | `dashboard`, `reporting`, listados de `audits` | *query services* con Prisma directo. Sin dominio |
 
 Reglas por tier:
@@ -309,7 +310,7 @@ la externa, y sin la anotación no hay rollback (autocommit).
 - `details` nunca lleva la restricción ni datos de la fila; el error original queda en `cause` (solo log).
 
 **Sellos: límite conocido.** Solo se sella la operación de nivel superior; una escritura anidada
-(`organization.create({ data: { assets: { create: … } } })`) **no** sella al hijo. Está fijado en un test. Regla:
+(`audit.update({ data: { reports: { create: … } } })`) **no** sella al hijo. Está fijado en un test. Regla:
 las raíces de agregado se crean con su propia llamada.
 
 **Guardas del catálogo (CI):** todo nombre de restricción referenciado existe en la migración; y **todo UNIQUE de la

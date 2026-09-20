@@ -4,13 +4,18 @@ export const LibraryErrors = defineErrors({
   // ── Escalas ────────────────────────────────────────────────────────────────
   SCALE_NOT_FOUND: { http: 404, message: 'Escala no encontrada' },
   SCALE_INACTIVE: { http: 422, message: 'La escala está inactiva' },
-  SCALE_CODE_TAKEN: { http: 409, message: 'Ya existe una escala con ese código', onUnique: 'scales_code_key' },
   SCALE_NAME_TAKEN: { http: 409, message: 'Ya existe una escala con ese nombre', onUnique: 'scales_name_key' },
   SCALE_IN_USE: {
     http: 409,
     message: 'La escala está en uso por alguna auditoría; desactívala en lugar de eliminarla',
     onForeignKeyDelete: 'audits_scaleId_fkey',
   },
+  /**
+   * La escala viola una invariante (`details.rule`): MIN_LEVELS (al menos 2 niveles), DUPLICATE_VALUE,
+   * DUPLICATE_LABEL (sin distinguir mayúsculas ni espacios) o MAX_MUST_BE_POSITIVE (el score divide entre el valor
+   * objetivo). Es lo único que queda de los antiguos tipos RANGE/BINARY/QUALITATIVE.
+   */
+  SCALE_LEVELS_INVALID: { http: 422, message: 'Los niveles de la escala no son válidos' },
   SCALE_LEVEL_NOT_FOUND: { http: 404, message: 'Nivel de escala no encontrado' },
   SCALE_LEVEL_VALUE_TAKEN: {
     http: 409,

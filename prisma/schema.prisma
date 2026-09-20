@@ -29,23 +29,6 @@ enum Role {
   AUDITOR
 }
 
-enum AssetType {
-  APPLICATION
-  SYSTEM
-  INFRASTRUCTURE
-  PROCESS
-  FACILITY
-  DEPARTMENT
-  OTHER
-}
-
-/// Solo afecta al widget del frontend; el cálculo es uniforme para todos los tipos.
-enum ScaleType {
-  RANGE
-  BINARY
-  QUALITATIVE
-}
-
 enum TemplateStatus {
   DRAFT
   PUBLISHED
@@ -57,11 +40,6 @@ enum AuditStatus {
   IN_PROGRESS
   CLOSED
   ARCHIVED
-}
-
-enum ScopeMode {
-  FULL_ORGANIZATION
-  SELECTED_ASSETS
 }
 
 enum AuditRole {
@@ -141,47 +119,23 @@ model Organization {
   createdById String?  @db.Uuid
   updatedById String?  @db.Uuid
 
-  assets Asset[]
   audits Audit[]
 
   @@map("organizations")
-}
-
-/// Cosa auditable dentro de una organización (sistema, proceso, sede…). Catálogo reutilizable entre auditorías.
-model Asset {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  organizationId String    @db.Uuid
-  name           String
-  type           AssetType @default(OTHER)
-  description    String?
-  isActive       Boolean   @default(true)
-
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
-  createdById String?  @db.Uuid
-  updatedById String?  @db.Uuid
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  auditLinks   AuditAsset[]
-
-  @@unique([organizationId, name])
-  // Destino de la FK compuesta de AuditAsset: garantiza que el activo pertenece a la organización auditada.
-  @@unique([id, organizationId])
-  @@map("assets")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Biblioteca
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Escala de valoración (COBIT 5, CMMI, binaria, cualitativa…).
+/// Escala de valoración (COBIT 5, CMMI, binaria, cualitativa…): una lista ordenada de niveles con valor numérico.
+/// Sin `type`: "binaria" es simplemente tener 2 niveles; cómo se dibuja es cosa del frontend. Sin `code`: `name` la
+/// identifica (igual que Template). Invariantes (dominio, ver docs/01): al menos 2 niveles, valores únicos, etiquetas
+/// únicas sin distinguir mayúsculas, y el valor máximo > 0 (el score divide entre el valor objetivo).
 model Scale {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  code        String    @unique
-  name        String    @unique
-  type        ScaleType @default(RANGE)
-  description String?
-  isActive    Boolean   @default(true)
+  id       String  @id @default(uuid(7)) @db.Uuid
+  name     String  @unique
+  isActive Boolean @default(true)
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
@@ -194,16 +148,14 @@ model Scale {
   @@map("scales")
 }
 
+/// Nivel de una escala. El orden es el del `value` (no hay `position`). Sin `color` ni `shortName`: son cosa de
+/// presentación y el frontend los deriva del valor normalizado. Los informes usan `label`, `value` y `description`.
 model ScaleLevel {
   id          String  @id @default(uuid(7)) @db.Uuid
   scaleId     String  @db.Uuid
   value       Decimal @db.Decimal(5, 2)
   label       String
-  shortName   String?
-  description String
-  /// Color hex `#RRGGBB`
-  color       String
-  position    Int
+  description String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -220,10 +172,9 @@ model ScaleLevel {
 /// Una norma completa e identificada por su nombre (p. ej. "ISO/IEC 27001:2022").
 /// PUBLISHED es inmutable: corregir = clonar con otro nombre.
 model Template {
-  id          String         @id @default(uuid(7)) @db.Uuid
-  name        String         @unique
-  description String?
-  status      TemplateStatus @default(DRAFT)
+  id     String         @id @default(uuid(7)) @db.Uuid
+  name   String         @unique
+  status TemplateStatus @default(DRAFT)
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
@@ -311,12 +262,10 @@ model Audit {
   /// 0 = auditoría inicial
   followUpNumber Int     @default(0)
 
-  status    AuditStatus @default(DRAFT)
-  scopeMode ScopeMode   @default(FULL_ORGANIZATION)
+  status AuditStatus @default(DRAFT)
 
   plannedStart DateTime? @db.Date
   plannedEnd   DateTime? @db.Date
-  startedAt    DateTime? @db.Timestamptz(3)
   closedAt     DateTime? @db.Timestamptz(3)
   /// Snapshot congelado al cerrar. En curso se calcula con scoring.ts
   finalScore   Decimal?  @db.Decimal(5, 2)
@@ -339,15 +288,13 @@ model Audit {
   parentAudit  Audit?       @relation("AuditFollowUp", fields: [parentAuditId], references: [id], onDelete: Restrict)
   followUps    Audit[]      @relation("AuditFollowUp")
 
-  assets      AuditAsset[]
+  scopeItems  AuditScopeItem[]
   members     AuditMember[]
   evaluations Evaluation[]
   reports     Report[]
   events      AuditEvent[]
 
   @@unique([parentAuditId, followUpNumber])
-  // Destino de la FK compuesta de AuditAsset
-  @@unique([id, organizationId])
   @@index([organizationId, status])
   @@index([templateId])
   @@index([managerId])
@@ -355,21 +302,20 @@ model Audit {
   @@map("audits")
 }
 
-/// Activos dentro del alcance (solo si Audit.scopeMode = SELECTED_ASSETS; regla de dominio: al menos uno).
-/// Las dos FK compuestas comparten `organizationId`: la BD garantiza que el activo es de la organización auditada.
-model AuditAsset {
-  auditId        String @db.Uuid
-  assetId        String @db.Uuid
-  organizationId String @db.Uuid
+/// Qué se audita, definido DENTRO de la auditoría en ese momento (un sistema, un proceso, una sede…). Sin elementos =
+/// toda la organización. Solo se edita mientras la auditoría está en DRAFT. Un seguimiento hereda una COPIA del
+/// alcance de la auditoría que sigue y no puede modificarlo: incluir algo distinto ya no es seguimiento, es otra auditoría.
+model AuditScopeItem {
+  id      String @id @default(uuid(7)) @db.Uuid
+  auditId String @db.Uuid
+  name    String
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  audit Audit @relation(fields: [auditId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  asset Asset @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
-  @@id([auditId, assetId])
-  @@index([assetId])
-  @@map("audit_assets")
+  @@unique([auditId, name])
+  @@map("audit_scope_items")
 }
 
 /// Quitar un miembro es un borrado; queda registrado en AuditEvent.
@@ -378,7 +324,6 @@ model AuditMember {
   auditId String    @db.Uuid
   userId  String    @db.Uuid
   role    AuditRole @default(INSPECTOR)
-  notes   String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -488,15 +433,14 @@ model Evidence {
   @@map("evidences")
 }
 
-/// Informe generado. Solo se guarda si la generación tuvo éxito. Quién lo generó = `createdById`.
+/// Informe generado. Solo se guarda si la generación tuvo éxito. Quién lo generó = `createdById`. Nombre y tamaño del
+/// archivo no se copian: son de Nextcloud (fuente de verdad) y nadie los leía; el nombre de descarga se deriva del título.
 model Report {
   id            String     @id @default(uuid(7)) @db.Uuid
   auditId       String     @db.Uuid
   type          ReportType @default(COMPLIANCE)
   title         String
   storageFileId String     @unique
-  fileName      String
-  size          BigInt
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)

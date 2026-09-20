@@ -24,7 +24,7 @@ export async function createAuditFixture(db: Db, organizationId: string, code = 
     data: { authentikId: `ak-${code}`, email: `${code}@x.com`.toLowerCase(), username: code.toLowerCase(), name: 'A B' },
   })
   const template = await db.template.create({ data: { name: `T-${code}` } })
-  const scale = await db.scale.create({ data: { code: `S-${code}`, name: `S-${code}` } })
+  const scale = await db.scale.create({ data: { name: `S-${code}` } })
   return db.audit.create({
     data: { code, name: 'Auditoría', templateId: template.id, organizationId, scaleId: scale.id, managerId: user.id },
   })

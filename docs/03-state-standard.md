@@ -9,7 +9,7 @@ nueva con estado, se clasifica con §1 y se aplica la sección que corresponda. 
 | Clase | Pregunta que responde | Cómo se modela | Hoy |
 |-------|-----------------------|----------------|-----|
 | **Ciclo de vida** | ¿En qué etapa de un proceso está y qué puede pasar después? | Enum de Prisma + `defineLifecycle` (§2) | `Template`, `Audit`, `Evaluation` |
-| **Disponibilidad** | ¿Se puede elegir para usos **nuevos**? | `isActive Boolean` (§3) | `Organization`, `Asset`, `Scale` |
+| **Disponibilidad** | ¿Se puede elegir para usos **nuevos**? | `isActive Boolean` (§3) | `Organization`, `Scale` |
 | **Derivado** | ¿Se deduce de otros datos? | **No se guarda.** Se calcula al leer | "vencida" (`plannedEnd` < hoy y `IN_PROGRESS`), "pendiente de revisión", "alcance completo" |
 | **Externo** | ¿Lo decide otro sistema? | **No se modela** (§4) | Activación de cuentas → Authentik |
 
@@ -85,10 +85,10 @@ usa (la API de la tabla es la misma).
      this.status = to
    }
    ```
-5. **Los efectos de una transición los hace el método de la entidad**, no el grafo: poner `startedAt`, sumar
+5. **Los efectos de una transición los hace el método de la entidad**, no el grafo: poner `closedAt`, sumar
    `round`, etc. Así hay un solo lugar por efecto y el grafo sigue siendo un dato.
 6. **Ningún estado se guarda por duplicado.** No hay una columna por etapa (`publishedAt`, `archivedAt`). Se
-   guarda una fecha **solo si el negocio usa esa fecha** (informes, plazos): `Audit.startedAt` / `closedAt`. El
+   guarda una fecha **solo si el negocio usa esa fecha** (informes, plazos): `Audit.closedAt`. `startedAt` no se guarda: solo lo escribía la máquina y nadie lo leía. El
    hecho de que "ocurrió una transición" queda en el historial (regla 8), no en columnas.
 7. **Errores**, siempre de este molde (todo en el catálogo, ver `02` §3):
    | Situación | Código | HTTP |
@@ -129,7 +129,7 @@ Borrar: solo `DRAFT` y sin uso (la FK lo garantiza). Corregir una publicada = cl
 **Audit**
 | Desde | Evento | Hacia | Efectos / precondiciones |
 |-------|--------|-------|--------------------------|
-| `DRAFT` | `START` | `IN_PROGRESS` | Precondición: al menos un miembro (`AUDIT_HAS_NO_MEMBERS`). Efecto: `startedAt` |
+| `DRAFT` | `START` | `IN_PROGRESS` | Precondición: al menos un miembro (`AUDIT_HAS_NO_MEMBERS`). Efecto: evento `AuditStarted` (el momento queda en el historial) |
 | `IN_PROGRESS` | `CLOSE` | `CLOSED` | Precondición: todas las evaluaciones aprobadas (`AUDIT_HAS_PENDING_EVALUATIONS`). Efectos: `closedAt`, `finalScore` (snapshot) |
 | `CLOSED` | `ARCHIVE` | `ARCHIVED` | — |
 
@@ -153,15 +153,15 @@ de estado: son acciones con registro en `evaluation_reviews`, no transiciones.
 
 ## 3. Disponibilidad (`isActive`)
 
-Para `Organization`, `Asset` y `Scale`.
+Para `Organization` y `Scale`.
 
 - **Significado único:** "se puede elegir para usos **nuevos**". No afecta a nada ya existente: una auditoría
   vieja sigue mostrando su organización aunque esté inactiva.
 - Booleano `isActive`, por defecto `true`. Se cambia con dos casos de uso, `activate` y `deactivate`.
   Sin ciclo de vida, sin máquina, sin eventos.
-- **Validación al crear una referencia nueva** (auditoría → organización, alcance → activo, auditoría → escala):
+- **Validación al crear una referencia nueva** (auditoría → organización, auditoría → escala):
   el caso de uso comprueba `isActive` y, si no, lanza `<ENTIDAD>_INACTIVE` (422): `ORGANIZATION_INACTIVE`,
-  `ASSET_INACTIVE`, `SCALE_INACTIVE`.
+  `SCALE_INACTIVE`.
 - Los selectores del frontend piden solo los activos (`?active=true`); los listados de administración los
   muestran todos.
 - **Desactivar es la alternativa a borrar** cuando hay referencias: la FK `Restrict` impide borrar y el error

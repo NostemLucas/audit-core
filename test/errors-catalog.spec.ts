@@ -24,8 +24,6 @@ function loadConstraints() {
  * (Un choque no mapeado igual llega al cliente como CONFLICT 409, nunca como 500.)
  */
 const UNMAPPED_UNIQUES: Readonly<Record<string, string>> = {
-  assets_id_organizationId_key: 'destino de la FK compuesta de audit_assets; incluye el id, no puede colisionar',
-  audits_id_organizationId_key: 'destino de la FK compuesta de audit_assets; incluye el id, no puede colisionar',
   controls_id_templateId_key: 'destino de la FK compuesta del árbol; incluye el id, no puede colisionar',
   audits_code_key: 'el código sale de la secuencia audit_code_seq; un choque es un bug, no un caso de usuario',
   evaluations_auditId_controlId_key: 'las evaluaciones las crea el inicializador de la auditoría; un choque es un bug',
@@ -69,7 +67,6 @@ describe('catálogo de errores', () => {
   })
 
   it('traduce una FK de borrado al error del módulo dueño', () => {
-    expect(errorRegistry.byForeignKeyDelete('assets_organizationId_fkey')?.code).toBe('ORGANIZATION_IN_USE')
     expect(errorRegistry.byForeignKeyDelete('audits_organizationId_fkey')?.code).toBe('ORGANIZATION_IN_USE')
     expect(errorRegistry.byUnique('organizations_name_key')?.code).toBe('ORGANIZATION_NAME_TAKEN')
   })

@@ -24,29 +24,31 @@ describe('traducción de errores de la BD (Prisma 7 + adaptador pg, contra Postg
     expect(error).toMatchObject({ code: 'ORGANIZATION_NAME_TAKEN', http: 409 })
   })
 
-  it('UNIQUE compuesto', async () => {
+  it('UNIQUE compuesto (auditId + name del alcance)', async () => {
     const org = await db.organization.create({ data: { name: 'ACME' } })
-    await db.asset.create({ data: { organizationId: org.id, name: 'ERP' } })
-    const error = await catchError(db.asset.create({ data: { organizationId: org.id, name: 'ERP' } }))
-    expect(error).toMatchObject({ code: 'ASSET_NAME_TAKEN', http: 409 })
+    const audit = await createAuditFixture(db, org.id)
+    await db.auditScopeItem.create({ data: { auditId: audit.id, name: 'ERP' } })
+    const error = await catchError(db.auditScopeItem.create({ data: { auditId: audit.id, name: 'ERP' } }))
+    expect(error).toMatchObject({ code: 'AUDIT_SCOPE_ITEM_NAME_TAKEN', http: 409 })
   })
 
-  it('FK al BORRAR → el error de "en uso" (organización con activos)', async () => {
+  it('el mismo nombre de alcance en OTRA auditoría es válido', async () => {
     const org = await db.organization.create({ data: { name: 'ACME' } })
-    await db.asset.create({ data: { organizationId: org.id, name: 'ERP' } })
+    const a1 = await createAuditFixture(db, org.id, 'AUD-A')
+    const a2 = await createAuditFixture(db, org.id, 'AUD-B')
+    await db.auditScopeItem.create({ data: { auditId: a1.id, name: 'ERP' } })
+    await expect(db.auditScopeItem.create({ data: { auditId: a2.id, name: 'ERP' } })).resolves.toBeDefined()
+  })
+
+  it('FK al BORRAR → el error de "en uso" (organización con auditorías)', async () => {
+    const org = await db.organization.create({ data: { name: 'ACME' } })
+    await createAuditFixture(db, org.id)
     const error = await catchError(db.organization.delete({ where: { id: org.id } }))
     expect(error).toMatchObject({ code: 'ORGANIZATION_IN_USE', http: 409 })
   })
 
-  it('FK al BORRAR → el MISMO error aunque Postgres reporte otra restricción (organización con auditorías)', async () => {
-    const org = await db.organization.create({ data: { name: 'ACME' } })
-    await createAuditFixture(db, org.id)
-    const error = await catchError(db.organization.delete({ where: { id: org.id } }))
-    expect(error).toMatchObject({ code: 'ORGANIZATION_IN_USE' })
-  })
-
   it('FK al ESCRIBIR → REFERENCE_INVALID (no "en uso")', async () => {
-    const error = await catchError(db.asset.create({ data: { organizationId: MISSING, name: 'X' } }))
+    const error = await catchError(db.auditScopeItem.create({ data: { auditId: MISSING, name: 'X' } }))
     expect(error).toMatchObject({ code: 'REFERENCE_INVALID', http: 422 })
   })
 
@@ -56,10 +58,8 @@ describe('traducción de errores de la BD (Prisma 7 + adaptador pg, contra Postg
   })
 
   it('CHECK de la BD → INTEGRITY_VIOLATION', async () => {
-    const scale = await db.scale.create({ data: { code: 'S', name: 'S' } })
-    const error = await catchError(
-      db.scaleLevel.create({ data: { scaleId: scale.id, value: 1, label: 'x', description: 'd', color: 'rojo', position: 1 } }),
-    )
+    const scale = await db.scale.create({ data: { name: 'S' } })
+    const error = await catchError(db.scaleLevel.create({ data: { scaleId: scale.id, value: -1, label: 'negativo' } }))
     expect(error).toMatchObject({ code: 'INTEGRITY_VIOLATION', http: 422 })
   })
 

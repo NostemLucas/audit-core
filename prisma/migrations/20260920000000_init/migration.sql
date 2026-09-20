@@ -5,19 +5,10 @@ CREATE SCHEMA IF NOT EXISTS "public";
 CREATE TYPE "Role" AS ENUM ('ADMIN', 'GERENTE', 'AUDITOR');
 
 -- CreateEnum
-CREATE TYPE "AssetType" AS ENUM ('APPLICATION', 'SYSTEM', 'INFRASTRUCTURE', 'PROCESS', 'FACILITY', 'DEPARTMENT', 'OTHER');
-
--- CreateEnum
-CREATE TYPE "ScaleType" AS ENUM ('RANGE', 'BINARY', 'QUALITATIVE');
-
--- CreateEnum
 CREATE TYPE "TemplateStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
 
 -- CreateEnum
 CREATE TYPE "AuditStatus" AS ENUM ('DRAFT', 'IN_PROGRESS', 'CLOSED', 'ARCHIVED');
-
--- CreateEnum
-CREATE TYPE "ScopeMode" AS ENUM ('FULL_ORGANIZATION', 'SELECTED_ASSETS');
 
 -- CreateEnum
 CREATE TYPE "AuditRole" AS ENUM ('LEAD_AUDITOR', 'INSPECTOR');
@@ -59,28 +50,9 @@ CREATE TABLE "organizations" (
 );
 
 -- CreateTable
-CREATE TABLE "assets" (
-    "id" UUID NOT NULL,
-    "organizationId" UUID NOT NULL,
-    "name" TEXT NOT NULL,
-    "type" "AssetType" NOT NULL DEFAULT 'OTHER',
-    "description" TEXT,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
-    "createdById" UUID,
-    "updatedById" UUID,
-
-    CONSTRAINT "assets_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "scales" (
     "id" UUID NOT NULL,
-    "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "type" "ScaleType" NOT NULL DEFAULT 'RANGE',
-    "description" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
@@ -96,10 +68,7 @@ CREATE TABLE "scale_levels" (
     "scaleId" UUID NOT NULL,
     "value" DECIMAL(5,2) NOT NULL,
     "label" TEXT NOT NULL,
-    "shortName" TEXT,
-    "description" TEXT NOT NULL,
-    "color" TEXT NOT NULL,
-    "position" INTEGER NOT NULL,
+    "description" TEXT,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
@@ -110,7 +79,6 @@ CREATE TABLE "scale_levels" (
 CREATE TABLE "templates" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
-    "description" TEXT,
     "status" "TemplateStatus" NOT NULL DEFAULT 'DRAFT',
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
@@ -163,10 +131,8 @@ CREATE TABLE "audits" (
     "parentAuditId" UUID,
     "followUpNumber" INTEGER NOT NULL DEFAULT 0,
     "status" "AuditStatus" NOT NULL DEFAULT 'DRAFT',
-    "scopeMode" "ScopeMode" NOT NULL DEFAULT 'FULL_ORGANIZATION',
     "plannedStart" DATE,
     "plannedEnd" DATE,
-    "startedAt" TIMESTAMPTZ(3),
     "closedAt" TIMESTAMPTZ(3),
     "finalScore" DECIMAL(5,2),
     "storageFolderId" TEXT,
@@ -180,13 +146,13 @@ CREATE TABLE "audits" (
 );
 
 -- CreateTable
-CREATE TABLE "audit_assets" (
+CREATE TABLE "audit_scope_items" (
+    "id" UUID NOT NULL,
     "auditId" UUID NOT NULL,
-    "assetId" UUID NOT NULL,
-    "organizationId" UUID NOT NULL,
+    "name" TEXT NOT NULL,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "audit_assets_pkey" PRIMARY KEY ("auditId","assetId")
+    CONSTRAINT "audit_scope_items_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -195,7 +161,6 @@ CREATE TABLE "audit_members" (
     "auditId" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "role" "AuditRole" NOT NULL DEFAULT 'INSPECTOR',
-    "notes" TEXT,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
@@ -268,8 +233,6 @@ CREATE TABLE "reports" (
     "type" "ReportType" NOT NULL DEFAULT 'COMPLIANCE',
     "title" TEXT NOT NULL,
     "storageFileId" TEXT NOT NULL,
-    "fileName" TEXT NOT NULL,
-    "size" BIGINT NOT NULL,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
     "createdById" UUID,
@@ -304,15 +267,6 @@ CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "organizations_name_key" ON "organizations"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "assets_organizationId_name_key" ON "assets"("organizationId", "name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "assets_id_organizationId_key" ON "assets"("id", "organizationId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "scales_code_key" ON "scales"("code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "scales_name_key" ON "scales"("name");
@@ -360,10 +314,7 @@ CREATE INDEX "audits_status_plannedEnd_idx" ON "audits"("status", "plannedEnd");
 CREATE UNIQUE INDEX "audits_parentAuditId_followUpNumber_key" ON "audits"("parentAuditId", "followUpNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "audits_id_organizationId_key" ON "audits"("id", "organizationId");
-
--- CreateIndex
-CREATE INDEX "audit_assets_assetId_idx" ON "audit_assets"("assetId");
+CREATE UNIQUE INDEX "audit_scope_items_auditId_name_key" ON "audit_scope_items"("auditId", "name");
 
 -- CreateIndex
 CREATE INDEX "audit_members_userId_idx" ON "audit_members"("userId");
@@ -414,9 +365,6 @@ CREATE INDEX "audit_events_actorId_idx" ON "audit_events"("actorId");
 CREATE INDEX "audit_events_targetUserId_idx" ON "audit_events"("targetUserId");
 
 -- AddForeignKey
-ALTER TABLE "assets" ADD CONSTRAINT "assets_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "scale_levels" ADD CONSTRAINT "scale_levels_scaleId_fkey" FOREIGN KEY ("scaleId") REFERENCES "scales"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -447,10 +395,7 @@ ALTER TABLE "audits" ADD CONSTRAINT "audits_managerId_fkey" FOREIGN KEY ("manage
 ALTER TABLE "audits" ADD CONSTRAINT "audits_parentAuditId_fkey" FOREIGN KEY ("parentAuditId") REFERENCES "audits"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "audit_assets" ADD CONSTRAINT "audit_assets_auditId_organizationId_fkey" FOREIGN KEY ("auditId", "organizationId") REFERENCES "audits"("id", "organizationId") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "audit_assets" ADD CONSTRAINT "audit_assets_assetId_organizationId_fkey" FOREIGN KEY ("assetId", "organizationId") REFERENCES "assets"("id", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "audit_scope_items" ADD CONSTRAINT "audit_scope_items_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "audits"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "audit_members" ADD CONSTRAINT "audit_members_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "audits"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -508,10 +453,9 @@ CREATE SEQUENCE "audit_code_seq" START WITH 1 INCREMENT BY 1;
 ALTER TABLE "users"
   ADD CONSTRAINT "users_email_lowercase" CHECK ("email" = lower("email"));
 
--- scale_levels
+-- scale_levels: el valor no puede ser negativo (que el máximo sea > 0 y que haya >= 2 niveles lo valida el dominio).
 ALTER TABLE "scale_levels"
-  ADD CONSTRAINT "scale_levels_color_hex"      CHECK ("color" ~ '^#[0-9A-Fa-f]{6}$'),
-  ADD CONSTRAINT "scale_levels_value_nonneg"   CHECK ("value" >= 0);
+  ADD CONSTRAINT "scale_levels_value_nonneg" CHECK ("value" >= 0);
 
 -- audits
 ALTER TABLE "audits"
@@ -536,10 +480,6 @@ ALTER TABLE "evaluation_reviews"
 ALTER TABLE "evidences"
   ADD CONSTRAINT "evidences_round_min"     CHECK ("round" >= 1),
   ADD CONSTRAINT "evidences_size_nonneg"   CHECK ("size" >= 0);
-
--- reports
-ALTER TABLE "reports"
-  ADD CONSTRAINT "reports_size_nonneg" CHECK ("size" >= 0);
 
 -- audit_events
 ALTER TABLE "audit_events"

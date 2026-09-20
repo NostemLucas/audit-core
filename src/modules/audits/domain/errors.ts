@@ -20,8 +20,18 @@ export const AuditErrors = defineErrors({
   AUDIT_ACCESS_DENIED: { http: 403, message: 'No participas en esta auditoría con el rol necesario' },
 
   // ── Alcance ────────────────────────────────────────────────────────────────
-  AUDIT_SCOPE_EMPTY: { http: 422, message: 'El alcance por activos requiere al menos un activo' },
-  AUDIT_ASSET_ORGANIZATION_MISMATCH: { http: 422, message: 'Un activo del alcance no pertenece a la organización auditada' },
+  /** Solo se edita el alcance con la auditoría en borrador (capacidad `editable`). */
+  AUDIT_SCOPE_ITEM_NOT_FOUND: { http: 404, message: 'Elemento de alcance no encontrado' },
+  AUDIT_SCOPE_ITEM_NAME_TAKEN: {
+    http: 409,
+    message: 'La auditoría ya tiene un elemento de alcance con ese nombre',
+    onUnique: 'audit_scope_items_auditId_name_key',
+  },
+  /** Un seguimiento hereda el alcance de la auditoría que sigue; incluir algo distinto es otra auditoría. */
+  AUDIT_SCOPE_INHERITED: {
+    http: 409,
+    message: 'Un seguimiento hereda el alcance de la auditoría original; para incluir otros elementos crea una auditoría nueva',
+  },
 
   // ── Equipo ─────────────────────────────────────────────────────────────────
   MEMBER_NOT_FOUND: { http: 404, message: 'Miembro no encontrado en la auditoría' },
