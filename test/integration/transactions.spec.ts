@@ -7,6 +7,7 @@ import { DB, InjectTx, Transactional, type Db, type Tx } from '../../src/platfor
 import { DomainError } from '../../src/platform/errors/index.js'
 import { createTestApp } from './support/app.js'
 import { resetDb } from './support/db.js'
+import { Public } from '../../src/platform/authz/index.js'
 
 @Injectable()
 class DemoService {
@@ -33,6 +34,7 @@ class DemoService {
   }
 }
 
+@Public()
 @Controller('__db')
 class DbProbeController {
   constructor(

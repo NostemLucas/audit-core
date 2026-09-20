@@ -10,6 +10,7 @@ import { configureApp } from '../src/configure-app.js'
 import { ENV } from '../src/platform/config/index.js'
 import { testEnv } from './support/env.js'
 import { Responds, page } from '../src/platform/http/index.js'
+import { Public } from '../src/platform/authz/index.js'
 
 // Esquemas de ejemplo: una sola definición da validación, tipo y documentación.
 const CreateInput = z.object({ name: z.string().min(3).max(20), tags: z.array(z.string()).default([]) })
@@ -20,6 +21,7 @@ const ID = '0199c0de-0000-7000-8000-000000000001'
 type CreateInputT = z.infer<typeof CreateInput>
 type ListQueryT = z.infer<typeof ListQuery>
 
+@Public()
 @Controller('__items')
 class ItemsController {
   @Post()

@@ -3,6 +3,9 @@ import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import './app-errors.js' // registra el catálogo de errores completo (lo necesita el traductor de errores de la BD)
 import './app-events.js' // registra el catálogo de eventos completo
+import { IdentityModule } from './modules/identity/index.js'
+import { AuthGuard, AuthModule } from './platform/auth/index.js'
+import { AbilitiesGuard, AuthzModule } from './platform/authz/index.js'
 import { ENV, EnvModule, type Env } from './platform/config/index.js'
 import { ContextModule } from './platform/context/context.module.js'
 import { DbModule } from './platform/db/index.js'
@@ -17,6 +20,9 @@ import { LoggingModule } from './platform/logging/index.js'
     DbModule,
     ContextModule,
     EventsModule,
+    AuthModule,
+    AuthzModule,
+    IdentityModule,
     ThrottlerModule.forRootAsync({
       imports: [], // EnvModule es global
       inject: [ENV],
@@ -24,6 +30,11 @@ import { LoggingModule } from './platform/logging/index.js'
     }),
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    // El ORDEN importa: primero el límite de peticiones, luego quién eres, luego qué puedes hacer.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: AbilitiesGuard },
+  ],
 })
 export class AppModule {}

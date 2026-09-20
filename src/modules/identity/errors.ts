@@ -8,6 +8,11 @@ import { defineErrors } from '../../platform/errors/index.js'
 export const IdentityErrors = defineErrors({
   USER_NOT_FOUND: { http: 404, message: 'Usuario no encontrado' },
   /**
+   * El token es válido pero le faltan claims que el sistema necesita (`details.missing`: email y/o preferred_username).
+   * Es un problema de configuración de Authentik (el scope `profile`/`email` del proveedor), no del usuario.
+   */
+  TOKEN_CLAIMS_MISSING: { http: 401, message: 'El token no incluye los datos de identidad necesarios' },
+  /**
    * Otra petición creó o actualizó al mismo usuario (authentikId, email o username) al mismo tiempo. Es la carrera
    * normal de dos logins simultáneos: la sincronización con Authentik atrapa este código y reintenta.
    */

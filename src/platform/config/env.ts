@@ -21,6 +21,12 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   /** Cadena de conexión de PostgreSQL. */
   DATABASE_URL: z.string().min(1).refine((v) => /^postgres(ql)?:\/\//.test(v), 'debe ser una URL postgresql://'),
+  /** `iss` exacto que emite Authentik (con la barra final), p. ej. https://auth.ejemplo.com/application/o/audit/ */
+  AUTHENTIK_ISSUER: z.url(),
+  /** Client ID de la aplicación en Authentik: es el `aud` que debe traer el token. */
+  AUTHENTIK_CLIENT_ID: z.string().min(1),
+  /** JWKS con las claves públicas. Por defecto `<AUTHENTIK_ISSUER>jwks/`, que es donde Authentik lo publica. */
+  AUTHENTIK_JWKS_URI: z.url().optional(),
   /** Nivel mínimo de log. Por defecto: `silent` en test, `info` en el resto. */
   LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
   /** Salida legible en consola en vez de JSON. Por defecto solo en desarrollo; `pino-pretty` es dependencia de desarrollo. */
@@ -38,6 +44,7 @@ const resolvedEnvSchema = envSchema.transform((env) => ({
   ...env,
   LOG_LEVEL: env.LOG_LEVEL ?? (env.NODE_ENV === 'test' ? ('silent' as const) : ('info' as const)),
   LOG_PRETTY: env.LOG_PRETTY ?? env.NODE_ENV === 'development',
+  AUTHENTIK_JWKS_URI: env.AUTHENTIK_JWKS_URI ?? `${env.AUTHENTIK_ISSUER.replace(/\/?$/, '/')}jwks/`,
 }))
 
 export type Env = z.output<typeof resolvedEnvSchema>

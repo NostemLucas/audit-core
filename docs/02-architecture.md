@@ -438,3 +438,72 @@ de contexto) hacen fallar los tests. Dos de mis primeras mutaciones eran sintác
 bajó): una mutación que no compila no prueba nada, por eso el resumen incluye siempre el conteo de archivos.
 Ejecución real del build en Node en JSON y en modo legible, sin secretos en la salida.
 
+## 14. Autenticación y autorización (Fase 1k)
+
+**Quién hace qué.** Authentik autentica y decide quién está activo; el sistema **solo verifica** el token y mantiene un
+espejo mínimo del usuario. CASL decide qué puede hacer. Son tres guards globales, **en este orden**:
+`ThrottlerGuard` (cuántas peticiones) → `AuthGuard` (quién eres) → `AbilitiesGuard` (qué puedes).
+
+**Puerto entre plataforma e identidad.** `platform/auth` verifica el token y necesita un usuario local, pero `platform`
+no importa módulos de negocio. Define el puerto `UserResolver` (`USER_RESOLVER`) y el módulo `identity` lo implementa
+(`AuthentikUserResolver`). La plataforma no sabe cómo se sincroniza un usuario; identidad no sabe cómo se verifica un token.
+
+**`jose` en lugar de `passport` + `passport-jwt` + `jwks-rsa`:** una dependencia en vez de tres, sin el modelo de
+estrategias de Passport. Valida firma, `iss`, `aud`, `exp`, algoritmo y exige `sub` y `exp`.
+
+**Verificación del token.**
+- Algoritmos **solo `RS256`/`ES256`**. Verificado con mutación: sin esa restricción, un token `alg: none` y uno HS256
+  (confusión de algoritmo) **sí pasan**; no es decorativa.
+- Ante un fallo se distingue lo que NO se debe mezclar: **token malo → 401** `TOKEN_INVALID` (vencido, `iss`/`aud`
+  distinto, firma ajena, `kid` desconocido…) y **no se pudo comprobar → 502** `UPSTREAM_UNAVAILABLE` (JWKS caído, 404,
+  500, JSON basura, timeout). Con 401 un Authentik caído desloguearía a todos por un fallo que no es suyo. Comprobado con
+  los errores REALES de `jose` (`test/token-verifier-remote.spec.ts`), no con errores inventados.
+- Al cliente **no se le dice por qué** falló: todas las causas dan la misma respuesta; el motivo (`ERR_JWT_EXPIRED`…)
+  queda en el log en `debug`.
+- El JWKS se descarga al primer token y se cachea. Con Authentik caído, una clave **ya conocida** sigue valiendo. Ojo con
+  la rotación de claves: `jose` no vuelve a consultar el JWKS hasta 30 s después de la última descarga, así que un token
+  con una `kid` nueva puede dar 401 hasta pasado ese enfriamiento.
+
+**Sincronización del usuario (`identity`).**
+- Se busca **solo por `authentikId`** (`sub`). **No se enlaza por email**: sin cuentas heredadas que migrar, enlazar por
+  email dejaría que quien reciba un email reasignado herede la cuenta de otra persona (mutación B4 lo demuestra). Otra
+  cuenta con el mismo email o username → 409 `USER_IDENTITY_CONFLICT`.
+- Se **escribe solo si algo cambió**; en una petición normal es una lectura por índice. Los roles van en orden fijo para que
+  el orden de los grupos no provoque escrituras.
+- `preferred_username` **falta → 401 `TOKEN_CLAIMS_MISSING`** (`details.missing`), **no se inventa** uno (el proyecto
+  anterior usaba `email.split('@')[0]`, que Nextcloud no conoce). Igual con `email`. `name` cae al username.
+- **El sistema nunca se queda sin ADMIN**: si Authentik le quitaría el rol al único administrador, se conserva y se avisa.
+- Dos primeros logins simultáneos chocan en un índice único: se reintenta **una vez** (`retryOnceOnIdentityConflict`, función
+  pura probada de forma determinista); un conflicto que persiste es real y se propaga.
+- Grupos → roles: contiene `admin` → ADMIN, `gerente`/`manager` → GERENTE, `auditor` → AUDITOR (cada grupo aporta a lo sumo
+  un rol; admin gana). Un usuario sin grupos reconocidos existe sin roles: no puede nada salvo `GET /profile`.
+
+**Permisos (CASL 7).**
+- `platform/authz/abilities.ts` es la **única** fuente: una tabla `rol → concesiones`. Son permisos **gruesos**; los que
+  dependen de la auditoría concreta (¿líder de ESTA auditoría?) van en `audits/domain/audit-policy.ts`.
+- Sujetos: `User, Organization, Template, Scale, Audit, AuditMember, Evaluation, Evidence, Report, Dashboard`. Desaparecen
+  `GlobalFeed`, `Notification`, `AuditMetrics`, `Standard`, `PredefinedText`, `EvaluationFramework`, `EvaluationLevel`
+  (lo cubren `Template`, `Scale` y `Dashboard`). Acciones: `manage`, `create`, `read`, `update`, `delete`; los verbos de
+  dominio (`approve`, `publish`…) se agregan cuando su módulo los necesite.
+- **Contrato con el frontend:** `GET /api/v1/profile` devuelve el usuario y las reglas con `packRules`; el frontend usa
+  `unpackRules` + `createMongoAbility`. Probado que las reglas reconstruidas dan **exactamente** los mismos permisos que
+  el backend para cada combinación de acción y sujeto. **El frontend debe usar la misma versión mayor de `@casl/ability`**
+  (7). No hay sidebar en el backend: lo calcula el frontend con estas reglas.
+
+**Toda ruta declara su acceso** (`platform/authz/route-access.ts`, única fuente del vocabulario): `@Public()`,
+`@Can(acción, sujeto)` o `@NoAbilityRequired()`.
+- **La aplicación no arranca** si alguna ruta no lo declara (`RouteProtectionCheck` lista método, ruta y handler). Es más
+  fuerte que un test de CI: un endpoint olvidado no llega a producción. Además `AbilitiesGuard` falla **cerrado**.
+- Declarar dos a la vez **falla al decorar**, en vez de que una sobrescriba a la otra sin avisar.
+- El método gana sobre la clase.
+
+**De extremo a extremo.** Token → `AuthGuard` → `request.user` + `userId` en el contexto ambiental → sellos
+`createdById`/`updatedById`, `userId` en los logs y en los eventos. Verificado con Postgres real. También con el build
+compilado contra un Authentik simulado que publica un JWKS real por HTTP.
+
+**Verificado con mutaciones (15):** algoritmos sin acotar, `aud` ignorado, `iss` ignorado, Authentik caído como 401, sin
+`userId` en el contexto, guard que permite todo, guard que falla abierto, arranque sin verificar rutas, username inventado,
+email sin minúsculas, protección del último ADMIN, escritura en cada petición, enlace por email, y reintento de la carrera.
+La de la carrera **no** se detectaba con la prueba concurrente (no llega a colisionar): se extrajo a una función pura y se
+probó de forma determinista.
+

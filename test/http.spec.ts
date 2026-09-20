@@ -11,7 +11,9 @@ import { DomainError } from '../src/platform/errors/index.js'
 import { page } from '../src/platform/http/index.js'
 import { OrganizationErrors } from '../src/modules/organizations/errors.js'
 import '../src/app-errors.js'
+import { Public } from '../src/platform/authz/index.js'
 
+@Public()
 @Controller('__test')
 class ProbeController {
   @Get('ok')

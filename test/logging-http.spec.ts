@@ -9,6 +9,7 @@ import { ENV } from '../src/platform/config/index.js'
 import { ContextRunner } from '../src/platform/context/context-runner.js'
 import { AppLogger, LOG_DESTINATION } from '../src/platform/logging/index.js'
 import { testEnv } from './support/env.js'
+import { Public } from '../src/platform/authz/index.js'
 
 @Injectable()
 class ProbeService {
@@ -19,6 +20,7 @@ class ProbeService {
   }
 }
 
+@Public()
 @Controller('__log')
 class LogProbeController {
   constructor(private readonly service: ProbeService) {}
