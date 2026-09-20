@@ -1,0 +1,136 @@
+# Audit Core — Revisión de decisiones y protocolo para contrastarlas con una auditoría real
+
+Estado: **documento de trabajo** (las correcciones técnicas de §1.1 son propuestas hasta que se aprueben; `01` aún describe el modelo anterior). Las decisiones tomadas hasta ahora salen de leer el proyecto anterior y de conversaciones,
+no de haber corrido una auditoría de verdad. Este documento separa lo que es un **error técnico** (se corrige ya) de lo que es
+una **decisión metodológica** (solo una auditoría real puede confirmarla), y dice cómo contrastarlas.
+
+## 1. El modelo de puntuación, revisado con cifras
+
+Fórmula heredada: por criterio `score = min(alcanzado / esperado, 1) × 100`; general y por dominio = `Σ(score × peso) / Σ(peso)`
+sobre lo evaluado y aplicable. Se reprodujo con casos concretos (script en el historial de la conversación):
+
+### 1.1 Errores técnicos (se corrigen sin necesidad de contrastar)
+
+**Los pesos "deben sumar 100" con 2 decimales están rotos.** El reparto uniforme del proyecto anterior
+(`round(100/n, 2)` y el último absorbe la diferencia) da:
+
+| Criterios | Cada uno | El último | |
+|---|---|---|---|
+| 93 (ISO 27001:2022) | 1,08 | **0,64** | pesa un 41 % menos: sesgo silencioso en el caso más típico |
+| 450 | 0,22 | 1,22 | desigual |
+| 601 | 0,17 | **−2** | negativo: viola el `CHECK weight ≥ 0`; la auditoría no se puede crear |
+
+→ **Pesos relativos**: un número positivo por criterio (por defecto 1) que se **normaliza al calcular** (`peso / Σ pesos`). No hay
+suma que cuadrar ni redondeo, y agregar o quitar un criterio no obliga a rebalancear. La pantalla puede mostrar el porcentaje
+resultante. Desaparecen `WEIGHTS_SUM_INVALID` y el reparto inicial; el `CHECK` pasa a `weight > 0`.
+
+**El puntaje guardado se desactualiza.** Con nivel esperado por criterio y una operación masiva que lo cambia, un `score`
+guardado (60 %) queda distinto del real (100 %) salvo que cada cambio lo recalcule: dos fuentes de la misma verdad. → **Se
+elimina `evaluations.score`**: se calcula al leer a partir de los niveles alcanzado y esperado (la escala son unas decenas de
+filas). Los agregados se calculan con los niveles y los pesos exactos, no con puntajes ya redondeados. Para lo cerrado sigue
+`audits.finalScore` (instantánea al cerrar).
+
+**El objetivo del gráfico** ignoraba el nivel esperado por control (usaba el máximo de la escala). Ya decidido: promedio
+ponderado por dominio (`04` §4.5).
+
+### 1.2 Decisiones metodológicas (necesitan una auditoría real)
+
+**(a) El % depende de dónde empieza la escala.** Con esperado 3:
+
+| Alcanzado | Escala 0–5 (COBIT) | Escala 1–5 (CMMI) | CMMI normalizando el mínimo |
+|---|---|---|---|
+| 0 | 0 % | — | — |
+| 1 | 33,3 % | 33,3 % | **0 %** |
+| 2 | 66,7 % | 66,7 % | 50 % |
+| 3 | 100 % | 100 % | 100 % |
+
+El mismo estado real ("inicial") vale 33 % en CMMI y 0 % en COBIT solo por cómo se numera. La alternativa
+`(alcanzado − mínimo) / (esperado − mínimo)` da 0 % al nivel más bajo en cualquier escala. Cuál es la correcta depende de qué
+significa el nivel más bajo: en COBIT, "0 = incompleto" es ausencia; en CMMI, "1 = inicial" existe de forma ad hoc. **Hay que
+ver qué hacen los auditores reales.** Además, los niveles de madurez son ordinales (el 4 no es "el doble" del 2); dividir es una
+convención, no una medida.
+
+**(b) El promedio ponderado compensa.** 50 criterios, 49 al 100 % y **uno crítico al 0 %** → 98 % general (90,7 % aunque ese
+criterio pese 5×). Una auditoría real no se decide por un promedio: un incumplimiento grave puede impedir la conclusión favorable
+aunque el resto esté bien. Opciones, de menor a mayor:
+1. informar **además** la cuenta de incumplimientos (criterios por debajo del esperado) y la lista de los peores (ya existía el
+   "top 5 controles débiles");
+2. distribución por nivel en cada dominio (cuántos criterios en cada nivel), más honesta que la media de un dato ordinal;
+3. un marcador de **criterio crítico**: si uno está por debajo del esperado, el dominio y el resultado general se marcan.
+
+**(c) Lo que no está modelado y una auditoría real casi seguro tiene:**
+- **clasificación del hallazgo** (conformidad, no conformidad mayor/menor, observación, oportunidad de mejora): hoy solo hay
+  un nivel y un texto;
+- **evidencia obligatoria**: nada impide completar un criterio sin adjuntar evidencia;
+- **el seguimiento**: en la práctica suele **revisar solo lo que falló** en la auditoría anterior; hoy un seguimiento crea
+  evaluaciones para **todas** las hojas.
+
+## 2. Revisión de todas las decisiones
+
+Confianza = cuánto respaldo tienen (`alta`: lo confirmó el usuario o hay datos; `media`: razonable pero sin contrastar;
+`baja`: hay indicios de que está mal). Costo de cambiarla después: `bajo` (una columna o un caso de uso), `alto` (toca el modelo
+y los datos).
+
+| # | Decisión | Confianza | Costo de cambio | Qué contrastar con una auditoría real |
+|---|---|---|---|---|
+| 1 | Plantilla identificada por su nombre (sin `code`/`version`) | alta | bajo | — |
+| 2 | Plantilla **publicada inmutable**; corregir = clonar | media | medio | ¿Se corrigen plantillas en uso? Con esto, las auditorías ya iniciadas siguen con la versión vieja |
+| 3 | Árbol de profundidad variable; la hoja se evalúa; el primer nivel es el dominio | alta | alto | Confirmado por el usuario |
+| 4 | **Una escala por auditoría**, no por sección | media | **alto** | ¿Una misma auditoría mezcla "cumple/no cumple" (cláusulas) con madurez (controles)? |
+| 5 | Alcance propio de la auditoría; el seguimiento lo hereda sin ampliarlo | media | medio | ¿Cómo se define el alcance de un seguimiento real? |
+| 6 | Seguimiento = auditoría nueva sobre una cerrada, **con todas las hojas** | **baja** | alto | ¿Se revisa todo o solo los incumplimientos? (§1.2c) |
+| 7 | Flujo de la evaluación: iniciar → completar → aprobar/devolver, con rondas; roles líder/inspector | media | alto | ¿Aprueba el líder **cada** criterio? ¿Hay auditorías de un solo auditor? |
+| 8 | Cerrar exige todo aprobado | media | bajo | ¿Se cierra con pendientes justificados? |
+| 9 | Nivel esperado **por criterio**, con motivo; iniciar exige fijarlos todos | alta | medio | Confirmado por el usuario |
+| 10 | Fórmula `min(A/E,1)×100`, promedio ponderado | **baja** | alto | §1.2 (a) y (b) |
+| 11 | Pesos que suman 100 | **baja (error)** | medio | Se reemplaza por pesos relativos (§1.1) |
+| 12 | Puntaje guardado por criterio | **baja (error)** | medio | Se elimina; se calcula (§1.1) |
+| 13 | Sin notificaciones ni feed global | alta | bajo | Reversible: es un manejador nuevo |
+| 14 | Usuario mínimo; roles desde los grupos de Authentik | alta | bajo | — |
+| 15 | Evidencia en Nextcloud, por criterio y ronda | media | medio | ¿Qué se exige adjuntar? ¿Evidencia a nivel de auditoría, no solo de criterio? |
+| 16 | Hallazgos sugeridos por control y nivel | media | bajo | ¿Los auditores los usan de verdad? Si no, se elimina |
+| 17 | Informe `.docx` desde una plantilla | media | medio | **Un informe real terminado** valida qué secciones, gráficos y cifras se necesitan |
+| 18 | Sin guía del auditor en la plantilla | alta | bajo | Confirmado por el usuario |
+
+Las de confianza baja o costo alto (4, 6, 7, 10) son las que conviene contrastar **antes** de la Fase 3, que es cuando se
+construyen.
+
+## 3. Cómo contrastar con una auditoría real
+
+Sirve **una sola auditoría terminada**, idealmente una ISO 27001 con su informe final.
+
+1. **Reunir cinco insumos:** (i) la plantilla usada (estructura); (ii) la escala y sus niveles; (iii) por criterio: nivel
+   esperado, nivel alcanzado, si era no aplicable, peso si lo hubo y el hallazgo; (iv) el informe final con sus gráficas y
+   conclusiones; (v) cómo fue el equipo (quién evaluó, quién aprobó).
+2. **Reproducir:** cargar esos datos como caso de prueba de `scoring.ts` (Fase 3), calcular y comparar el % por dominio y el
+   general con los del informe real.
+3. **Clasificar cada diferencia:** (a) error nuestro, (b) el auditor usa otro método (se decide), (c) faltan datos.
+4. Las diferencias resuelven §1.2 y la tabla anterior.
+
+Formato sugerido para los datos (una fila por criterio; sirve un Excel o un CSV):
+
+| dominio | referencia | criterio (título) | esperado | alcanzado | no aplica | peso | hallazgo |
+|---|---|---|---|---|---|---|---|
+| A.5 Políticas | A.5.1.1 | Existe política de seguridad aprobada | 3 | 2 | no | 1 | Sin firma del CISO |
+
+## 4. Preguntas para hacerle a quien hizo esa auditoría
+
+1. ¿Cómo obtienes el porcentaje de un dominio? ¿Y el general? ¿Lo informas, o informas el nivel de madurez?
+2. ¿El nivel más bajo de la escala significa "no existe" o "existe pero informal"? ¿Cuánto vale en tu porcentaje?
+3. ¿Ponderas los criterios? ¿Con qué criterio (riesgo, criticidad)? ¿Hay criterios cuyo incumplimiento cambia la conclusión
+   sin importar el promedio?
+4. ¿Clasificas los hallazgos (no conformidad mayor/menor, observación)? ¿En el informe aparecen contados?
+5. ¿Se exige evidencia para calificar un criterio? ¿A qué nivel (criterio, dominio, auditoría)?
+6. ¿Aprueba una segunda persona cada criterio, o se revisa por dominio o al final?
+7. En un seguimiento, ¿se vuelve a evaluar todo o solo lo que falló?
+8. ¿Qué gráficas y cifras van en el informe final? (el radar por dominio, ¿en % o en niveles?)
+9. ¿Se mezclan formas de evaluar en una misma auditoría (cumple/no cumple y madurez)?
+
+## 5. Qué propongo corregir ya (con tu visto bueno) y qué espera
+
+| Propuesta: corregir en la Fase 2/3 sin esperar (pendiente de visto bueno) | Espera a la auditoría real |
+|---|---|
+| Pesos relativos; se elimina el reparto a 100 | Punto cero de la escala (§1.2a) |
+| Se elimina `evaluations.score` (se calcula) | Marcador de criterio crítico / cuenta de incumplimientos (§1.2b) |
+| Promedio ponderado por dominio como definición única | Clasificación de hallazgos y evidencia obligatoria (§1.2c) |
+| Nivel esperado por criterio; obligatorio para iniciar | Seguimiento: todas las hojas o solo las fallidas (#6) |
