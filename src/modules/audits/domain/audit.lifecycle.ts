@@ -29,6 +29,12 @@ export function assertAuditStaffable(status: AuditStatus): void {
   auditLifecycle.assert(status, 'staffable', AuditErrors.AUDIT_TEAM_LOCKED)
 }
 
+/** Lanza AUDIT_NOT_EVALUABLE si la auditoría no está en curso: docs/03 regla 10, cada acción sobre un criterio exige
+ * primero que SU auditoría esté en curso (evaluar, enviar, revisar; también quitarlo de revisión). */
+export function assertAuditEvaluable(status: AuditStatus): void {
+  auditLifecycle.assert(status, 'evaluable', AuditErrors.AUDIT_NOT_EVALUABLE)
+}
+
 /** Lanza AUDIT_NOT_EDITABLE si la auditoría no está en borrador. */
 export function assertAuditEditable(status: AuditStatus): void {
   auditLifecycle.assert(status, 'editable', AuditErrors.AUDIT_NOT_EDITABLE)

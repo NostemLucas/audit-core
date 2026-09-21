@@ -15,6 +15,13 @@ export const EvaluationView = z.object({
   assignedUser: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   expectedLevel: z.object({ id: z.uuid(), value: DecimalNumber, label: z.string() }).nullable(),
   guidance: z.string().nullable(),
+  achievedLevel: z.object({ id: z.uuid(), value: DecimalNumber, label: z.string() }).nullable(),
+  findings: z.string().nullable(),
+  notes: z.string().nullable(),
+  isNotApplicable: z.boolean(),
+  notApplicableReason: z.string().nullable(),
+  /** Cuántas evidencias tiene adjuntas (la Fase 4 trae el detalle; aquí solo el conteo, para saber si puede enviarse). */
+  evidenceCount: z.int(),
 })
 
 export const ListEvaluationsQuery = z.object({
@@ -43,3 +50,30 @@ export const SetExpectedLevel = z.object({
   guidance: optionalText().optional(),
 })
 export type SetExpectedLevelT = z.infer<typeof SetExpectedLevel>
+
+/**
+ * Editar el contenido de un criterio (el auditor asignado, docs/06 §3). No aplica y nivel alcanzado son excluyentes: no se
+ * puede marcar "no aplica" y fijar un nivel a la vez en el mismo envío.
+ */
+export const UpdateEvaluationContent = z
+  .object({
+    achievedLevelId: z.uuid().nullable().optional(),
+    findings: optionalText().nullable().optional(),
+    notes: optionalText().nullable().optional(),
+    isNotApplicable: z.boolean().optional(),
+    notApplicableReason: optionalText().nullable().optional(),
+  })
+  .refine((body) => Object.keys(body).length > 0, { message: 'Indica al menos un campo a modificar' })
+  .refine((body) => !(body.isNotApplicable === true && body.achievedLevelId), {
+    message: 'No se puede marcar "no aplica" y fijar un nivel alcanzado a la vez',
+  })
+export type UpdateEvaluationContentT = z.infer<typeof UpdateEvaluationContent>
+
+/** Aprobar: el comentario es opcional. Devolver y reabrir: obligatorio (docs/06 §3). */
+export const ApproveEvaluation = z.object({ comments: optionalText().optional() })
+export type ApproveEvaluationT = z.infer<typeof ApproveEvaluation>
+
+export const ReturnEvaluation = z.object({ comments: z.string().trim().min(1).max(LIMITS.text) })
+export type ReturnEvaluationT = z.infer<typeof ReturnEvaluation>
+
+export const EvaluationId = z.uuid()

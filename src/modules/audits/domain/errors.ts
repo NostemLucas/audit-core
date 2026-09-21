@@ -31,6 +31,8 @@ export const AuditErrors = defineErrors({
   },
   /** Permiso contextual: el actor no es miembro (con el rol necesario) de esta auditoría. */
   AUDIT_ACCESS_DENIED: { http: 403, message: 'No participas en esta auditoría con el rol necesario' },
+  /** Capacidad `evaluable` (docs/03): las acciones sobre un criterio exigen la auditoría en curso. */
+  AUDIT_NOT_EVALUABLE: { http: 409, message: 'La auditoría debe estar en curso para actuar sobre sus criterios' },
 
   // ── Alcance ────────────────────────────────────────────────────────────────
   /** Solo se edita el alcance con la auditoría en borrador (capacidad `editable`). */
@@ -82,11 +84,16 @@ export const AuditErrors = defineErrors({
     http: 409,
     message: 'No se puede cambiar la asignación de criterios enviados a revisión o aprobados',
   },
-  EVALUATION_NOT_ASSIGNED: { http: 403, message: 'La evaluación no está asignada a este usuario' },
-  /** Completar exige el nivel alcanzado (o marcarla no aplicable). */
-  EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para completar la evaluación' },
+  /** Enviar a revisión exige nivel alcanzado (o N/A con motivo) y, según el caso, hallazgo y/o evidencia (docs/06 §3).
+   * `details.missing`: ACHIEVED_LEVEL_OR_NOT_APPLICABLE | NOT_APPLICABLE_REASON | FINDINGS | EVIDENCE. */
+  EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para enviar el criterio a revisión' },
   EVALUATION_LEVEL_NOT_IN_SCALE: { http: 422, message: 'El nivel no pertenece a la escala de la auditoría' },
   NOT_APPLICABLE_REASON_REQUIRED: { http: 422, message: 'Marcar como no aplicable requiere un motivo' },
+  /** "No aplica" y nivel alcanzado son excluyentes: para fijar un nivel hay que desmarcar antes "no aplica" (`isNotApplicable: false`). */
+  EVALUATION_IS_NOT_APPLICABLE: {
+    http: 409,
+    message: 'El criterio está marcado como no aplica; desmárcalo antes de fijar un nivel alcanzado',
+  },
   /** Un criterio enviado a revisión o aprobado no cambia de nivel esperado (mismo motivo que EVALUATION_NOT_REASSIGNABLE: cambiar
    * el objetivo después de evaluar invalidaría lo ya enviado). `details.evaluationIds` = los que lo impiden. */
   EVALUATION_EXPECTED_LEVEL_LOCKED: {

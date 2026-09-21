@@ -96,6 +96,13 @@ NOT_STARTED ─▶ IN_PROGRESS ─▶ COMPLETED ─▶ APPROVED
 - La **guía** (`guidance`) es un solo texto del líder por criterio: el contexto para el auditor y, a la vez, el porqué del nivel
   esperado. Sustituye a `expectedLevelReason`.
 - Reasignar un criterio (líder) solo mientras no esté `COMPLETED` ni `APPROVED`.
+- **Todas las acciones sobre un criterio** (editar, enviar, aprobar, devolver, reabrir) exigen la auditoría **en curso**
+  (`AUDIT_NOT_EVALUABLE`): en una cerrada o archivada no se toca nada, tampoco reabrir.
+- **No hay «iniciar» explícito**: la primera edición del auditor asignado arranca el criterio (`NOT_STARTED` → `IN_PROGRESS`,
+  evento `EvaluationStarted`). Enviar (`COMPLETE`) sin haberlo editado es `EVALUATION_INVALID_STATE`; el ciclo de vida se
+  comprueba **antes** que las precondiciones de contenido.
+- **«No aplica» y nivel alcanzado son excluyentes**: marcar «no aplica» borra el nivel; poner un nivel con «no aplica»
+  activo es `EVALUATION_IS_NOT_APPLICABLE` (hay que desmarcarlo de forma explícita, `isNotApplicable: false`).
 
 ## 4. Historia de las revisiones
 
@@ -131,7 +138,7 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3b-0** (hecho) | Ajustes de este diseño sobre lo hecho: esquema (lo de §6), permisos del ADMIN, política de permisos |
 | **3b** (hecho) | Equipo: lector de usuarios (`identity`), designar líder y auditores, transferir el manager; asignar criterios |
 | **3c** (hecho) | Nivel esperado y guía por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
-| **3d** | Flujo del criterio (iniciar, editar, completar, aprobar, devolver, reabrir) con su historia |
+| **3d** (hecho) | Flujo del criterio (iniciar al primer edit, editar, completar, aprobar, devolver, reabrir) con su historia |
 | **3e** | `scoring.ts` (distribución por opción, promedios esperado/alcanzado, brecha) y lecturas: estadísticas, gráficas, brechas, historial |
 | **3f** | Seguimientos (qué criterios incluir: pendiente de decidir, ver `05` §6) |
 

@@ -35,4 +35,9 @@ export const auditMessages = defineMessages(AuditEvents, {
   AuditStarted: () => 'Inició la auditoría',
   AuditClosed: () => 'Cerró la auditoría',
   AuditArchived: () => 'Archivó la auditoría',
+  EvaluationStarted: (p) => `Comenzó a trabajar en «${p.controlTitle}»`,
+  EvaluationCompleted: (p) => `Envió «${p.controlTitle}» a revisión`,
+  EvaluationApproved: (p) => (p.comments ? `Aprobó «${p.controlTitle}»: ${p.comments}` : `Aprobó «${p.controlTitle}»`),
+  EvaluationReturned: (p) => `Devolvió «${p.controlTitle}»: ${p.comments}`,
+  EvaluationReopened: (p) => `Reabrió «${p.controlTitle}» (estaba aprobado): ${p.comments}`,
 })

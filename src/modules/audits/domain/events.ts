@@ -75,6 +75,28 @@ export const AuditEvents = defineEvents({
   AuditStarted: z.object({ ...audit }),
   AuditClosed: z.object({ ...audit }),
   AuditArchived: z.object({ ...audit }),
+  // Ciclo de vida de un criterio (docs/06 §3, §4). El sujeto es la evaluación.
+  EvaluationStarted: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string() }),
+  /** Lleva una COPIA del contenido enviado (docs/06 §4): permite ver "cómo estaba" sin tabla de revisiones aparte. */
+  EvaluationCompleted: z.object({
+    ...audit,
+    evaluationId: z.uuid(),
+    controlTitle: z.string(),
+    achievedLevelLabel: z.string().nullable(),
+    isNotApplicable: z.boolean(),
+    notApplicableReason: z.string().nullable(),
+    findings: z.string().nullable(),
+    notes: z.string().nullable(),
+    evidence: z.array(z.object({ id: z.uuid(), title: z.string() })),
+  }),
+  EvaluationApproved: z.object({
+    ...audit,
+    evaluationId: z.uuid(),
+    controlTitle: z.string(),
+    comments: z.string().nullable(),
+  }),
+  EvaluationReturned: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),
+  EvaluationReopened: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),
 })
 
 export const AUDIT_EVENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AuditEvents))
