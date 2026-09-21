@@ -32,9 +32,19 @@ interface Grant {
   readonly subjects: readonly Subject[]
 }
 
-/** Los permisos como DATO: leer la tabla es leer la política. */
+/**
+ * Los permisos como DATO: leer la tabla es leer la política (modelo de roles: docs/06 §1). No hay superusuario:
+ *  - ADMIN administra la PLATAFORMA (usuarios y catálogos) y VE las auditorías, pero no actúa sobre su contenido.
+ *  - GERENTE dirige la función de auditoría: crea auditorías y arma equipos (como manager), y administra la biblioteca.
+ *  - AUDITOR trabaja en las auditorías donde lo asignan: evalúa, adjunta evidencia y, si es líder, asigna y revisa
+ *    (`update Evaluation`); el detalle de qué puede hacer sobre CADA auditoría lo decide la política contextual.
+ * Los roles se suman: quien deba poder ambas cosas tiene los dos roles y actúa como el que la acción exige.
+ */
 const GRANTS: Readonly<Record<Role, readonly Grant[]>> = {
-  ADMIN: [{ actions: ['manage'], subjects: ['all'] }],
+  ADMIN: [
+    { actions: ['manage'], subjects: ['User', 'Organization', 'Template', 'Scale'] },
+    { actions: ['read'], subjects: ['Audit', 'AuditMember', 'Evaluation', 'Evidence', 'Report', 'Dashboard'] },
+  ],
 
   GERENTE: [
     { actions: ['manage'], subjects: ['Audit', 'AuditMember', 'Evaluation', 'Evidence', 'Report'] },
@@ -44,7 +54,6 @@ const GRANTS: Readonly<Record<Role, readonly Grant[]>> = {
 
   AUDITOR: [
     { actions: ['read'], subjects: ['Audit', 'AuditMember', 'Report', 'Template', 'Scale', 'Dashboard'] },
-    { actions: ['create', 'update', 'delete'], subjects: ['AuditMember'] },
     { actions: ['create', 'read', 'update'], subjects: ['Evaluation', 'Evidence'] },
     { actions: ['delete'], subjects: ['Evidence'] },
   ],

@@ -515,6 +515,10 @@ estrategias de Passport. Valida firma, `iss`, `aud`, `exp`, algoritmo y exige `s
 **Permisos (CASL 7).**
 - `platform/authz/abilities.ts` es la **única** fuente: una tabla `rol → concesiones`. Son permisos **gruesos**; los que
   dependen de la auditoría concreta (¿líder de ESTA auditoría?) van en `audits/domain/audit-policy.ts`.
+- **No hay superusuario** (`06` §1): el ADMIN administra la plataforma (usuarios, organizaciones, biblioteca) y solo VE las
+  auditorías; no actúa sobre su contenido. Los roles se suman: quien deba poder ambas cosas tiene ADMIN y GERENTE y actúa
+  como el que la acción exige, con su nombre en el historial. El GERENTE dirige las auditorías que crea (es su manager); el
+  AUDITOR trabaja en las que lo asignan. Lo que se puede hacer sobre CADA auditoría lo decide `audit-policy.ts`.
 - Sujetos: `User, Organization, Template, Scale, Audit, AuditMember, Evaluation, Evidence, Report, Dashboard`. Desaparecen
   `GlobalFeed`, `Notification`, `AuditMetrics`, `Standard`, `PredefinedText`, `EvaluationFramework`, `EvaluationLevel`
   (lo cubren `Template`, `Scale` y `Dashboard`). Acciones: `manage`, `create`, `read`, `update`, `delete`; los verbos de

@@ -49,9 +49,11 @@ enum AuditStatus {
   ARCHIVED
 }
 
+/// Rol dentro de UNA auditoría (docs/06 §1). LEAD coordina y revisa; MEMBER (el auditor) hace el trabajo. No confundir con `Role`
+/// (rol global de la cuenta).
 enum AuditRole {
-  LEAD_AUDITOR
-  INSPECTOR
+  LEAD
+  MEMBER
 }
 
 enum EvaluationStatus {
@@ -60,14 +62,6 @@ enum EvaluationStatus {
   COMPLETED
   RETURNED
   APPROVED
-}
-
-enum ReviewAction {
-  APPROVE
-  RETURN
-  REASSIGN
-  REOPEN
-  RESTORE
 }
 
 enum ReportType {
@@ -104,7 +98,6 @@ model User {
   managedAudits       Audit[]            @relation("AuditManager")
   memberships         AuditMember[]
   assignedEvaluations Evaluation[]
-  reviewsDone         EvaluationReview[]
   eventsActed         AuditEvent[]       @relation("EventActor")
   eventsTargeted      AuditEvent[]       @relation("EventTarget")
 
@@ -331,12 +324,13 @@ model AuditScopeItem {
   @@map("audit_scope_items")
 }
 
-/// Quitar un miembro es un borrado; queda registrado en AuditEvent.
+/// Quitar un miembro es un borrado; queda registrado en AuditEvent. Un solo LEAD por auditoría: índice único parcial en el bloque
+/// manual de la migración (Prisma no modela índices parciales).
 model AuditMember {
   id      String    @id @default(uuid(7)) @db.Uuid
   auditId String    @db.Uuid
   userId  String    @db.Uuid
-  role    AuditRole @default(INSPECTOR)
+  role    AuditRole @default(MEMBER)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -349,8 +343,8 @@ model AuditMember {
   @@map("audit_members")
 }
 
-/// Evaluación de un control (hoja) dentro de una auditoría. El estado vigente vive aquí;
-/// el historial de decisiones está en EvaluationReview. (Antes: audit_responses + audit_evaluations.)
+/// Evaluación de un control (hoja) dentro de una auditoría. El estado vigente vive aquí; la historia (envíos, devoluciones,
+/// aprobaciones, con una copia de lo enviado) está en AuditEvent (docs/06 §4). (Antes: audit_responses + audit_evaluations.)
 model Evaluation {
   id        String @id @default(uuid(7)) @db.Uuid
   auditId   String @db.Uuid
@@ -358,13 +352,12 @@ model Evaluation {
 
   /// Opción esperada para ESTE control (varía por control). Obligatoria antes de iniciar la auditoría; nulo solo en DRAFT.
   expectedLevelId     String? @db.Uuid
-  /// Por qué se espera esa opción (p. ej. "criticidad alta según el análisis de riesgos"). Opcional.
-  expectedLevelReason String?
+  /// La guía del líder para este criterio: contexto para el auditor y porqué se espera esa opción (p. ej. "criticidad alta según
+  /// el análisis de riesgos"). Opcional.
+  guidance            String?
   assignedUserId      String? @db.Uuid
 
   status EvaluationStatus @default(NOT_STARTED)
-  /// Ronda devolver/corregir, desde 1
-  round  Int              @default(1)
 
   achievedLevelId String? @db.Uuid
   findings        String?
@@ -387,7 +380,6 @@ model Evaluation {
   achievedLevel ScaleLevel? @relation("EvaluationAchievedLevel", fields: [achievedLevelId], references: [id], onDelete: Restrict)
   assignedUser  User?       @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
 
-  reviews   EvaluationReview[]
   evidences Evidence[]
 
   @@unique([auditId, controlId])
@@ -397,34 +389,11 @@ model Evaluation {
   @@map("evaluations")
 }
 
-/// Log append-only de decisiones sobre una evaluación. `snapshot` guarda el contenido en ese momento
-/// (nivel, score, hallazgos, notas, N/A, ids de evidencia; tipado con Zod). Restaurar una ronda lee el snapshot.
-model EvaluationReview {
-  id           String       @id @default(uuid(7)) @db.Uuid
-  evaluationId String       @db.Uuid
-  round        Int
-  action       ReviewAction
-  actorId      String       @db.Uuid
-  comments     String?
-  snapshot     Json
-
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
-  actor      User       @relation(fields: [actorId], references: [id], onDelete: Restrict)
-
-  @@index([evaluationId, createdAt])
-  @@index([actorId, createdAt])
-  @@map("evaluation_reviews")
-}
-
 /// Metadatos de un archivo de evidencia. La fuente de verdad del archivo es Nextcloud (`storageFileId`).
 /// Quién la subió = `createdById`. Único modelo con soft-delete: la evidencia eliminada debe seguir siendo trazable.
 model Evidence {
   id            String    @id @default(uuid(7)) @db.Uuid
   evaluationId  String    @db.Uuid
-  /// Ronda de la evaluación en la que se adjuntó
-  round         Int
   title         String
   description   String?
   fileName      String
@@ -440,7 +409,7 @@ model Evidence {
 
   evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
-  @@index([evaluationId, round])
+  @@index([evaluationId])
   @@map("evidences")
 }
 

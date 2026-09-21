@@ -118,7 +118,7 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | Paso | Contenido |
 |---|---|
 | **3a** (hecho) | Auditorías (crear, ver, listar, editar, eliminar), alcance, historial, lectores públicos |
-| **3b-0** | Ajustes de este diseño sobre lo hecho: esquema (lo de §6), permisos del ADMIN, política de permisos |
+| **3b-0** (hecho) | Ajustes de este diseño sobre lo hecho: esquema (lo de §6), permisos del ADMIN, política de permisos |
 | **3b** | Equipo: lector de usuarios (`identity`), designar líder y auditores, transferir el manager; asignar criterios |
 | **3c** | Nivel esperado y guía por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
 | **3d** | Flujo del criterio (iniciar, editar, completar, aprobar, devolver, reabrir) con su historia |

@@ -9,7 +9,6 @@ export {
   AuditStatus,
   EvaluationStatus,
   ReportType,
-  ReviewAction,
   Role,
   ScaleDimension,
   TemplateStatus,

@@ -7,9 +7,25 @@ import { ACTIONS, SUBJECTS, defineAbilityFor, type Action, type Subject } from '
 const can = (roles: Role[], action: Action, subject: Subject) => defineAbilityFor(roles).can(action, subject)
 
 describe('permisos globales por rol', () => {
-  it('ADMIN puede todo', () => {
-    for (const action of ACTIONS)
-      for (const subject of SUBJECTS) expect(can(['ADMIN'], action, subject), `${action} ${subject}`).toBe(true)
+  it('ADMIN administra la PLATAFORMA (usuarios, organizaciones, biblioteca): todas las acciones', () => {
+    for (const subject of ['User', 'Organization', 'Template', 'Scale'] as const) {
+      for (const action of ACTIONS) expect(can(['ADMIN'], action, subject), `${action} ${subject}`).toBe(true)
+    }
+  })
+
+  it('ADMIN VE las auditorías y su contenido, pero no actúa sobre él: sin superusuario (docs/06 §1)', () => {
+    for (const subject of ['Audit', 'AuditMember', 'Evaluation', 'Evidence', 'Report', 'Dashboard'] as const) {
+      expect(can(['ADMIN'], 'read', subject), `read ${subject}`).toBe(true)
+      for (const action of ['manage', 'create', 'update', 'delete'] as const) {
+        expect(can(['ADMIN'], action, subject), `${action} ${subject}`).toBe(false)
+      }
+    }
+  })
+
+  it('quien necesita poder hacerlo todo tiene los dos roles: ADMIN + GERENTE suma los permisos de ambos', () => {
+    expect(can(['ADMIN', 'GERENTE'], 'create', 'Audit')).toBe(true)
+    expect(can(['ADMIN', 'GERENTE'], 'manage', 'User')).toBe(true)
+    expect(can(['ADMIN'], 'create', 'Audit')).toBe(false)
   })
 
   it('GERENTE gestiona auditorías, biblioteca y organizaciones; solo lee usuarios y dashboard', () => {
@@ -58,9 +74,11 @@ describe('permisos globales por rol', () => {
     expect(can(['AUDITOR'], 'read', 'User')).toBe(false)
   })
 
-  it('el equipo de la auditoría: el AUDITOR tiene el permiso grueso; quién puede en ESTA auditoría lo decide la policy contextual', () => {
-    for (const action of ['create', 'update', 'delete'] as const)
-      expect(can(['AUDITOR'], action, 'AuditMember')).toBe(true)
+  it('el equipo lo arma el manager (GERENTE): el AUDITOR solo lo ve, aunque sea el líder', () => {
+    for (const action of ['create', 'update', 'delete'] as const) {
+      expect(can(['AUDITOR'], action, 'AuditMember')).toBe(false)
+      expect(can(['GERENTE'], action, 'AuditMember')).toBe(true)
+    }
   })
 
   it('sin roles no se puede nada', () => {

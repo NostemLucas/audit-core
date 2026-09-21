@@ -14,13 +14,10 @@ CREATE TYPE "TemplateStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
 CREATE TYPE "AuditStatus" AS ENUM ('DRAFT', 'IN_PROGRESS', 'CLOSED', 'ARCHIVED');
 
 -- CreateEnum
-CREATE TYPE "AuditRole" AS ENUM ('LEAD_AUDITOR', 'INSPECTOR');
+CREATE TYPE "AuditRole" AS ENUM ('LEAD', 'MEMBER');
 
 -- CreateEnum
 CREATE TYPE "EvaluationStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'RETURNED', 'APPROVED');
-
--- CreateEnum
-CREATE TYPE "ReviewAction" AS ENUM ('APPROVE', 'RETURN', 'REASSIGN', 'REOPEN', 'RESTORE');
 
 -- CreateEnum
 CREATE TYPE "ReportType" AS ENUM ('COMPLIANCE', 'EXECUTIVE_SUMMARY', 'FINDINGS', 'GAP_ANALYSIS', 'OTHER');
@@ -162,7 +159,7 @@ CREATE TABLE "audit_members" (
     "id" UUID NOT NULL,
     "auditId" UUID NOT NULL,
     "userId" UUID NOT NULL,
-    "role" "AuditRole" NOT NULL DEFAULT 'INSPECTOR',
+    "role" "AuditRole" NOT NULL DEFAULT 'MEMBER',
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
@@ -175,10 +172,9 @@ CREATE TABLE "evaluations" (
     "auditId" UUID NOT NULL,
     "controlId" UUID NOT NULL,
     "expectedLevelId" UUID,
-    "expectedLevelReason" TEXT,
+    "guidance" TEXT,
     "assignedUserId" UUID,
     "status" "EvaluationStatus" NOT NULL DEFAULT 'NOT_STARTED',
-    "round" INTEGER NOT NULL DEFAULT 1,
     "achievedLevelId" UUID,
     "findings" TEXT,
     "notes" TEXT,
@@ -194,24 +190,9 @@ CREATE TABLE "evaluations" (
 );
 
 -- CreateTable
-CREATE TABLE "evaluation_reviews" (
-    "id" UUID NOT NULL,
-    "evaluationId" UUID NOT NULL,
-    "round" INTEGER NOT NULL,
-    "action" "ReviewAction" NOT NULL,
-    "actorId" UUID NOT NULL,
-    "comments" TEXT,
-    "snapshot" JSONB NOT NULL,
-    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "evaluation_reviews_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "evidences" (
     "id" UUID NOT NULL,
     "evaluationId" UUID NOT NULL,
-    "round" INTEGER NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
     "fileName" TEXT NOT NULL,
@@ -324,16 +305,10 @@ CREATE INDEX "evaluations_controlId_idx" ON "evaluations"("controlId");
 CREATE UNIQUE INDEX "evaluations_auditId_controlId_key" ON "evaluations"("auditId", "controlId");
 
 -- CreateIndex
-CREATE INDEX "evaluation_reviews_evaluationId_createdAt_idx" ON "evaluation_reviews"("evaluationId", "createdAt");
-
--- CreateIndex
-CREATE INDEX "evaluation_reviews_actorId_createdAt_idx" ON "evaluation_reviews"("actorId", "createdAt");
-
--- CreateIndex
 CREATE UNIQUE INDEX "evidences_storageFileId_key" ON "evidences"("storageFileId");
 
 -- CreateIndex
-CREATE INDEX "evidences_evaluationId_round_idx" ON "evidences"("evaluationId", "round");
+CREATE INDEX "evidences_evaluationId_idx" ON "evidences"("evaluationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "reports_storageFileId_key" ON "reports"("storageFileId");
@@ -408,12 +383,6 @@ ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_achievedLevelId_fkey" FORE
 ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_assignedUserId_fkey" FOREIGN KEY ("assignedUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "evaluation_reviews" ADD CONSTRAINT "evaluation_reviews_evaluationId_fkey" FOREIGN KEY ("evaluationId") REFERENCES "evaluations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "evaluation_reviews" ADD CONSTRAINT "evaluation_reviews_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "evidences" ADD CONSTRAINT "evidences_evaluationId_fkey" FOREIGN KEY ("evaluationId") REFERENCES "evaluations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -464,19 +433,16 @@ ALTER TABLE "audits"
   ADD CONSTRAINT "audits_not_own_parent"       CHECK ("parentAuditId" IS NULL OR "parentAuditId" <> "id"),
   ADD CONSTRAINT "audits_planned_dates"        CHECK ("plannedStart" IS NULL OR "plannedEnd" IS NULL OR "plannedEnd" >= "plannedStart");
 
+-- audit_members: UN SOLO líder por auditoría (docs/06 §1). Índice único parcial: lo garantiza la BD, sin bloqueos de fila
+-- (con dos designaciones simultáneas la segunda choca y se traduce a AUDIT_LEAD_ALREADY_ASSIGNED).
+CREATE UNIQUE INDEX "audit_members_one_lead" ON "audit_members"("auditId") WHERE "role" = 'LEAD';
+
 -- evaluations
 ALTER TABLE "evaluations"
-  ADD CONSTRAINT "evaluations_round_min"     CHECK ("round" >= 1),
   ADD CONSTRAINT "evaluations_na_reason"     CHECK (NOT "isNotApplicable" OR "notApplicableReason" IS NOT NULL);
-
--- evaluation_reviews
-ALTER TABLE "evaluation_reviews"
-  ADD CONSTRAINT "evaluation_reviews_round_min"        CHECK ("round" >= 1),
-  ADD CONSTRAINT "evaluation_reviews_snapshot_object"  CHECK (jsonb_typeof("snapshot") = 'object');
 
 -- evidences
 ALTER TABLE "evidences"
-  ADD CONSTRAINT "evidences_round_min"     CHECK ("round" >= 1),
   ADD CONSTRAINT "evidences_size_nonneg"   CHECK ("size" >= 0);
 
 -- audit_events

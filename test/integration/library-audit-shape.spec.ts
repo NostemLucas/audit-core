@@ -159,7 +159,7 @@ describe('Control: la numeración es texto libre, no una clave', () => {
 })
 
 describe('Evaluación y auditoría: nada calculado se guarda', () => {
-  it('Evaluation no guarda peso ni score y sí el motivo del nivel esperado; Audit no guarda finalScore', async () => {
+  it('Evaluation no guarda peso, score ni ronda y sí la guía del líder; Audit no guarda finalScore', async () => {
     const org = await db.organization.create({ data: { name: 'ACME' } })
     const audit = await createAuditFixture(db, org.id)
     const control = await db.control.create({
@@ -168,7 +168,7 @@ describe('Evaluación y auditoría: nada calculado se guarda', () => {
     const evaluation = await db.evaluation.create({ data: { auditId: audit.id, controlId: control.id } })
     expect(evaluation).not.toHaveProperty('weight')
     expect(evaluation).not.toHaveProperty('score')
-    expect(evaluation.expectedLevelReason).toBeNull()
+    expect(evaluation.guidance).toBeNull()
     expect(audit).not.toHaveProperty('finalScore')
   })
 })

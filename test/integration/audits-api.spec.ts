@@ -105,17 +105,18 @@ describe('crear', () => {
     const rows = await db.evaluation.findMany({ where: { auditId: audit.id }, include: { control: true } })
     expect(rows.map((r) => r.control.title).sort()).toEqual([...LEAF_TITLES].sort())
     expect(
-      rows.every(
-        (r) => r.status === 'NOT_STARTED' && r.round === 1 && r.expectedLevelId === null && r.assignedUserId === null,
-      ),
+      rows.every((r) => r.status === 'NOT_STARTED' && r.expectedLevelId === null && r.assignedUserId === null),
     ).toBe(true)
     expect((await db.audit.findUniqueOrThrow({ where: { id: audit.id } })).createdById).toBe(manager.id)
   })
 
-  it('el ADMIN también crea (y queda como manager)', async () => {
-    const res = await create(auditBody(lib), 'admin')
-    expect(res.status).toBe(201)
-    expect(res.body.data.manager.name).toBe('admin')
+  it('el ADMIN solo NO crea (administra la plataforma, no dirige auditorías); con también el rol GERENTE sí, como manager', async () => {
+    const denied = await create(auditBody(lib), 'admin')
+    expect(denied.status).toBe(403)
+    expect(await db.audit.count()).toBe(0)
+    const both = await create(auditBody(lib), 'adminManager')
+    expect(both.status).toBe(201)
+    expect(both.body.data.manager.name).toBe('adminManager')
   })
 
   it('deja constancia en el historial: AuditCreated con el actor, sobre la auditoría, y su texto se genera al leer', async () => {
@@ -214,7 +215,7 @@ describe('crear', () => {
 })
 
 describe('ver', () => {
-  it('el manager y el ADMIN ven el detalle; el alcance sale en el orden en que se agregó', async () => {
+  it('el manager ve el detalle y el ADMIN también, pero solo lo VE; el alcance sale en el orden en que se agregó', async () => {
     const id = await idOf(auditBody(lib, { scopeItems: ['Zeta', 'Alfa'] }))
     const mine = await get(id)
     expect(mine.status).toBe(200)
@@ -222,7 +223,8 @@ describe('ver', () => {
     expect(mine.body.data.permissions).toEqual({ manage: true, lead: false })
     const admin = await get(id, 'admin')
     expect(admin.status).toBe(200)
-    expect(admin.body.data.permissions).toEqual({ manage: true, lead: true })
+    expect(admin.body.data.permissions).toEqual({ manage: false, lead: false })
+    expect(admin.body.data.allowedActions).toEqual([])
   })
 
   it('otro GERENTE puede VERLA pero no gestionarla: permisos y acciones lo reflejan', async () => {
@@ -238,7 +240,7 @@ describe('ver', () => {
     const denied = await get(id, 'auditor')
     expect(denied.status).toBe(403)
     expect(denied.body.error).toMatchObject({ code: 'AUDIT_ACCESS_DENIED', details: { required: 'MEMBER' } })
-    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'INSPECTOR' } })
+    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'MEMBER' } })
     const ok = await get(id, 'auditor')
     expect(ok.status).toBe(200)
     expect(ok.body.data.permissions).toEqual({ manage: false, lead: false })
@@ -247,7 +249,7 @@ describe('ver', () => {
 
   it('el líder ve permissions.lead = true', async () => {
     const id = await idOf()
-    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'LEAD_AUDITOR' } })
+    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'LEAD' } })
     expect((await get(id, 'auditor')).body.data.permissions).toEqual({ manage: false, lead: true })
   })
 
@@ -261,7 +263,7 @@ describe('listar', () => {
   it('un GERENTE o ADMIN ve todas; un auditor solo donde es miembro; orden: la más nueva primero; con meta de paginación', async () => {
     const a = await idOf(auditBody(lib, { name: 'Primera' }))
     const b = await idOf(auditBody(lib, { name: 'Segunda' }), 'manager', 'otro')
-    const c = await idOf(auditBody(lib, { name: 'Tercera' }), 'admin')
+    const c = await idOf(auditBody(lib, { name: 'Tercera' }), 'adminManager')
     const names = async (role: TestRole, who?: string, query: Record<string, unknown> = {}) =>
       (
         await api()
@@ -278,7 +280,7 @@ describe('listar', () => {
     expect((await names('admin')).meta).toEqual({ page: 1, pageSize: 20, total: 3, totalPages: 1 })
     expect((await names('auditor')).data).toEqual([])
 
-    await db.auditMember.create({ data: { auditId: b, userId: await t.userId('auditor'), role: 'INSPECTOR' } })
+    await db.auditMember.create({ data: { auditId: b, userId: await t.userId('auditor'), role: 'MEMBER' } })
     expect((await names('auditor')).data.map((x: { name: string }) => x.name)).toEqual(['Segunda'])
     expect(a && c).toBeTruthy()
   })
@@ -339,7 +341,7 @@ describe('listar', () => {
 
   it('cada fila trae sus permisos según quién pregunta', async () => {
     const id = await idOf()
-    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'LEAD_AUDITOR' } })
+    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'LEAD' } })
     const asLead = (
       await api()
         .get(A)
@@ -409,13 +411,22 @@ describe('editar', () => {
     expect((await patch(id, { plannedEnd: '2026-10-20' })).status).toBe(200)
   })
 
-  it('solo el manager (o el ADMIN): otro GERENTE 403; el líder 403', async () => {
+  it('solo el manager: otro GERENTE 403, el ADMIN 403 (no es superusuario) y el líder 403', async () => {
     const id = await idOf()
     const denied = await patch(id, { name: 'x' }, 'manager', 'otro')
     expect(denied.status).toBe(403)
     expect(denied.body.error).toMatchObject({ code: 'AUDIT_ACCESS_DENIED', details: { required: 'MANAGER' } })
-    expect((await patch(id, { name: 'del admin' }, 'admin')).status).toBe(200)
-    expect((await db.audit.findUniqueOrThrow({ where: { id } })).name).toBe('del admin')
+    expect((await patch(id, { name: 'x' }, 'admin')).status).toBe(403)
+    await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'LEAD' } })
+    expect((await patch(id, { name: 'x' }, 'auditor')).status).toBe(403)
+    expect((await db.audit.findUniqueOrThrow({ where: { id } })).name).toBe('Auditoría ISO 27001')
+  })
+
+  it('quien tiene ADMIN y GERENTE edita las que DIRIGE, no las de otro manager', async () => {
+    const mine = await idOf(auditBody(lib), 'adminManager')
+    const theirs = await idOf()
+    expect((await patch(mine, { name: 'mía' }, 'adminManager')).status).toBe(200)
+    expect((await patch(theirs, { name: 'ajena' }, 'adminManager')).status).toBe(403)
   })
 
   it('solo en borrador: en curso, cerrada o archivada es 409 AUDIT_NOT_EDITABLE', async () => {
@@ -453,16 +464,17 @@ describe('eliminar', () => {
     expect((await remove(id)).status).toBe(404)
   })
 
-  it('solo el manager o el ADMIN; y solo en borrador', async () => {
+  it('solo el manager (ni otro GERENTE ni el ADMIN); y solo en borrador', async () => {
     const id = await idOf()
     expect((await remove(id, 'manager', 'otro')).status).toBe(403)
+    expect((await remove(id, 'admin')).status).toBe(403)
     await db.audit.update({ where: { id }, data: { status: 'IN_PROGRESS' } })
     const res = await remove(id)
     expect(res.status).toBe(409)
     expect(res.body.error.code).toBe('AUDIT_NOT_EDITABLE')
     expect(await db.audit.count()).toBe(1)
     await db.audit.update({ where: { id }, data: { status: 'DRAFT' } })
-    expect((await remove(id, 'admin')).status).toBe(204)
+    expect((await remove(id)).status).toBe(204)
   })
 })
 
@@ -520,10 +532,11 @@ describe('alcance', () => {
     expect(await db.auditScopeItem.count()).toBe(1)
   })
 
-  it('solo el manager (o el ADMIN) y solo en borrador; auditoría inexistente 404', async () => {
+  it('solo el manager (ni otro GERENTE ni el ADMIN) y solo en borrador; auditoría inexistente 404', async () => {
     const id = await idOf(auditBody(lib, { scopeItems: ['ERP'] }))
     const item = await db.auditScopeItem.findFirstOrThrow({ where: { auditId: id } })
     expect((await addScope(id, 'x', 'manager', 'otro')).status).toBe(403)
+    expect((await addScope(id, 'x', 'admin')).status).toBe(403)
     expect((await removeScope(id, item.id, 'manager', 'otro')).status).toBe(403)
     expect((await addScope(UNKNOWN_ID, 'x')).body.error.code).toBe('AUDIT_NOT_FOUND')
     await db.audit.update({ where: { id }, data: { status: 'IN_PROGRESS' } })

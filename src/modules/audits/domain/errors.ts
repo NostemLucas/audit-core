@@ -42,6 +42,12 @@ export const AuditErrors = defineErrors({
   },
 
   // ── Equipo ─────────────────────────────────────────────────────────────────
+  /** La auditoría ya tiene líder (índice único parcial en la BD): dos designaciones simultáneas, o designar sin quitar al actual. */
+  AUDIT_LEAD_ALREADY_ASSIGNED: {
+    http: 409,
+    message: 'La auditoría ya tiene un líder',
+    onUnique: 'audit_members_one_lead',
+  },
   MEMBER_NOT_FOUND: { http: 404, message: 'Miembro no encontrado en la auditoría' },
   MEMBER_ALREADY_ASSIGNED: {
     http: 409,
@@ -62,7 +68,6 @@ export const AuditErrors = defineErrors({
   EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para completar la evaluación' },
   EVALUATION_LEVEL_NOT_IN_SCALE: { http: 422, message: 'El nivel no pertenece a la escala de la auditoría' },
   NOT_APPLICABLE_REASON_REQUIRED: { http: 422, message: 'Marcar como no aplicable requiere un motivo' },
-  REVIEW_SNAPSHOT_NOT_FOUND: { http: 404, message: 'No existe esa ronda en el historial de la evaluación' },
 
   // ── Evidencia ──────────────────────────────────────────────────────────────
   EVIDENCE_NOT_FOUND: { http: 404, message: 'Evidencia no encontrada' },

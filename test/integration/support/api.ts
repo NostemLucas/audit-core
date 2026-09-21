@@ -6,7 +6,13 @@ import { createTestIssuer } from '../../support/identity.js'
 import { createTestApp } from './app.js'
 import { resetDb } from './db.js'
 
-const GROUPS = { admin: 'admin', manager: 'gerente', auditor: 'auditor' } as const
+/** Los grupos de Authentik de cada rol de prueba. `adminManager` es alguien con DOS roles globales (se suman). */
+const GROUPS = {
+  admin: ['admin'],
+  manager: ['gerente'],
+  auditor: ['auditor'],
+  adminManager: ['admin', 'gerente'],
+} as const
 export type TestRole = keyof typeof GROUPS
 
 /**
@@ -41,7 +47,7 @@ export function useTestApi() {
     async as(role: TestRole, who: string = role): Promise<string> {
       const token = await issuer.sign({
         subject: `sub-${who}`,
-        claims: { email: `${who}@ejemplo.com`, preferred_username: who, name: who, groups: [GROUPS[role]] },
+        claims: { email: `${who}@ejemplo.com`, preferred_username: who, name: who, groups: [...GROUPS[role]] },
       })
       return `Bearer ${token}`
     },
@@ -49,7 +55,7 @@ export function useTestApi() {
     async userId(role: TestRole, who: string = role): Promise<string> {
       const token = await issuer.sign({
         subject: `sub-${who}`,
-        claims: { email: `${who}@ejemplo.com`, preferred_username: who, name: who, groups: [GROUPS[role]] },
+        claims: { email: `${who}@ejemplo.com`, preferred_username: who, name: who, groups: [...GROUPS[role]] },
       })
       await request(app.getHttpServer()).get('/api/v1/profile').set('authorization', `Bearer ${token}`).expect(200)
       return (await db.user.findUniqueOrThrow({ where: { authentikId: `sub-${who}` } })).id
