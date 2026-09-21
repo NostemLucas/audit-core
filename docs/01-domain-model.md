@@ -204,7 +204,13 @@ Qué se cambia:
   (`SCALE_LEVEL_IN_USE` / `SCALE_IN_USE`, `details.reason = SUGGESTED_FINDINGS`) en lugar de destruir texto redactado en cascada.
 - API: `GET /templates/:id/suggested-findings?scaleId=` (la matriz: una fila por hoja con su dominio y solo los textos que
   existen), `PUT` y `DELETE /templates/:id/controls/:controlId/suggested-findings/:levelId` (quitar es idempotente).
-- Importación y exportación por Excel de estos textos: se conservan (formato de matriz por escala; se documenta al implementarse).
+- **Excel** (matriz por escala; `domain/suggested-findings-import.ts` es la única lógica y `infrastructure/matrix-excel.ts` solo
+  lee y escribe el libro): `GET …/suggested-findings/export?scaleId=` baja una hoja `Hallazgos` con una fila por hoja del árbol
+  (columnas `Dominio`, `Referencia`, `Control` y una por opción: `0 – No cumple`, `50 – Parcial`…) y una columna `ID` **oculta** que
+  identifica al control. `POST …/import?scaleId=` la vuelve a leer: las opciones se reconocen por el puntaje del encabezado (o,
+  si no, por la etiqueta), lo que no se reconoce se ignora con un aviso, y **solo agrega o cambia** (una celda vacía no borra:
+  borrar es explícito). Todo o nada, con los errores de todas las filas juntos. Como las referencias ya no son claves (`04` §4.1),
+  el formato antiguo por `código` + nivel no se puede reconocer: la matriz se baja del sistema.
 
 ## 5. Qué se conserva del proyecto actual
 

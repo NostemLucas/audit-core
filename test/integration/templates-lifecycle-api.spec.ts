@@ -355,6 +355,14 @@ describe('importar', () => {
     expect(await db.template.count()).toBe(0)
   })
 
+  it('una petición sin cuerpo ni archivo: 422 "Falta el archivo" (igual que con campos pero sin archivo)', async () => {
+    const res = await api()
+      .post(`${T}/import`)
+      .set('authorization', await as('manager'))
+    expect(res.status).toBe(422)
+    expect(res.body.error.details.errors[0].message).toMatch(/Falta el archivo/)
+  })
+
   it('un archivo de más de 5 MB: 413 PAYLOAD_TOO_LARGE', async () => {
     const res = await upload(Buffer.alloc(5 * 1024 * 1024 + 1024, 'a'), { name: 'Enorme' })
     expect(res.status).toBe(413)

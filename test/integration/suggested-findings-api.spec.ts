@@ -83,6 +83,8 @@ describe('permisos', () => {
     expect(declared).toEqual(
       [
         'GET /templates/:templateId/suggested-findings → read Template',
+        'GET /templates/:templateId/suggested-findings/export → read Template',
+        'POST /templates/:templateId/suggested-findings/import → update Template',
         'PUT /templates/:templateId/controls/:controlId/suggested-findings/:levelId → update Template',
         'DELETE /templates/:templateId/controls/:controlId/suggested-findings/:levelId → update Template',
       ].sort(),

@@ -7,6 +7,7 @@ import { LIMITS } from '../../../shared/limits.js'
  * sugerido de cada opción que lo tenga. Los huecos no existen: solo se guarda (y se devuelve) lo que alguien redactó.
  */
 export const SuggestedFindingsMatrixView = z.object({
+  template: z.object({ id: z.uuid(), name: z.string() }),
   scale: z.object({
     id: z.uuid(),
     name: z.string(),
@@ -33,5 +34,29 @@ export const SuggestedFindingView = z.object({ controlId: z.uuid(), levelId: z.u
 /** Texto plano. Vacío no es un texto: para quitar una sugerencia se usa DELETE. */
 export const SetSuggestedFinding = z.object({ text: z.string().trim().min(1).max(LIMITS.text) })
 export type SetSuggestedFindingT = z.infer<typeof SetSuggestedFinding>
+
+/** Importar la matriz (multipart): `file` se documenta aquí; multer lo entrega aparte (ver `ImportTemplateBody`). */
+export const ImportMatrixBody = z.object({
+  file: z
+    .any()
+    .meta({
+      type: 'string',
+      format: 'binary',
+      description:
+        'Matriz de Excel (.xlsx) descargada del sistema y completada. Obligatorio: sin él la respuesta es 422.',
+    })
+    .optional(),
+})
+
+export type ImportMatrixBodyT = z.infer<typeof ImportMatrixBody>
+
+export const ImportMatrixResult = z.object({
+  created: z.int(),
+  updated: z.int(),
+  /** Celdas cuyo texto ya era ese. */
+  unchanged: z.int(),
+  /** Columnas que no se reconocieron y se ignoraron. */
+  warnings: z.array(z.string()),
+})
 
 export const LevelId = z.uuid()

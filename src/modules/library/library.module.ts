@@ -13,7 +13,9 @@ import { UpdateScaleLevelUseCase } from './scales/use-cases/update-scale-level.u
 import { ArchiveTemplateUseCase } from './templates/use-cases/archive-template.use-case.js'
 import { SuggestedFindingsController } from './templates/suggested-findings.controller.js'
 import { CloneTemplateUseCase } from './templates/use-cases/clone-template.use-case.js'
+import { ExportSuggestedFindingsUseCase } from './templates/use-cases/export-suggested-findings.use-case.js'
 import { GetSuggestedFindingsMatrixUseCase } from './templates/use-cases/get-suggested-findings-matrix.use-case.js'
+import { ImportSuggestedFindingsUseCase } from './templates/use-cases/import-suggested-findings.use-case.js'
 import { RemoveSuggestedFindingUseCase } from './templates/use-cases/remove-suggested-finding.use-case.js'
 import { SetSuggestedFindingUseCase } from './templates/use-cases/set-suggested-finding.use-case.js'
 import { ControlsController } from './templates/controls.controller.js'
@@ -62,6 +64,8 @@ import { UpdateControlUseCase } from './templates/use-cases/update-control.use-c
     GetSuggestedFindingsMatrixUseCase,
     SetSuggestedFindingUseCase,
     RemoveSuggestedFindingUseCase,
+    ExportSuggestedFindingsUseCase,
+    ImportSuggestedFindingsUseCase,
   ],
 })
 export class LibraryModule {}

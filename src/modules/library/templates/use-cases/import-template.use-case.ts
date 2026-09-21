@@ -1,15 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
-import { DomainError } from '../../../../platform/errors/index.js'
-import { LibraryErrors } from '../../errors.js'
-import { buildImportPlan, type ImportIssue, type ImportNode } from '../domain/control-import.js'
+import { buildImportPlan, type ImportNode } from '../domain/control-import.js'
+import { importError } from '../import-error.js'
 import { readTemplateWorkbook } from '../infrastructure/excel-reader.js'
 import { CreateTemplate } from '../template.schemas.js'
 import { loadTemplate, withActions } from '../template.queries.js'
-
-/** Cuántos errores se devuelven al cliente (el total se informa aparte). */
-const MAX_ISSUES_REPORTED = 20
 
 @Injectable()
 export class ImportTemplateUseCase {
@@ -56,11 +52,4 @@ export class ImportTemplateUseCase {
     })
     return withActions(await loadTemplate(this.tx, created.id))
   }
-}
-
-function importError(issues: readonly ImportIssue[]): DomainError {
-  return new DomainError(LibraryErrors.TEMPLATE_IMPORT_INVALID, {
-    errors: issues.slice(0, MAX_ISSUES_REPORTED),
-    totalErrors: issues.length,
-  })
 }

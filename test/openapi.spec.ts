@@ -43,6 +43,10 @@ describe('OpenAPI de la aplicación', () => {
       'GET /api/v1/templates',
       'POST /api/v1/templates/import',
       'GET /api/v1/templates/{id}/export',
+      'GET /api/v1/templates/{templateId}/suggested-findings',
+      'GET /api/v1/templates/{templateId}/suggested-findings/export',
+      'POST /api/v1/templates/{templateId}/suggested-findings/import',
+      'POST /api/v1/templates/{id}/clone',
       'POST /api/v1/templates/{templateId}/controls/{controlId}/move',
     ]) {
       expect(routes, route).toContain(route)
@@ -61,6 +65,12 @@ describe('OpenAPI de la aplicación', () => {
   it('la importación es multipart con un archivo binario y la exportación produce un .xlsx', () => {
     const importBody = (doc.paths['/api/v1/templates/import']?.post as Operation).requestBody
     expect(importBody.content['multipart/form-data'].schema.properties.file).toMatchObject({
+      type: 'string',
+      format: 'binary',
+    })
+    const matrixBody = (doc.paths['/api/v1/templates/{templateId}/suggested-findings/import']?.post as Operation)
+      .requestBody
+    expect(matrixBody.content['multipart/form-data'].schema.properties.file).toMatchObject({
       type: 'string',
       format: 'binary',
     })

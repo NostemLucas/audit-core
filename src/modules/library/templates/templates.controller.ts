@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiOkResponse, ApiProduces } from '@nestjs/swagger'
 import { Can } from '../../../platform/authz/index.js'
-import { Responds } from '../../../platform/http/index.js'
+import { attachment, Responds, XLSX_MIME } from '../../../platform/http/index.js'
 import { LIMITS } from '../../../shared/limits.js'
 import { ArchiveTemplateUseCase } from './use-cases/archive-template.use-case.js'
 import { CloneTemplateUseCase } from './use-cases/clone-template.use-case.js'
@@ -42,8 +42,6 @@ import {
   UpdateTemplate,
   type UpdateTemplateT,
 } from './template.schemas.js'
-
-const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 @Controller('templates')
 export class TemplatesController {
@@ -125,35 +123,23 @@ export class TemplatesController {
   @Responds(ImportTemplateResult, { status: 201 })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: LIMITS.importBytes, files: 1 } }))
+  // El cuerpo es opcional: una petición sin cuerpo tampoco trae archivo, y eso se responde igual (422 "Falta el archivo").
   import(
-    @Body({ schema: ImportTemplateBody }) body: ImportTemplateBodyT,
+    @Body({ schema: ImportTemplateBody.optional() }) body: ImportTemplateBodyT | undefined,
     @UploadedFile() file: { buffer: Buffer } | undefined,
   ) {
-    return this.importTemplate.execute({ name: body.name, file: file?.buffer })
+    return this.importTemplate.execute({ name: body?.name, file: file?.buffer })
   }
 
   @Get(':id/export')
   @Can('read', 'Template')
-  @ApiProduces(XLSX)
+  @ApiProduces(XLSX_MIME)
   @ApiOkResponse({
     description: 'La plantilla como Excel',
-    content: { [XLSX]: { schema: { type: 'string', format: 'binary' } } },
+    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
   })
   async export(@Param('id', { schema: TemplateId }) id: string): Promise<StreamableFile> {
     const { buffer, name } = await this.exportTemplate.execute(id)
-    return new StreamableFile(buffer, { type: XLSX, disposition: attachment(name) })
+    return new StreamableFile(buffer, { type: XLSX_MIME, disposition: attachment(name, 'xlsx') })
   }
-}
-
-/**
- * Content-Disposition seguro para cualquier nombre de plantilla: un respaldo ASCII sin comillas, barras ni caracteres de
- * control (nunca se inyectan encabezados) y el nombre real en `filename*` (RFC 5987).
- */
-export function attachment(name: string): string {
-  const ascii = name
-    .normalize('NFKD')
-    .replace(/[^\x20-\x7e]/g, '')
-    .replace(/["\\/:*?<>|;,]/g, '_')
-    .trim()
-  return `attachment; filename="${ascii || 'plantilla'}.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}.xlsx`
 }

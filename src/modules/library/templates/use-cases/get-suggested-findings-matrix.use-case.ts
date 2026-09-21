@@ -9,7 +9,7 @@ export class GetSuggestedFindingsMatrixUseCase {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async execute(templateId: string, scaleId: string) {
-    const template = await this.db.template.findUnique({ where: { id: templateId }, select: { id: true } })
+    const template = await this.db.template.findUnique({ where: { id: templateId }, select: { id: true, name: true } })
     if (!template) throw new DomainError(LibraryErrors.TEMPLATE_NOT_FOUND, { id: templateId })
     const scale = await this.db.scale.findUnique({
       where: { id: scaleId },
@@ -30,6 +30,7 @@ export class GetSuggestedFindingsMatrixUseCase {
     const tree = new ControlTree(controls)
 
     return {
+      template,
       scale: { id: scale.id, name: scale.name, levels: scale.levels },
       // Solo las hojas: un control que hoy es agrupador puede conservar textos de cuando era hoja, pero no se muestran.
       controls: tree.leaves().map((leaf) => ({
