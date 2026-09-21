@@ -98,10 +98,12 @@ una norma completa son cientos o pocos miles de nodos, y se carga entera por pla
 7. **Importación con una columna `nivel`** y las filas en orden de lectura: el padre de una fila es la fila anterior de nivel
    menor. Es lo único que no depende de códigos, que aquí son arbitrarios. Se sigue aceptando `código padre` (archivos
    existentes) resolviéndolo solo dentro del archivo. La exportación escribe el mismo formato (ida y vuelta estable).
-8. **Qué exige publicar** (`TEMPLATE_EMPTY` / `TEMPLATE_INVALID_STRUCTURE`, con la lista de nodos que fallan): la plantilla tiene
-   al menos una hoja; todo nodo tiene título; y **todo nodo raíz tiene hijos** (un dominio es un agrupador). Una plantilla plana
-   (un raíz que es a la vez criterio) no se publica: hay que agruparla, porque el dominio es siempre el primer nivel y de
-   otro modo no existiría para ese criterio. **No se exige descripción** en ningún nodo.
+8. **Qué exige publicar:** la plantilla no está vacía (`TEMPLATE_EMPTY`) y **todo nodo raíz tiene hijos** (un dominio es un
+   agrupador; `TEMPLATE_INVALID_STRUCTURE` con `details.roots` = los que fallan). Una plantilla plana (un raíz que es a la vez
+   criterio) no se publica: hay que agruparla, porque el dominio es siempre el primer nivel y de otro modo no existiría para
+   ese criterio. **No se exige descripción** en ningún nodo. (Se retiraron dos reglas que se habían enumerado: "al menos una
+   hoja" se cumple siempre que la plantilla no esté vacía —todo árbol finito tiene hojas— y "todo nodo tiene título" lo exige
+   ya la entrada; como precondiciones no podían fallar.)
 9. **Para quien audita, el árbol es contexto.** El auditor trabaja con la lista plana de criterios (las hojas), cada uno con
    su ruta (dominio › objetivo) para no ser ambiguo entre dominios. El árbol se mantiene poco: la plantilla publicada es
    inmutable, se importa con la columna `nivel`, y se corrige subiendo o bajando elementos.

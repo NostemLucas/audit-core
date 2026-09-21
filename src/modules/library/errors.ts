@@ -60,15 +60,17 @@ export const LibraryErrors = defineErrors({
   TEMPLATE_NOT_PUBLISHED: { http: 409, message: 'Solo se puede auditar con una plantilla publicada' },
   TEMPLATE_EMPTY: { http: 422, message: 'La plantilla no tiene controles' },
   /**
-   * No se puede publicar: `details.rule` = NO_LEAF (ningún control evaluable), UNTITLED (control sin título) o
-   * ROOT_WITHOUT_CHILDREN (un capítulo de primer nivel sin hijos: el primer nivel es el dominio que se mide y una
-   * plantilla plana no tiene dominios).
+   * No se puede publicar: hay dominios (capítulos de primer nivel) sin hijos — `details.roots` = ids. El primer nivel es
+   * el dominio que se mide; una plantilla plana no tiene dominios. (Que haya al menos una hoja y que todo control tenga
+   * título no son reglas: lo primero se cumple siempre que la plantilla no esté vacía y lo segundo lo exige la entrada.)
    */
   TEMPLATE_INVALID_STRUCTURE: { http: 422, message: 'La estructura de la plantilla no permite publicarla' },
   TEMPLATE_IMPORT_INVALID: { http: 422, message: 'El archivo de importación contiene errores' },
 
   // ── Controles ──────────────────────────────────────────────────────────────
   CONTROL_NOT_FOUND: { http: 404, message: 'Control no encontrado' },
+  /** El árbol excedería `LIMITS.controlDepth` niveles. */
+  CONTROL_DEPTH_EXCEEDED: { http: 422, message: 'El control quedaría a demasiada profundidad en el árbol' },
   CONTROL_HAS_CHILDREN: { http: 409, message: 'El control tiene subcontroles; elimínalos primero' },
   /** Padre de otra plantilla o movimiento que crea un ciclo. */
   CONTROL_PARENT_INVALID: { http: 422, message: 'El control padre no es válido' },

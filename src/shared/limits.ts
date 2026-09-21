@@ -9,6 +9,8 @@ export const LIMITS = {
   title: 500,
   /** Máximo de opciones de una escala (un tope contra abusos; el mínimo lo fija la invariante de la escala). */
   scaleLevels: 20,
+  /** Niveles máximos de profundidad del árbol de una plantilla (una norma real llega a 4-6). */
+  controlDepth: 10,
   /** Textos largos sin formato: descripciones, hallazgos, notas. */
   text: 20_000,
 } as const

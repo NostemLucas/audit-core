@@ -69,7 +69,8 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **templates**: `name` UQ, `status` (`DRAFT | PUBLISHED | ARCHIVED`).
 - **controls**: `templateId` FK (cascade), `parentId?` FK→controls (cascade), `reference?` (numeración de la norma tal como la
   escribe la plantilla; texto libre, **no único, sin lógica**), `title` (en una hoja ES el criterio), `description?`, `position`
-  (el orden es explícito). Índice (`templateId`, `parentId`, `position`). Sin `code` ni `guidance` (`04` §4).
+  (el orden es explícito: entre hermanos, `position` = 0..n-1, se renumera al insertar, mover o eliminar). Profundidad máxima
+  `LIMITS.controlDepth` (10 niveles). Índice (`templateId`, `parentId`, `position`). Sin `code` ni `guidance` (`04` §4).
   **FK compuesta** (`parentId`, `templateId`) → controls(`id`, `templateId`): la BD garantiza que el padre es de
   la misma plantilla.
   Se carga completo por plantilla (cientos de nodos) y el árbol se arma en memoria.

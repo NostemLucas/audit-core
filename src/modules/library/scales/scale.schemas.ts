@@ -2,15 +2,11 @@ import { z } from 'zod'
 import { DecimalNumber, Instant } from '../../../platform/http/index.js'
 import { ScaleDimension } from '../../../shared/enums.js'
 import { LIMITS } from '../../../shared/limits.js'
+import { optionalText } from '../../../shared/schemas.js'
 
 const Name = z.string().trim().min(1).max(LIMITS.name)
 const Label = z.string().trim().min(1).max(LIMITS.title)
-/** Texto opcional: un texto vacío equivale a "sin texto" (se guarda NULL, nunca ""). */
-const Description = z
-  .string()
-  .trim()
-  .max(LIMITS.text)
-  .transform((text) => text || null)
+const Description = optionalText()
 /** Puntaje de una opción: columna Decimal(5,2), no negativo (CHECK en la BD). */
 const Points = z.number().min(0).max(999.99).multipleOf(0.01)
 

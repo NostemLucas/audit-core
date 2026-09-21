@@ -21,7 +21,5 @@
   "ignoreIssues": {
     // defineMessages / renderEventMessage: los usará `audits` (mensajes del historial). Fase 3.
     "src/platform/events/index.ts": ["exports", "types"],
-    // defineLifecycle: lo usarán `library` (Template) y `audits` (Audit, Evaluation). Fases 2 y 3.
-    "src/platform/state/index.ts": ["files"],
   },
 }
