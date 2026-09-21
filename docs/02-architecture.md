@@ -113,7 +113,9 @@ Reglas por tier:
 
 **Tier A**
 - `domain/` es TypeScript puro: entidades, ciclos de vida, `scoring`, `policy`, eventos, errores. No importa Nest ni
-  Prisma (salvo los enums vía `shared/enums.ts`). No hace I/O.
+  Prisma (salvo los enums vía `shared/enums.ts`). No hace I/O. De la plataforma solo usa `errors`, `state` y la
+  **definición** de eventos y mensajes (`events/define-events.ts`, `define-messages.ts`: declaraciones puras con Zod); el bus, que
+  usa Nest, no.
 - Los *ports* (interfaces) se declaran en `application/ports/`; los adaptadores viven en `infrastructure/`.
 - Solo hay port para: repositorios de agregados (`Audit`, `Evaluation`, `Template`), `FileStoragePort`, `Clock`.
 - Un único **mapper** por agregado (`toDomain` / `toPersistence`) en `infrastructure/`. Es el único punto de

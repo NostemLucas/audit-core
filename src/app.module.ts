@@ -3,11 +3,13 @@ import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import './app-errors.js' // registra el catálogo de errores completo (lo necesita el traductor de errores de la BD)
 import './app-events.js' // registra el catálogo de eventos completo
+import { AuditsModule } from './modules/audits/index.js'
 import { IdentityModule } from './modules/identity/index.js'
 import { LibraryModule } from './modules/library/index.js'
 import { OrganizationsModule } from './modules/organizations/index.js'
 import { AuthGuard, AuthModule } from './platform/auth/index.js'
 import { AbilitiesGuard, AuthzModule } from './platform/authz/index.js'
+import { ClockModule } from './platform/clock/index.js'
 import { ENV, EnvModule, type Env } from './platform/config/index.js'
 import { ContextModule } from './platform/context/context.module.js'
 import { DbModule } from './platform/db/index.js'
@@ -22,11 +24,13 @@ import { LoggingModule } from './platform/logging/index.js'
     DbModule,
     ContextModule,
     EventsModule,
+    ClockModule,
     AuthModule,
     AuthzModule,
     IdentityModule,
     OrganizationsModule,
     LibraryModule,
+    AuditsModule,
     ThrottlerModule.forRootAsync({
       imports: [], // EnvModule es global
       inject: [ENV],

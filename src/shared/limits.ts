@@ -15,6 +15,8 @@ export const LIMITS = {
   importBytes: 5 * 1024 * 1024,
   /** Filas máximas de un archivo de importación (una norma real tiene cientos; esto es un tope contra abusos). */
   importRows: 5000,
+  /** Elementos de alcance que se pueden dar al crear una auditoría (un tope contra abusos). */
+  scopeItems: 100,
   /** Textos largos sin formato: descripciones, hallazgos, notas. */
   text: 20_000,
 } as const

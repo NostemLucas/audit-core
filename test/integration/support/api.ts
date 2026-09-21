@@ -34,13 +34,25 @@ export function useTestApi() {
     db: lazyDb,
     /** Una petición HTTP a la app. */
     api: () => request(app.getHttpServer()),
-    /** El encabezado `authorization` de un usuario con ese rol (cada rol es un usuario distinto). */
-    async as(role: TestRole): Promise<string> {
+    /**
+     * El encabezado `authorization` de un usuario con ese rol. Cada rol es un usuario distinto; `who` distingue a varios
+     * usuarios con el mismo rol (`as('manager', 'otro')` es otro gerente).
+     */
+    async as(role: TestRole, who: string = role): Promise<string> {
       const token = await issuer.sign({
-        subject: `sub-${role}`,
-        claims: { email: `${role}@ejemplo.com`, preferred_username: role, name: role, groups: [GROUPS[role]] },
+        subject: `sub-${who}`,
+        claims: { email: `${who}@ejemplo.com`, preferred_username: who, name: who, groups: [GROUPS[role]] },
       })
       return `Bearer ${token}`
+    },
+    /** El id local de un usuario (lo crea si aún no ha entrado: el primer login lo sincroniza). */
+    async userId(role: TestRole, who: string = role): Promise<string> {
+      const token = await issuer.sign({
+        subject: `sub-${who}`,
+        claims: { email: `${who}@ejemplo.com`, preferred_username: who, name: who, groups: [GROUPS[role]] },
+      })
+      await request(app.getHttpServer()).get('/api/v1/profile').set('authorization', `Bearer ${token}`).expect(200)
+      return (await db.user.findUniqueOrThrow({ where: { authentikId: `sub-${who}` } })).id
     },
   }
 }

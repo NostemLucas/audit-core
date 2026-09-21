@@ -262,7 +262,7 @@ model Audit {
   code String @unique
   name String
 
-  /// HTML permitido (se sanea en la entrada)
+  /// Texto plano. Si se quisiera formato enriquecido se decide con los informes (Fase 4), con un sanitizador.
   introduction String?
   scopeNotes   String?
   objectives   String?

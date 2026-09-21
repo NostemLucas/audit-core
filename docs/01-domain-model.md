@@ -78,7 +78,8 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 
 ### Auditorías
 - **audits**: `code` UQ (secuencia de Postgres, sin `findByCode` + reintento), `name`, `introduction?`,
-  `scopeNotes?`, `objectives?`, `templateId` FK, `organizationId` FK, `scaleId` FK, `managerId` FK→users,
+  `scopeNotes?`, `objectives?` (los tres, texto plano: si se quisiera formato enriquecido se decide con los informes, con un
+  sanitizador), `templateId` FK, `organizationId` FK, `scaleId` FK, `managerId` FK→users,
   `parentAuditId?` FK→audits, `followUpNumber` (0 = inicial), `status` (`DRAFT|IN_PROGRESS|CLOSED|ARCHIVED`),
   `plannedStart?`, `plannedEnd?`, `closedAt?`,
   `storageFolderId?` (la ruta se deriva del `code`; se revisa en la fase de evidencia), `version` (bloqueo optimista).

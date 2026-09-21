@@ -11,11 +11,13 @@ export function directDb(getUserId: () => string | undefined = () => undefined):
   return createDb(databaseUrl(), getUserId)
 }
 
-/** Vacía todas las tablas de negocio entre tests. */
+/** Vacía todas las tablas de negocio (y reinicia la secuencia de códigos) entre tests. */
 export async function resetDb(db: Db): Promise<void> {
   const tables = await db.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`
   await db.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} RESTART IDENTITY CASCADE`)
+  // La secuencia del código de auditoría no pertenece a ninguna tabla: TRUNCATE ... RESTART IDENTITY no la reinicia.
+  await db.$executeRawUnsafe('ALTER SEQUENCE "audit_code_seq" RESTART WITH 1')
 }
 
 /** Lo mínimo para poder crear una auditoría. */

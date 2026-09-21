@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { LibraryReader } from './library.reader.js'
 import { ScalesController } from './scales/scales.controller.js'
 import { AddScaleLevelUseCase } from './scales/use-cases/add-scale-level.use-case.js'
 import { CreateScaleUseCase } from './scales/use-cases/create-scale.use-case.js'
@@ -66,6 +67,8 @@ import { UpdateControlUseCase } from './templates/use-cases/update-control.use-c
     RemoveSuggestedFindingUseCase,
     ExportSuggestedFindingsUseCase,
     ImportSuggestedFindingsUseCase,
+    LibraryReader,
   ],
+  exports: [LibraryReader],
 })
 export class LibraryModule {}

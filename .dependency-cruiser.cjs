@@ -40,7 +40,7 @@ module.exports = {
       name: 'dominio-puro',
       severity: 'error',
       comment:
-        'domain/ es TypeScript puro: sin Nest, Express, Prisma ni infraestructura. Solo puede usar shared y, de la plataforma, errores y ciclos de vida.',
+        'domain/ es TypeScript puro: sin Nest, Express, Prisma ni infraestructura. Solo puede usar shared y, de la plataforma, errores, ciclos de vida y la DEFINICIÓN de eventos y sus mensajes (declaraciones puras con Zod; el bus, que usa Nest, no).',
       from: { path: '^src/modules/[^/]+/domain/' },
       to: {
         path: [
@@ -50,7 +50,7 @@ module.exports = {
           '^src/generated/',
           '^src/platform/',
         ],
-        pathNot: '^src/platform/(errors|state)/',
+        pathNot: '^src/platform/(errors/|state/|events/define-(events|messages)\\.ts$)',
       },
     },
 

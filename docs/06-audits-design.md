@@ -41,7 +41,9 @@ Es el de `03` §2.4. Puntos concretos:
 - **Cerrar** exige todas las evaluaciones aprobadas, incluidas las «no aplica» (`AUDIT_HAS_PENDING_EVALUATIONS`).
 - **Crear una auditoría** exige: plantilla **publicada**, escala **activa**, organización **activa** (`03` §3), y fechas
   coherentes (`plannedEnd >= plannedStart`, que ya comprueba la BD).
-- El código `AUD-AAAA-NNNNN` sale de la secuencia `audit_code_seq`; el año, del reloj del sistema.
+- El código `AUD-AAAA-NNNNN` sale de la secuencia `audit_code_seq`; el año, del reloj del sistema (`platform/clock`, inyectable).
+- Los textos largos (`introduction`, `scopeNotes`, `objectives`) son **texto plano** **[nueva]**: el proyecto anterior los guardaba como HTML
+  saneado; eso se decide con los informes (Fase 4) y no antes, porque exige un sanitizador.
 
 ## 3. Historial (`audit_events`)
 
@@ -54,8 +56,8 @@ evento sea solo su esquema y su mensaje. El texto se genera al leer. Nada de not
 
 | Paso | Contenido |
 |---|---|
-| 3a | Lectores públicos de `identity`, `organizations` y `library`; reloj; política, ciclo de vida, eventos y registrador; crear, ver, listar, editar y eliminar auditorías; alcance |
-| 3b | Equipo: designar líder, agregar y quitar inspectores; asignar criterios |
+| 3a | Lectores públicos de `organizations` y `library` (el de `identity` llega con el equipo, que es cuando se usa); reloj; política, ciclo de vida, eventos y registrador; crear, ver, listar, editar y eliminar auditorías; alcance |
+| 3b | Lector de usuarios (`identity`); equipo: designar líder, agregar y quitar inspectores; asignar criterios |
 | 3c | Nivel esperado por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
 | 3d | Flujo de evaluación (iniciar, editar, completar, aprobar, devolver, reabrir, restaurar) y `evaluation_reviews` |
 | 3e | `scoring.ts` (distribución por opción, promedios esperado/alcanzado, brecha) y lecturas: estadísticas, gráficas, análisis de brechas, historial |

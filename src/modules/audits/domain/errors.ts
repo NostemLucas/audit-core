@@ -9,6 +9,8 @@ export const AuditErrors = defineErrors({
   AUDIT_NOT_EDITABLE: { http: 409, message: 'Solo una auditoría en borrador puede modificarse o eliminarse' },
   /** Iniciar exige nivel esperado en cada control evaluable. `details.missing` = cuántos faltan. */
   AUDIT_EXPECTED_LEVELS_MISSING: { http: 422, message: 'Faltan niveles esperados en algunos controles' },
+  /** La fecha de fin prevista es anterior a la de inicio. */
+  AUDIT_DATES_INVALID: { http: 422, message: 'La fecha de fin prevista no puede ser anterior a la de inicio' },
   AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un miembro para iniciarse' },
   AUDIT_HAS_PENDING_EVALUATIONS: {
     http: 422,

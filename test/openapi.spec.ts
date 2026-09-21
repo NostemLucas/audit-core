@@ -38,6 +38,9 @@ describe('OpenAPI de la aplicación', () => {
     const routes = operations().map(([name]) => name)
     for (const route of [
       'GET /api/v1/organizations',
+      'POST /api/v1/audits',
+      'GET /api/v1/audits/{id}',
+      'POST /api/v1/audits/{auditId}/scope-items',
       'POST /api/v1/scales',
       'POST /api/v1/scales/{id}/levels',
       'GET /api/v1/templates',
@@ -51,6 +54,15 @@ describe('OpenAPI de la aplicación', () => {
     ]) {
       expect(routes, route).toContain(route)
     }
+  })
+
+  it('las fechas previstas de una auditoría se documentan como texto de fecha (date), sin hora', () => {
+    const audit = doc.paths['/api/v1/audits/{id}']?.get?.responses?.['200'] as {
+      content: Record<string, { schema: any }>
+    }
+    const data = audit.content['application/json']!.schema.properties.data.properties
+    expect(data.plannedStart).toMatchObject({ format: 'date' })
+    expect(data.closedAt).toBeDefined()
   })
 
   it('las fechas se documentan como texto date-time y los puntajes como número (no como objetos internos)', () => {
