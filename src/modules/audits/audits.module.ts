@@ -11,6 +11,12 @@ import { EvaluationsController } from './evaluation/evaluations.controller.js'
 import { SetExpectedLevelUseCase } from './evaluation/use-cases/set-expected-level.use-case.js'
 import { AssignEvaluationsUseCase } from './evaluation/use-cases/assign-evaluations.use-case.js'
 import { ListEvaluationsUseCase } from './evaluation/use-cases/list-evaluations.use-case.js'
+import { HistoryController } from './history/history.controller.js'
+import { GetEvaluationHistoryUseCase } from './history/use-cases/get-evaluation-history.use-case.js'
+import { ListAuditHistoryUseCase } from './history/use-cases/list-audit-history.use-case.js'
+import { ResultsController } from './results/results.controller.js'
+import { GetAuditResultsUseCase } from './results/use-cases/get-audit-results.use-case.js'
+import { ListGapsUseCase } from './results/use-cases/list-gaps.use-case.js'
 import { AuditHistoryRecorder } from './audit-history.recorder.js'
 import { AuditsController } from './lifecycle/audits.controller.js'
 import { CreateAuditUseCase } from './lifecycle/use-cases/create-audit.use-case.js'
@@ -34,7 +40,14 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
 /** `identity` es global (UserDirectory); `organizations` y `library` se importan por su API pública (sus lectores). */
 @Module({
   imports: [OrganizationsModule, LibraryModule],
-  controllers: [AuditsController, ScopeController, TeamController, EvaluationsController],
+  controllers: [
+    AuditsController,
+    ScopeController,
+    TeamController,
+    EvaluationsController,
+    ResultsController,
+    HistoryController,
+  ],
   providers: [
     AuditHistoryRecorder,
     ListAuditsUseCase,
@@ -61,6 +74,10 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     StartAuditUseCase,
     CloseAuditUseCase,
     ArchiveAuditUseCase,
+    GetAuditResultsUseCase,
+    ListGapsUseCase,
+    ListAuditHistoryUseCase,
+    GetEvaluationHistoryUseCase,
   ],
 })
 export class AuditsModule {}

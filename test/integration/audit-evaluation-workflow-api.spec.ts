@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import '../../src/app-events.js'
 import { renderEventMessage } from '../../src/platform/events/index.js'
 import { type TestRole, useTestApi } from './support/api.js'
-import { auditBody, type LibraryFixture, libraryFixture } from './support/audits.js'
+import { libraryFixture } from './support/audits.js'
+import { type StartedAudit, startedAudit } from './support/started-audit.js'
 
 const A = '/api/v1/audits'
 const UNKNOWN_ID = '0199c0de-0000-7000-8000-000000000001'
@@ -10,47 +11,10 @@ const UNKNOWN_ID = '0199c0de-0000-7000-8000-000000000001'
 const t = useTestApi()
 const { api, as, db } = t
 
-interface Ctx {
-  auditId: string
-  lib: LibraryFixture
-  ana: string
-  luis: string
-  lead: string
-}
+type Ctx = StartedAudit
 
-/** Una auditoría EN CURSO: líder 'lider', auditores 'ana' y 'luis', todos los criterios asignados a ana. */
-async function inProgress(dimension: 'CONFORMITY' | 'MATURITY' = 'CONFORMITY', suffix = ''): Promise<Ctx> {
-  const lib = await libraryFixture(db, suffix, dimension)
-  const manager = await as('manager')
-  const auditId = (await api().post(A).set('authorization', manager).send(auditBody(lib))).body.data.id as string
-  const [ana, luis, lead] = await Promise.all([
-    t.userId('auditor', 'ana'),
-    t.userId('auditor', 'luis'),
-    t.userId('auditor', 'lider'),
-  ])
-  for (const [userId, role] of [
-    [lead, 'LEAD'],
-    [ana, 'MEMBER'],
-    [luis, 'MEMBER'],
-  ] as const) {
-    await api().post(`${A}/${auditId}/members`).set('authorization', manager).send({ userId, role })
-  }
-  const ids = (await db.evaluation.findMany({ where: { auditId }, select: { id: true } })).map((e) => e.id)
-  await api()
-    .put(`${A}/${auditId}/assignments`)
-    .set('authorization', await as('auditor', 'lider'))
-    .send({ evaluationIds: ids, userId: ana })
-  if (dimension === 'MATURITY') {
-    const mid = lib.scale.levels.find((l) => l.label === 'Parcial')!
-    await api()
-      .put(`${A}/${auditId}/expected-levels`)
-      .set('authorization', await as('auditor', 'lider'))
-      .send({ evaluationIds: ids, expectedLevelId: mid.id })
-  }
-  const started = await api().post(`${A}/${auditId}/start`).set('authorization', manager)
-  expect(started.status).toBe(200)
-  return { auditId, lib, ana, luis, lead }
-}
+const inProgress = (dimension: 'CONFORMITY' | 'MATURITY' = 'CONFORMITY', suffix = '') =>
+  startedAudit(t, dimension, suffix)
 
 const level = (ctx: Ctx, label: string) => ctx.lib.scale.levels.find((l) => l.label === label)!.id
 const evaluationOf = async (ctx: Ctx, title: string) =>

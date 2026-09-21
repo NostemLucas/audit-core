@@ -151,8 +151,11 @@ Lo que se describió como práctica de sus auditores reemplaza a la fórmula her
 1. Nivel esperado y alcanzado de un dominio o de la auditoría = **promedio simple** de los niveles de sus hojas.
 2. Ambos promedios se calculan sobre **las mismas hojas**: las evaluadas y aplicables (no aplicables excluidas), para que sean
    comparables. El avance de una auditoría en curso se muestra aparte.
-3. El general de la auditoría es el promedio de **todas las hojas** (un dominio con más criterios influye más). *Pendiente de
-   confirmar frente al promedio de promedios por dominio.*
+3. **No hay nota global** (decidido con el usuario, 2026-09-21). En la práctica de auditoría no se certifica con un promedio: se
+   mira cada criterio (¿llegó a lo esperado?) y, en conformidad formal, los hallazgos. Un promedio general mezcla criterios de
+   importancia distinta y esconde cuáles fallaron. La auditoría en conjunto lleva **conteos** (cumplen, por debajo, pendientes,
+   no aplica) y la **distribución por opción de la escala**; los **promedios esperado/alcanzado y su brecha** solo existen por
+   dominio (para el radar). Si un cliente o regulador pide un porcentaje, se añade como lectura derivada, sin datos nuevos.
 4. La brecha de una hoja es `alcanzado − esperado`; una hoja con brecha negativa es una no conformidad.
 
 **Consecuencias que hay que atender:**

@@ -139,11 +139,23 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3b** (hecho) | Equipo: lector de usuarios (`identity`), designar líder y auditores, transferir el manager; asignar criterios |
 | **3c** (hecho) | Nivel esperado y guía por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
 | **3d** (hecho) | Flujo del criterio (iniciar al primer edit, editar, completar, aprobar, devolver, reabrir) con su historia |
-| **3e** | `scoring.ts` (distribución por opción, promedios esperado/alcanzado, brecha) y lecturas: estadísticas, gráficas, brechas, historial |
+| **3e** (hecho) | `scoring.ts` (conteos, distribución por opción, promedios esperado/alcanzado por dominio, brecha; **sin nota global**, `05` §6) y lecturas: `GET results`, `GET gaps`, `GET history` (de la auditoría) y `GET evaluations/:id/history` (de un criterio) |
 | **3f** | Seguimientos (qué criterios incluir: pendiente de decidir, ver `05` §6) |
 
 La **evidencia** (subir archivos, Nextcloud) y los **informes** son la Fase 4. La regla de evidencia de §3 se aplica contando los
 registros de evidencia; hasta la Fase 4 no hay forma real de crearlos (las pruebas los insertan directamente).
+
+### Lecturas del 3e
+
+| Endpoint | Devuelve |
+|---|---|
+| `GET /audits/:id/results` | Avance por estado del criterio; total con conteos y distribución; por dominio, conteos, distribución y los dos promedios con su brecha. Provisional mientras la auditoría está en curso (`progress.approved` dice cuánto está aprobado) |
+| `GET /audits/:id/gaps` | Criterios evaluados por debajo de lo esperado, del más lejano al menos (a igual brecha, orden de lectura) |
+| `GET /audits/:id/history` | Historial paginado, lo más reciente primero, con el texto redactado al leer |
+| `GET /audits/:id/evaluations/:evaluationId/history` | Historia de un criterio en orden cronológico, con el contenido del evento (la copia de lo enviado) |
+
+Los ven todos los que ven la auditoría. Un evento que ya no existe o cuyo contenido no cumple el formato actual **no rompe** la
+lectura: se muestra su tipo (§4).
 
 ## 8. Sin cambios respecto a lo ya acordado
 
