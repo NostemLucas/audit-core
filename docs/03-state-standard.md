@@ -77,7 +77,7 @@ usa (la API de la tabla es la misma).
    o en el caso de uso y fallan con **su propio error 422**, que explica el motivo. Un guard que falla solo
    podría decir "estado inválido", y eso oculta la causa.
 4. **Orden dentro de un método de entidad:** (1) `to = lifecycle.next(...)`, para que un estado inválido gane a
-   cualquier otro error; (2) precondiciones; (3) asignar estado y efectos (fechas, `round`, etc.).
+   cualquier otro error; (2) precondiciones; (3) asignar estado y efectos (fechas, etc.).
    ```ts
    publish(): void {
      const to = templateLifecycle.next(this.status, 'PUBLISH')
@@ -86,7 +86,7 @@ usa (la API de la tabla es la misma).
    }
    ```
 5. **Los efectos de una transición los hace el método de la entidad**, no el grafo: poner `closedAt`, sumar
-   `round`, etc. Así hay un solo lugar por efecto y el grafo sigue siendo un dato.
+   etc. Así hay un solo lugar por efecto y el grafo sigue siendo un dato.
 6. **Ningún estado se guarda por duplicado.** No hay una columna por etapa (`publishedAt`, `archivedAt`). Se
    guarda una fecha **solo si el negocio usa esa fecha** (informes, plazos): `Audit.closedAt`. `startedAt` no se guarda: solo lo escribía la máquina y nadie lo leía. El
    hecho de que "ocurrió una transición" queda en el historial (regla 8), no en columnas.
@@ -97,8 +97,8 @@ usa (la API de la tabla es la misma).
    | Falta una capacidad (`editable`, …) | `<ENTIDAD>_NOT_<CAPACIDAD>`, p. ej. `AUDIT_NOT_EDITABLE` | 409 |
    | Falla una precondición | un código específico (`TEMPLATE_EMPTY`, `AUDIT_HAS_NO_MEMBERS`) | 422 |
 8. **Historial:** toda transición de `Audit` y `Evaluation` publica un evento de dominio (`AuditStarted`…) dentro
-   de la misma transacción; el handler lo escribe en `audit_events` (y en `evaluation_reviews` cuando hay una
-   decisión de revisión). `Template` no publica evento hoy (no hay consumidor); agregarlo después es un handler.
+   de la misma transacción; el handler lo escribe en `audit_events`, que es el ÚNICO historial (también el de las revisiones
+   de un criterio: `06` §4). `Template` no publica evento hoy (no hay consumidor); agregarlo después es un handler.
 9. **Concurrencia, sin bloqueos de fila.** El sistema NO usa bloqueos pesimistas (`SELECT … FOR UPDATE`). Lo que la BD puede
    garantizar (nombres únicos, FK, CHECK, el padre de un control es de la misma plantilla) lo garantiza ella; lo demás es un
    riesgo asumido y corregible (dos personas cambiando lo mismo en el mismo instante). La biblioteca (escalas, plantillas) no
@@ -143,16 +143,16 @@ Capacidades: `DRAFT` → `editable`; `IN_PROGRESS` → `evaluable` (se evalúa y
 | Desde | Evento | Hacia | Efectos / precondiciones |
 |-------|--------|-------|--------------------------|
 | `NOT_STARTED` | `START` | `IN_PROGRESS` | — |
-| `IN_PROGRESS` | `COMPLETE` | `COMPLETED` | Precondiciones: nivel alcanzado presente (o N/A con motivo); hallazgos si el nivel alcanzado es inferior al esperado (`EVALUATION_INCOMPLETE`) |
-| `RETURNED` | `RESUME` | `IN_PROGRESS` | Corregir una evaluación devuelta |
-| `RETURNED` | `COMPLETE` | `COMPLETED` | Igual que arriba |
-| `COMPLETED` | `APPROVE` | `APPROVED` | Precondición: nivel alcanzado presente. Escribe `evaluation_reviews` |
-| `COMPLETED` | `RETURN` | `RETURNED` | Abre nueva ronda (`round + 1`). Escribe `evaluation_reviews` |
-| `APPROVED` | `REOPEN` | `RETURNED` | Excepcional, exige comentario. Abre nueva ronda. Escribe `evaluation_reviews` |
+| `IN_PROGRESS` | `COMPLETE` | `COMPLETED` | Enviar a revisión (lo hace el auditor asignado). Precondiciones (`06` §3): nivel alcanzado (o N/A con motivo); hallazgo si el nivel alcanzado es inferior al esperado (`EVALUATION_INCOMPLETE`); evidencia si es superior al mínimo de la escala. Su evento lleva **una copia del contenido** |
+| `RETURNED` | `COMPLETE` | `COMPLETED` | Igual que arriba (se corrige y se vuelve a enviar) |
+| `COMPLETED` | `APPROVE` | `APPROVED` | Lo hace el líder; comentario opcional |
+| `COMPLETED` | `RETURN` | `RETURNED` | Lo hace el líder; **comentario obligatorio** |
+| `APPROVED` | `REOPEN` | `RETURNED` | Lo hace el líder; excepcional, **comentario obligatorio** |
 
 Capacidades: `IN_PROGRESS` y `RETURNED` → `editable`; `COMPLETED` → `awaitingReview`; `APPROVED` → `locked`.
-Además exige que la auditoría esté `evaluable` (regla 10). Otras operaciones (`REASSIGN`, `RESTORE`) no cambian
-de estado: son acciones con registro en `evaluation_reviews`, no transiciones.
+Además exige que la auditoría esté `evaluable` (regla 10). Reasignar (`REASSIGN`) no cambia de estado: es una acción del líder,
+solo mientras el criterio no esté `COMPLETED` ni `APPROVED`. **No hay rondas ni tabla de revisiones**: la historia de un criterio
+sale de `audit_events` (`06` §4).
 
 ## 3. Disponibilidad (`isActive`)
 

@@ -27,8 +27,8 @@ Estado: **propuesta para revisión**. Nada de esto está implementado. Reemplaza
 | D3 | Una plantilla **PUBLISHED es inmutable**. Corregir = clonar (`name` nuevo) y trabajar en la copia DRAFT. | Hoy el contenido publicado se puede editar y una auditoría en curso cambia por debajo. Inmutable permite que la auditoría referencie los controles sin copiarlos. |
 | D4 | Un único árbol de **controles** por plantilla. **Evaluable = hoja.** Se eliminan `level` e `isAuditable`. | Hoy hay dos reglas para lo mismo (`isAuditable` en 28 sitios; el inicializador usa "hoja"). La profundidad se calcula al armar el árbol en memoria. |
 | D5 | Se mantiene una tabla `templates` mínima (cabecera) en vez de un nodo raíz en el árbol. Los capítulos de primer nivel tienen `parentId = NULL`. | La cabecera lleva el `status`. En un nodo raíz, ese campo quedaría nulo en todos los demás nodos y haría falta un trigger para asegurar que la auditoría apunte a una raíz. |
-| D6 | `AuditResponse` + `AuditEvaluation` se fusionan en **`evaluations`**: la evaluación de un control dentro de una auditoría. El estado vigente vive en la fila; el historial es un log append-only `evaluation_reviews`. | Hoy hay dos fuentes de verdad (`isCurrent` y `currentEvaluationId`) y un servicio solo para sincronizarlas. "Response" además no dice qué es. |
-| D7 | "Revisión" se separa en dos: **seguimiento** (`audits.parentAuditId`, nueva auditoría sobre una cerrada) y **ronda** (`evaluations.round`, ciclo devolver/corregir). | Hoy una sola palabra nombra ambas cosas. |
+| D6 | `AuditResponse` + `AuditEvaluation` se fusionan en **`evaluations`**: la evaluación de un control dentro de una auditoría. El estado vigente vive en la fila; el historial de un criterio (envíos, devoluciones, aprobaciones, con el contenido enviado) sale de `audit_events` (`06` §4): no hay tabla de revisiones. | Hoy hay dos fuentes de verdad (`isCurrent` y `currentEvaluationId`) y un servicio solo para sincronizarlas. "Response" además no dice qué es. |
+| D7 | "Revisión" se separa: **seguimiento** (`audits.parentAuditId`, nueva auditoría sobre una cerrada) y **revisión de un criterio** (devolver/aprobar, en el historial). **No hay rondas** (`round` se elimina: `06` §6). | Hoy una sola palabra nombra ambas cosas. |
 | D8 | `frameworks`/`framework_levels` pasan a **`scales`/`scale_levels`**, y quedan **mínimas**: `name` + `dimension` (`CONFORMITY | MATURITY`) + `isActive`; opciones con `value` (su **puntaje**), `label`, `description?`. Sin `type`, `code`, `description`, `color`, `shortName` ni `position`. La escala es donde vive el concepto de "cómo se puntúa" (`05` §11). | "Framework" se confundía con la norma. Y lo que quedaba era presentación o derivable: el `type` solo lo leía un validador (`BINARY` = 2 niveles; `RANGE` = enteros consecutivos, que no cambia ningún cálculo); el orden es el del `value`; el color lo deriva el frontend. Los informes solo leen `name`, `label`, `value` y `description`. Ver §2.2. |
 | D9 | **Alcance propio de la auditoría**: `audit_scope_items` (solo un nombre) dentro de cada auditoría. Sin catálogo de activos por organización, sin `scopeMode`. | Se define **en el momento** de la auditoría qué se audita. Un seguimiento hereda una **copia** del alcance y no puede ampliarlo: incluir algo distinto ya no es seguimiento, es otra auditoría. Con un catálogo reutilizable ese rechazo no tendría fundamento. Ver §3. |
 | D10 | **Se eliminan `global_feed` y `notifications`** del alcance inicial. Queda **`audit_events`**, el historial de cada auditoría. | Definir qué notificar y a quién es una decisión de producto que hoy no está tomada; las tablas solo agregan peso. El historial de auditoría sí se usa (19 puntos de escritura). Se agregan después vía §6. |
@@ -86,19 +86,16 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
   Se eliminan `description`, `publishedAt`, `archivedAt`, `startedAt`, `scopeMode`, `overallScore`, `finalScore` y
   `nextcloudFolderPath`.
 - **audit_scope_items**: `auditId` FK (cascade), `name`. UQ(`auditId`, `name`). Sin elementos = toda la organización.
-- **audit_members**: `auditId`, `userId`, `role` (`LEAD_AUDITOR | INSPECTOR`). UQ(`auditId`, `userId`).
-  Quitar un miembro es un borrado; queda en `audit_events`.
+- **audit_members**: `auditId`, `userId`, `role` (`LEAD | MEMBER`; antes `LEAD_AUDITOR | INSPECTOR`). UQ(`auditId`, `userId`) y
+  UQ parcial (`auditId`) donde `role = 'LEAD'` (un solo líder). Quitar un miembro es un borrado; queda en `audit_events`.
 - **evaluations** (una por auditoría × control **hoja**): `auditId` FK, `controlId` FK,
-  `expectedLevelId?` FK (nulo solo en DRAFT: iniciar la auditoría lo exige en cada hoja; por criterio, no por auditoría) y `expectedLevelReason?` (por qué ese nivel en esta auditoría), `assignedUserId?` FK, `status`
-  (`NOT_STARTED|IN_PROGRESS|COMPLETED|RETURNED|APPROVED`), `round` (desde 1), `achievedLevelId?` FK,
+  `expectedLevelId?` FK (nulo solo en DRAFT: iniciar la auditoría lo exige en cada hoja; por criterio, no por auditoría) y `guidance?` (la guía del líder para este criterio, que incluye el porqué del nivel esperado), `assignedUserId?` FK, `status`
+  (`NOT_STARTED|IN_PROGRESS|COMPLETED|RETURNED|APPROVED`), `achievedLevelId?` FK,
   `findings?`, `notes?`, `isNotApplicable`, `notApplicableReason?`, `version`.
   UQ(`auditId`, `controlId`). Índices (`auditId`, `status`) y (`assignedUserId`, `status`).
   Sin `weight` ni `score`: los resultados se derivan (`05` §6, §11).
   CHECK: `isNotApplicable` ⇒ `notApplicableReason` no nulo.
-- **evaluation_reviews** (log append-only): `evaluationId` FK, `round`, `action`
-  (`APPROVE|RETURN|REASSIGN|REOPEN|RESTORE`), `actorId` FK, `comments?`, `snapshot jsonb` (nivel,
-  hallazgos, notas, N/A, ids de evidencia; tipado con Zod), `createdAt`. Restaurar una ronda lee el snapshot.
-- **evidences** (antes `work_papers`): `evaluationId` FK, `round`, `title`, `description?`, `fileName`, `mimeType`,
+- **evidences** (antes `work_papers`): `evaluationId` FK, `title`, `description?`, `fileName`, `mimeType`,
   `size BigInt`, `storageFileId` UQ NOT NULL (fuente de verdad en Nextcloud), `deletedAt?` (único soft-delete del
   sistema: la evidencia eliminada debe seguir siendo trazable). Quién la subió: `createdById`.
   Ya no existen `source='legacy'`, `status`, `type`, `remotePath`, `uploadedBy`, `auditId` ni `standardId`.
@@ -116,7 +113,7 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 | El padre de un control es de la misma plantilla | FK compuesta en `controls` |
 | No se borra una organización / plantilla / escala / control en uso | FK `onDelete: Restrict` (la cascada plantilla → controles también se bloquea si hay evaluaciones) |
 | Una evaluación por control y auditoría; un miembro por auditoría | UNIQUE |
-| N/A exige motivo; `round ≥ 1` | CHECK en `evaluations` |
+| N/A exige motivo | CHECK en `evaluations` |
 | Seguimiento coherente: `parentAuditId` nulo ⇔ `followUpNumber = 0`; no es su propio padre; fechas ordenadas | CHECK en `audits` |
 | `email` y `username` en minúsculas | CHECK en `users` |
 | Puntaje de una opción ≥ 0; `payload` y `snapshot` son objetos JSON | CHECK |
@@ -291,7 +288,7 @@ Sin Redis ni colas mientras los informes sean síncronos.
 | `standards` | `controls` (`code` → `reference` libre y opcional; sin `level`, `isAuditable`, `guidance`) |
 | `predefined_texts` | `suggested_findings` |
 | `evaluation_frameworks` / `evaluation_levels` | `scales` / `scale_levels` |
-| `audit_responses` + `audit_evaluations` | `evaluations` + `evaluation_reviews` |
+| `audit_responses` + `audit_evaluations` | `evaluations` (la historia, en `audit_events`) |
 | `audit_work_papers` | `evidences` |
 | `audit_reports` | `reports` |
 | `audit_activity` | `audit_events` |
