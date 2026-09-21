@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
 import type { CloneTemplateT } from '../template.schemas.js'
-import { loadControls, loadTemplate, lockTemplate, withActions } from '../template.queries.js'
+import { loadControls, loadTemplate, withActions } from '../template.queries.js'
 
 @Injectable()
 export class CloneTemplateUseCase {
@@ -11,12 +11,10 @@ export class CloneTemplateUseCase {
   /**
    * Copia el árbol completo (orden incluido) y los hallazgos sugeridos de la plantilla `sourceId`, en cualquier estado, a
    * una plantilla NUEVA en borrador. El origen no cambia (no se archiva): una publicada sigue en uso por auditorías en
-   * curso, y corregirla es justamente clonar y publicar la nueva. Todo o nada. Toma el bloqueo del origen para copiar un
-   * estado coherente (sin una edición a medias).
+   * curso, y corregirla es justamente clonar y publicar la nueva. Todo o nada.
    */
   @Transactional()
   async execute(sourceId: string, input: CloneTemplateT) {
-    await lockTemplate(this.tx, sourceId)
     await loadTemplate(this.tx, sourceId)
     const controls = await loadControls(this.tx, sourceId)
     const findings = await this.tx.suggestedFinding.findMany({ where: { control: { templateId: sourceId } } })

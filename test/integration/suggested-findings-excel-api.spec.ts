@@ -389,25 +389,4 @@ describe('importar la matriz', () => {
       await db.$executeRawUnsafe('DROP FUNCTION test_fail_update()')
     }
   })
-
-  it('espera al bloqueo de la plantilla (la importación ve un árbol coherente)', async () => {
-    const c = await setup()
-    const file = await editedMatrix(c, (sheet) => (rowOf(sheet, 'Roles').getCell(COL.Cumple).value = 'ok'))
-    let release!: () => void
-    let taken!: () => void
-    const gate = new Promise<void>((resolve) => (release = resolve))
-    const lockTaken = new Promise<void>((resolve) => (taken = resolve))
-    const holder = db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "templates" WHERE "id" = ${c.template.id}::uuid FOR NO KEY UPDATE`
-      taken()
-      await gate
-    })
-    await lockTaken
-    const pending = upload(c, file).then((response) => response)
-    const early = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve('esperando'), 500))])
-    expect(early).toBe('esperando')
-    release()
-    await holder
-    expect((await pending).status).toBe(201)
-  })
 })

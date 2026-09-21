@@ -6,7 +6,7 @@ import { ControlTree } from '../domain/control-tree.js'
 import { matchLevelColumns, planSuggestedImport } from '../domain/suggested-findings-import.js'
 import { importError } from '../import-error.js'
 import { type MatrixContent, readMatrixWorkbook } from '../infrastructure/matrix-excel.js'
-import { loadControls, lockTemplate } from '../template.queries.js'
+import { loadControls, loadTemplate } from '../template.queries.js'
 
 @Injectable()
 export class ImportSuggestedFindingsUseCase {
@@ -29,7 +29,7 @@ export class ImportSuggestedFindingsUseCase {
    */
   @Transactional()
   protected async apply(templateId: string, scaleId: string, workbook: MatrixContent) {
-    await lockTemplate(this.tx, templateId)
+    await loadTemplate(this.tx, templateId)
     const scale = await this.tx.scale.findUnique({ where: { id: scaleId }, include: { levels: true } })
     if (!scale) throw new DomainError(LibraryErrors.SCALE_NOT_FOUND, { id: scaleId })
 

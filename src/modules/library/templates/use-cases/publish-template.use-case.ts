@@ -4,7 +4,7 @@ import { DomainError } from '../../../../platform/errors/index.js'
 import { LibraryErrors } from '../../errors.js'
 import { ControlTree } from '../domain/control-tree.js'
 import { templateLifecycle } from '../domain/template.lifecycle.js'
-import { loadControls, loadTemplate, lockTemplate, withActions } from '../template.queries.js'
+import { loadControls, loadTemplate, withActions } from '../template.queries.js'
 
 @Injectable()
 export class PublishTemplateUseCase {
@@ -16,7 +16,6 @@ export class PublishTemplateUseCase {
    */
   @Transactional()
   async execute(id: string) {
-    await lockTemplate(this.tx, id)
     const template = await loadTemplate(this.tx, id)
     const to = templateLifecycle.next(template.status, 'PUBLISH')
 

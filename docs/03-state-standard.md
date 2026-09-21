@@ -99,9 +99,12 @@ usa (la API de la tabla es la misma).
 8. **Historial:** toda transición de `Audit` y `Evaluation` publica un evento de dominio (`AuditStarted`…) dentro
    de la misma transacción; el handler lo escribe en `audit_events` (y en `evaluation_reviews` cuando hay una
    decisión de revisión). `Template` no publica evento hoy (no hay consumidor); agregarlo después es un handler.
-9. **Concurrencia:** las entidades que dos personas pueden tocar a la vez (`Audit`, `Evaluation`) llevan
-   `version` (bloqueo optimista) y toda transición es `@Transactional()`. Un choque sale como
-   `PlatformErrors.VERSION_CONFLICT`.
+9. **Concurrencia, sin bloqueos de fila.** El sistema NO usa bloqueos pesimistas (`SELECT … FOR UPDATE`). Lo que la BD puede
+   garantizar (nombres únicos, FK, CHECK, el padre de un control es de la misma plantilla) lo garantiza ella; lo demás es un
+   riesgo asumido y corregible (dos personas cambiando lo mismo en el mismo instante). La biblioteca (escalas, plantillas) no
+   bloquea nada. Donde dos personas sí pueden chocar de verdad y el daño sería pisar el trabajo de otra (`Audit`, `Evaluation`),
+   la entidad lleva `version` (**bloqueo optimista**) y toda transición es `@Transactional()`. Un choque sale como
+   `PlatformErrors.VERSION_CONFLICT`: el segundo recibe «otra persona lo modificó, vuelve a cargar».
 10. **Dependencia entre agregados:** si actuar sobre un hijo exige un estado del padre (editar una evaluación
     exige auditoría `IN_PROGRESS`), el caso de uso carga el padre y afirma **su** capacidad primero. Cada
     agregado responde por su propio estado; no se copia el estado del padre al hijo.

@@ -4,7 +4,7 @@ import { DomainError } from '../../../../platform/errors/index.js'
 import { LibraryErrors } from '../../errors.js'
 import { ControlTree } from '../domain/control-tree.js'
 import { assertTemplateEditable } from '../domain/template.lifecycle.js'
-import { listControls, loadControls, loadTemplate, lockTemplate, writeOrder } from '../template.queries.js'
+import { listControls, loadControls, loadTemplate, writeOrder } from '../template.queries.js'
 
 @Injectable()
 export class DeleteControlUseCase {
@@ -13,7 +13,6 @@ export class DeleteControlUseCase {
   /** Solo se elimina un control sin hijos (los subcontroles se eliminan primero). Devuelve la lista completa. */
   @Transactional()
   async execute(templateId: string, controlId: string) {
-    await lockTemplate(this.tx, templateId)
     assertTemplateEditable((await loadTemplate(this.tx, templateId)).status)
 
     const rows = await loadControls(this.tx, templateId)

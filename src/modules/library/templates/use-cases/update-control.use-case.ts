@@ -4,7 +4,7 @@ import { DomainError } from '../../../../platform/errors/index.js'
 import { LibraryErrors } from '../../errors.js'
 import { assertTemplateEditable } from '../domain/template.lifecycle.js'
 import type { UpdateControlT } from '../control.schemas.js'
-import { listControls, loadTemplate, lockTemplate } from '../template.queries.js'
+import { listControls, loadTemplate } from '../template.queries.js'
 
 @Injectable()
 export class UpdateControlUseCase {
@@ -13,7 +13,6 @@ export class UpdateControlUseCase {
   /** Cambia el contenido (referencia, título, descripción), no el lugar en el árbol. Devuelve solo ese control. */
   @Transactional()
   async execute(templateId: string, controlId: string, input: UpdateControlT) {
-    await lockTemplate(this.tx, templateId)
     assertTemplateEditable((await loadTemplate(this.tx, templateId)).status)
 
     const { count } = await this.tx.control.updateMany({

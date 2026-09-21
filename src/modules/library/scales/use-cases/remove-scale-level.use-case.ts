@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
 import { DomainError } from '../../../../platform/errors/index.js'
 import { LibraryErrors } from '../../errors.js'
-import { assertLevelsValid, assertStructureEditable, loadScale, lockScale } from '../scale.queries.js'
+import { assertLevelsValid, assertStructureEditable, loadScale } from '../scale.queries.js'
 
 @Injectable()
 export class RemoveScaleLevelUseCase {
@@ -10,7 +10,6 @@ export class RemoveScaleLevelUseCase {
 
   @Transactional()
   async execute(scaleId: string, levelId: string) {
-    await lockScale(this.tx, scaleId)
     const scale = await loadScale(this.tx, scaleId)
     if (!scale.levels.some((level) => level.id === levelId)) {
       throw new DomainError(LibraryErrors.SCALE_LEVEL_NOT_FOUND, { scaleId, levelId })

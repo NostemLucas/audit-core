@@ -19,16 +19,6 @@ export async function loadTemplate(tx: Tx, id: string) {
   return template
 }
 
-/**
- * Bloquea la fila de la plantilla hasta el final de la transacción. Toda operación que cambia su estructura, su contenido
- * o su estado la toma: una plantilla PUBLISHED es inmutable, y sin el bloqueo una edición y una publicación simultáneas
- * podrían colarse una en la otra; dos ediciones simultáneas del árbol tampoco pueden renumerar posiciones a la vez.
- */
-export async function lockTemplate(tx: Tx, id: string): Promise<void> {
-  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "templates" WHERE "id" = ${id}::uuid FOR UPDATE`
-  if (rows.length === 0) throw new DomainError(LibraryErrors.TEMPLATE_NOT_FOUND, { id })
-}
-
 export function loadControls(tx: Tx, templateId: string) {
   return tx.control.findMany({ where: { templateId } })
 }

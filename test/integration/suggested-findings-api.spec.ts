@@ -351,39 +351,7 @@ describe('una escala con hallazgos sugeridos no pierde textos en silencio', () =
   })
 })
 
-describe('bloqueo de la plantilla', () => {
-  /** Igual que en escalas y controles: se toma un bloqueo más débil que el propio (FOR NO KEY UPDATE) y la operación debe esperar. */
-  it.each([
-    ['escribir', 'put'],
-    ['quitar', 'delete'],
-  ] as const)('%s una sugerencia espera al bloqueo de la plantilla', async (_name, method) => {
-    const c = await setup()
-    const auth = await as('manager')
-    let release!: () => void
-    let taken!: () => void
-    const gate = new Promise<void>((resolve) => (release = resolve))
-    const lockTaken = new Promise<void>((resolve) => (taken = resolve))
-    const holder = db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "templates" WHERE "id" = ${c.template.id}::uuid FOR NO KEY UPDATE`
-      taken()
-      await gate
-    })
-    await lockTaken
-
-    const call =
-      method === 'put'
-        ? api()
-            .put(url(c, 'Roles', 'Parcial'))
-            .send({ text: 'x' })
-        : api().delete(url(c, 'Roles', 'Parcial'))
-    const pending = call.set('authorization', auth).then((response) => response)
-    const early = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve('esperando'), 500))])
-    expect(early).toBe('esperando')
-    release()
-    await holder
-    expect((await pending).status).toBeLessThan(300)
-  })
-
+describe('escrituras simultáneas', () => {
   it('escrituras simultáneas de la misma sugerencia: todas 200 y queda una sola fila (nunca 409/500)', async () => {
     const c = await setup()
     const auth = await as('manager')

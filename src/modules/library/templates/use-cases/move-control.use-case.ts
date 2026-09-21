@@ -6,14 +6,7 @@ import { LibraryErrors } from '../../errors.js'
 import { ControlTree } from '../domain/control-tree.js'
 import { assertTemplateEditable } from '../domain/template.lifecycle.js'
 import type { MoveControlT } from '../control.schemas.js'
-import {
-  listControls,
-  loadControls,
-  loadTemplate,
-  lockTemplate,
-  placeInParent,
-  writeOrder,
-} from '../template.queries.js'
+import { listControls, loadControls, loadTemplate, placeInParent, writeOrder } from '../template.queries.js'
 
 @Injectable()
 export class MoveControlUseCase {
@@ -22,7 +15,6 @@ export class MoveControlUseCase {
   /** Cambiar de padre y/o de lugar entre hermanos (subir y bajar es moverlo a otra posición). Devuelve la lista completa. */
   @Transactional()
   async execute(templateId: string, controlId: string, input: MoveControlT) {
-    await lockTemplate(this.tx, templateId)
     assertTemplateEditable((await loadTemplate(this.tx, templateId)).status)
 
     const rows = await loadControls(this.tx, templateId)

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
 import { DomainError } from '../../../../platform/errors/index.js'
 import { LibraryErrors } from '../../errors.js'
-import { assertLevelsValid, assertStructureEditable, loadScale, lockScale } from '../scale.queries.js'
+import { assertLevelsValid, assertStructureEditable, loadScale } from '../scale.queries.js'
 import type { UpdateScaleLevelT } from '../scale.schemas.js'
 
 @Injectable()
@@ -12,7 +12,6 @@ export class UpdateScaleLevelUseCase {
   /** Etiqueta y descripción siempre se corrigen; cambiar el puntaje solo mientras ninguna auditoría use la escala. */
   @Transactional()
   async execute(scaleId: string, levelId: string, input: UpdateScaleLevelT) {
-    await lockScale(this.tx, scaleId)
     const scale = await loadScale(this.tx, scaleId)
     const current = scale.levels.find((level) => level.id === levelId)
     if (!current) throw new DomainError(LibraryErrors.SCALE_LEVEL_NOT_FOUND, { scaleId, levelId })

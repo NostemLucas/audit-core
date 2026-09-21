@@ -6,7 +6,7 @@ import { LibraryErrors } from '../../errors.js'
 import { ControlTree } from '../domain/control-tree.js'
 import { assertTemplateEditable } from '../domain/template.lifecycle.js'
 import type { CreateControlT } from '../control.schemas.js'
-import { listControls, loadControls, loadTemplate, lockTemplate, placeInParent } from '../template.queries.js'
+import { listControls, loadControls, loadTemplate, placeInParent } from '../template.queries.js'
 
 @Injectable()
 export class CreateControlUseCase {
@@ -15,7 +15,6 @@ export class CreateControlUseCase {
   /** Devuelve la lista completa: las posiciones de los hermanos pueden haber cambiado. */
   @Transactional()
   async execute(templateId: string, input: CreateControlT) {
-    await lockTemplate(this.tx, templateId)
     assertTemplateEditable((await loadTemplate(this.tx, templateId)).status)
 
     const rows = await loadControls(this.tx, templateId)

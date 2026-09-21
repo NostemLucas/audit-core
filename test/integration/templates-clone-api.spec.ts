@@ -248,25 +248,4 @@ describe('clonar', () => {
       await db.$executeRawUnsafe('DROP FUNCTION test_fail_control()')
     }
   })
-
-  /** Copiar mientras alguien edita el origen daría un árbol a medias: la operación espera al bloqueo del origen. */
-  it('espera al bloqueo del origen (copia un estado coherente)', async () => {
-    const original = await source('Original', 'DRAFT')
-    let release!: () => void
-    let taken!: () => void
-    const gate = new Promise<void>((resolve) => (release = resolve))
-    const lockTaken = new Promise<void>((resolve) => (taken = resolve))
-    const holder = db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "templates" WHERE "id" = ${original.id}::uuid FOR NO KEY UPDATE`
-      taken()
-      await gate
-    })
-    await lockTaken
-    const pending = clone(original.id, 'Copia').then((response) => response)
-    const early = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve('esperando'), 500))])
-    expect(early).toBe('esperando')
-    release()
-    await holder
-    expect((await pending).status).toBe(201)
-  })
 })

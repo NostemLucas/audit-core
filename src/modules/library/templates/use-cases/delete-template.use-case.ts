@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
 import { assertTemplateEditable } from '../domain/template.lifecycle.js'
-import { loadTemplate, lockTemplate } from '../template.queries.js'
+import { loadTemplate } from '../template.queries.js'
 
 @Injectable()
 export class DeleteTemplateUseCase {
@@ -14,7 +14,6 @@ export class DeleteTemplateUseCase {
    */
   @Transactional()
   async execute(id: string): Promise<void> {
-    await lockTemplate(this.tx, id)
     assertTemplateEditable((await loadTemplate(this.tx, id)).status)
     await this.tx.template.delete({ where: { id } })
   }

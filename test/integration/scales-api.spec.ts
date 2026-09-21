@@ -396,67 +396,6 @@ describe('opciones de una escala SIN uso', () => {
       .set('authorization', await as('manager'))
       .expect(404)
   })
-
-  it('bajas simultáneas: nunca queda con menos de 2 opciones (humo; la garantía la fija el test del bloqueo)', async () => {
-    const auth = await as('manager')
-    const scale = (await conformity()).body.data
-    const results = await Promise.all(
-      scale.levels.map((l: { id: string }) =>
-        api().delete(`${BASE}/${scale.id}/levels/${l.id}`).set('authorization', auth),
-      ),
-    )
-    expect(results.filter((r) => r.status === 200)).toHaveLength(1)
-    expect(await db.scaleLevel.count()).toBe(2)
-  })
-
-  /**
-   * Determinista (una carrera real depende del tiempo y puede no aparecer): el test toma el bloqueo de la fila de la
-   * escala y comprueba que la operación ESPERA a que se suelte. Sin `lockScale` respondería de inmediato.
-   * Se toma FOR NO KEY UPDATE (y no FOR UPDATE) a propósito: insertar una opción ya toma un bloqueo compartido de
-   * clave por la FK, que también chocaría con FOR UPDATE y taparía la ausencia del bloqueo propio.
-   */
-  it.each([
-    ['agregar', (id: string) => ({ method: 'post', url: `${BASE}/${id}/levels`, body: { value: 75, label: 'Nueva' } })],
-    [
-      'editar',
-      (id: string, level: string) => ({
-        method: 'patch',
-        url: `${BASE}/${id}/levels/${level}`,
-        body: { label: 'Otra' },
-      }),
-    ],
-    [
-      'quitar',
-      (id: string, level: string) => ({ method: 'delete', url: `${BASE}/${id}/levels/${level}`, body: undefined }),
-    ],
-  ] as const)('%s una opción espera al bloqueo de la fila de la escala', async (_operacion, build) => {
-    const auth = await as('manager')
-    const scale = (await conformity()).body.data
-    const { method, url, body } = build(scale.id, levelId(scale, 'Parcial'))
-
-    let release!: () => void
-    let taken!: () => void
-    const gate = new Promise<void>((resolve) => (release = resolve))
-    const lockTaken = new Promise<void>((resolve) => (taken = resolve))
-    const holder = db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "scales" WHERE "id" = ${scale.id}::uuid FOR NO KEY UPDATE`
-      taken()
-      await gate
-    })
-    await lockTaken
-
-    const call = method === 'post' ? api().post(url) : method === 'patch' ? api().patch(url) : api().delete(url)
-    const pending = call
-      .set('authorization', auth)
-      .send(body)
-      .then((response) => response)
-    const early = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve('esperando'), 500))])
-    expect(early).toBe('esperando')
-
-    release()
-    await holder
-    expect((await pending).status).toBeLessThan(300)
-  })
 })
 
 describe('opciones de una escala YA USADA: la estructura queda congelada', () => {

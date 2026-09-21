@@ -147,8 +147,6 @@ Las reglas se evalúan sobre el conjunto que quedaría **después** del cambio (
 - **Estructura congelada al usarse.** Si alguna auditoría usa la escala, ya no se agregan ni se quitan opciones ni se
   cambia un puntaje (`SCALE_STRUCTURE_LOCKED`); solo se corrigen etiquetas y descripciones. Otra estructura = otra escala.
 - **La dimensión no se edita** (`scales.dimension` fija el significado de la escala).
-- Las operaciones sobre opciones bloquean la fila de la escala (`FOR UPDATE`): dos bajas simultáneas no pueden dejarla con
-  menos de 2 opciones.
 
 "Binaria" es simplemente `niveles.length === 2`; el frontend decide cómo dibujarla. La regla antigua "un nivel
 debe valer 0" no se conserva: no protege ningún cálculo.
@@ -180,7 +178,7 @@ auditoría. Añade una dimensión a `evaluations` y a los pesos. Si se necesita,
   - Tope de 5 MB y 5000 filas.
 - **Clonar** (`POST /templates/:id/clone`, con un `name` nuevo): copia el árbol (orden incluido) y los hallazgos sugeridos de una
   plantilla en **cualquier estado** a otra NUEVA en borrador; el origen no cambia (no se archiva: una publicada sigue en uso por
-  auditorías en curso, y corregirla es clonar y publicar la nueva). Todo o nada; toma el bloqueo del origen.
+  auditorías en curso, y corregirla es clonar y publicar la nueva). Todo o nada.
 
 ## 4. Textos predefinidos → `suggested_findings` (D12)
 
