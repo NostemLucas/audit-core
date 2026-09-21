@@ -15,7 +15,7 @@
  *   502/503  falla de un sistema externo (Nextcloud, Authentik)
  */
 
-export type HttpStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 502 | 503
+export type HttpStatus = 400 | 401 | 403 | 404 | 409 | 413 | 422 | 429 | 500 | 502 | 503
 
 export interface ErrorSpec {
   readonly http: HttpStatus

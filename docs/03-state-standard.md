@@ -120,7 +120,7 @@ Contrato de diseño. Al implementar cada `.lifecycle.ts`, un test compara el gra
 **Template**
 | Desde | Evento | Hacia | Efectos / precondiciones |
 |-------|--------|-------|--------------------------|
-| `DRAFT` | `PUBLISH` | `PUBLISHED` | Precondición: tiene al menos un control (`TEMPLATE_EMPTY`) |
+| `DRAFT` | `PUBLISH` | `PUBLISHED` | Precondiciones, en este orden: no está vacía (`TEMPLATE_EMPTY`) y todo dominio (primer nivel) tiene hijos (`TEMPLATE_INVALID_STRUCTURE`, con la lista de los que fallan). El ciclo de vida se comprueba antes |
 | `PUBLISHED` | `ARCHIVE` | `ARCHIVED` | — |
 
 Capacidades: `DRAFT` → `editable`; `PUBLISHED` → `usable` (se puede auditar con ella). `ARCHIVED` es final.

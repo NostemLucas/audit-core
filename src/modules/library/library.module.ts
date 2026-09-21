@@ -10,16 +10,20 @@ import { RenameScaleUseCase } from './scales/use-cases/rename-scale.use-case.js'
 import { SetScaleAvailabilityUseCase } from './scales/use-cases/set-scale-availability.use-case.js'
 import { UpdateScaleLevelUseCase } from './scales/use-cases/update-scale-level.use-case.js'
 
+import { ArchiveTemplateUseCase } from './templates/use-cases/archive-template.use-case.js'
 import { ControlsController } from './templates/controls.controller.js'
 import { TemplatesController } from './templates/templates.controller.js'
 import { CreateControlUseCase } from './templates/use-cases/create-control.use-case.js'
 import { CreateTemplateUseCase } from './templates/use-cases/create-template.use-case.js'
 import { DeleteControlUseCase } from './templates/use-cases/delete-control.use-case.js'
 import { DeleteTemplateUseCase } from './templates/use-cases/delete-template.use-case.js'
+import { ExportTemplateUseCase } from './templates/use-cases/export-template.use-case.js'
 import { GetTemplateUseCase } from './templates/use-cases/get-template.use-case.js'
+import { ImportTemplateUseCase } from './templates/use-cases/import-template.use-case.js'
 import { ListControlsUseCase } from './templates/use-cases/list-controls.use-case.js'
 import { ListTemplatesUseCase } from './templates/use-cases/list-templates.use-case.js'
 import { MoveControlUseCase } from './templates/use-cases/move-control.use-case.js'
+import { PublishTemplateUseCase } from './templates/use-cases/publish-template.use-case.js'
 import { RenameTemplateUseCase } from './templates/use-cases/rename-template.use-case.js'
 import { UpdateControlUseCase } from './templates/use-cases/update-control.use-case.js'
 
@@ -45,6 +49,10 @@ import { UpdateControlUseCase } from './templates/use-cases/update-control.use-c
     UpdateControlUseCase,
     MoveControlUseCase,
     DeleteControlUseCase,
+    PublishTemplateUseCase,
+    ArchiveTemplateUseCase,
+    ImportTemplateUseCase,
+    ExportTemplateUseCase,
   ],
 })
 export class LibraryModule {}

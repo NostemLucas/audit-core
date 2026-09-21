@@ -2,6 +2,7 @@ import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core'
 import { describe, expect, it } from 'vitest'
 import { listRoutes } from '../../src/platform/authz/index.js'
 import { useTestApi } from './support/api.js'
+import { type SeedNode, seedControls } from './support/templates.js'
 
 const T = '/api/v1/templates'
 const UNKNOWN_ID = '0199c0de-0000-7000-8000-000000000001'
@@ -58,6 +59,10 @@ describe('permisos', () => {
         'POST /templates → create Template',
         'PATCH /templates/:id → update Template',
         'DELETE /templates/:id → delete Template',
+        'POST /templates/:id/publish → update Template',
+        'POST /templates/:id/archive → update Template',
+        'POST /templates/import → create Template',
+        'GET /templates/:id/export → read Template',
         'GET /templates/:templateId/controls → read Template',
         'POST /templates/:templateId/controls → update Template',
         'PATCH /templates/:templateId/controls/:controlId → update Template',
@@ -198,17 +203,7 @@ const dbPositions = async (templateId: string, parentId: string | null) =>
     })
   ).map((c) => [c.title, c.position])
 
-/** Inserta un árbol directamente en la BD (rápido) para probar los casos que no dependen de la API de alta. */
-async function seed(
-  templateId: string,
-  spec: ReadonlyArray<{ title: string; kids?: ReadonlyArray<any> }>,
-  parentId: string | null = null,
-): Promise<void> {
-  for (const [position, node] of spec.entries()) {
-    const row = await db.control.create({ data: { templateId, parentId, title: node.title, position } })
-    if (node.kids) await seed(templateId, node.kids, row.id)
-  }
-}
+const seed = (templateId: string, spec: readonly SeedNode[]) => seedControls(db, templateId, spec)
 
 describe('controles: crear y listar', () => {
   it('arma un árbol de profundidad desigual y lo lista en orden de lectura con nivel e hoja', async () => {

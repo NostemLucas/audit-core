@@ -11,6 +11,10 @@ export const LIMITS = {
   scaleLevels: 20,
   /** Niveles máximos de profundidad del árbol de una plantilla (una norma real llega a 4-6). */
   controlDepth: 10,
+  /** Tamaño máximo de un archivo de importación. */
+  importBytes: 5 * 1024 * 1024,
+  /** Filas máximas de un archivo de importación (una norma real tiene cientos; esto es un tope contra abusos). */
+  importRows: 5000,
   /** Textos largos sin formato: descripciones, hallazgos, notas. */
   text: 20_000,
 } as const

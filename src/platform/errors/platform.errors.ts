@@ -6,6 +6,7 @@ export const PlatformErrors = defineErrors({
   TOKEN_INVALID: { http: 401, message: 'Token ausente, inválido o vencido' },
   FORBIDDEN: { http: 403, message: 'No tienes permiso para realizar esta acción' },
   NOT_FOUND: { http: 404, message: 'El recurso no existe' },
+  PAYLOAD_TOO_LARGE: { http: 413, message: 'El archivo o el cuerpo de la petición es demasiado grande' },
   CONFLICT: { http: 409, message: 'La operación entra en conflicto con el estado actual' },
   /** Bloqueo optimista: alguien modificó el registro después de que lo leíste. */
   VERSION_CONFLICT: { http: 409, message: 'El registro fue modificado por otra persona; vuelve a cargarlo' },

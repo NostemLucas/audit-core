@@ -179,7 +179,15 @@ Qué se cambia:
   interfaz muestra la matriz de una plantilla **para una escala elegida**.
 - Se copia solo si `findings` está vacío y se guarda como texto normal; después no hay vínculo con la sugerencia.
 - Vive en la biblioteca junto a las plantillas (inmutable al publicar, igual que los controles).
-- Importación y exportación por Excel: se conservan.
+- Importación y exportación por Excel: se conservan, con un formato nuevo (`library/templates/domain/control-import.ts` es la
+  única lógica; `infrastructure/excel-*.ts` solo lee y escribe el libro):
+  - Hoja `Controles` con `Nivel`, `Referencia`, `Título`, `Descripción`, en orden de lectura; el padre de una fila es la fila
+    anterior de nivel menor (no depende de ninguna referencia). Hoja `Plantilla` (`Campo`/`Valor`) con `Nombre`.
+  - Se siguen aceptando los archivos del proyecto anterior (`Standards`, `Código`, `Código padre`) resolviendo el padre solo dentro
+    del archivo; la columna "Guía auditor" se ignora con un aviso. Los avisos no impiden importar.
+  - Importar **crea una plantilla nueva** en borrador (todo o nada); los errores se devuelven todos juntos con su fila
+    (`TEMPLATE_IMPORT_INVALID`, primeros 20 y el total). Exportar → importar reproduce el árbol tal cual.
+  - Tope de 5 MB y 5000 filas.
 
 ## 5. Qué se conserva del proyecto actual
 

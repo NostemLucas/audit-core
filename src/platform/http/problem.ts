@@ -30,6 +30,8 @@ function byStatus(status: number): ErrorDef {
       return PlatformErrors.NOT_FOUND
     case 409:
       return PlatformErrors.CONFLICT
+    case 413:
+      return PlatformErrors.PAYLOAD_TOO_LARGE
     case 429:
       return PlatformErrors.RATE_LIMITED
     default:
