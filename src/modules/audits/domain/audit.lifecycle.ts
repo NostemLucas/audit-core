@@ -24,6 +24,11 @@ export const auditLifecycle = defineLifecycle<AuditStatus, AuditEvent, AuditTag>
   },
 })
 
+/** Lanza AUDIT_TEAM_LOCKED si el equipo ya no puede cambiar (auditoría cerrada o archivada). */
+export function assertAuditStaffable(status: AuditStatus): void {
+  auditLifecycle.assert(status, 'staffable', AuditErrors.AUDIT_TEAM_LOCKED)
+}
+
 /** Lanza AUDIT_NOT_EDITABLE si la auditoría no está en borrador. */
 export function assertAuditEditable(status: AuditStatus): void {
   auditLifecycle.assert(status, 'editable', AuditErrors.AUDIT_NOT_EDITABLE)

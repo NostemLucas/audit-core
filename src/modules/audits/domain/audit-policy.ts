@@ -52,6 +52,29 @@ export function canEvaluate(actor: Actor, access: AuditAccess, assignedUserId: s
   return access.memberRole === AuditRole.MEMBER && assignedUserId === actor.id
 }
 
+/** ¿Puede ser miembro de un equipo? Rol global AUDITOR o GERENTE (un gerente puede ser líder, docs/06 §1). */
+export function isEligibleForTeam(roles: readonly Role[]): boolean {
+  return roles.includes(Role.AUDITOR) || roles.includes(Role.GERENTE)
+}
+
+/** ¿Puede ser el manager de una auditoría? Rol global GERENTE. */
+export function isEligibleManager(roles: readonly Role[]): boolean {
+  return roles.includes(Role.GERENTE)
+}
+
+/**
+ * Transferir una auditoría a otro manager: la ÚNICA acción que el ADMIN tiene sobre una auditoría (p. ej. el manager dejó la
+ * organización). Queda en el historial. Es contextual y no de CASL porque el permiso `manage` de CASL también cubriría cualquier
+ * acción nueva del GERENTE.
+ */
+export function canTransfer(actor: Actor): boolean {
+  return actor.roles.includes(Role.ADMIN)
+}
+
+export function assertCanTransfer(actor: Actor): void {
+  if (!canTransfer(actor)) throw new DomainError(AuditErrors.AUDIT_ACCESS_DENIED, { required: 'ADMIN' })
+}
+
 const REQUIRED = { read: 'MEMBER', manage: 'MANAGER', lead: 'LEAD' } as const
 
 export function assertOnAudit(action: AuditAction, actor: Actor, access: AuditAccess): void {

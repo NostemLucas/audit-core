@@ -9,6 +9,8 @@ import {
   type CreateAuditT,
   ListAuditsQuery,
   type ListAuditsQueryT,
+  TransferAudit,
+  type TransferAuditT,
   UpdateAudit,
   type UpdateAuditT,
 } from './audit.schemas.js'
@@ -16,6 +18,7 @@ import { CreateAuditUseCase } from './use-cases/create-audit.use-case.js'
 import { DeleteAuditUseCase } from './use-cases/delete-audit.use-case.js'
 import { GetAuditUseCase } from './use-cases/get-audit.use-case.js'
 import { ListAuditsUseCase } from './use-cases/list-audits.use-case.js'
+import { TransferAuditUseCase } from './use-cases/transfer-audit.use-case.js'
 import { UpdateAuditUseCase } from './use-cases/update-audit.use-case.js'
 
 /**
@@ -30,6 +33,7 @@ export class AuditsController {
     private readonly create: CreateAuditUseCase,
     private readonly update: UpdateAuditUseCase,
     private readonly remove: DeleteAuditUseCase,
+    private readonly transferAudit: TransferAuditUseCase,
   ) {}
 
   @Get()
@@ -69,5 +73,20 @@ export class AuditsController {
   @Can('delete', 'Audit')
   async delete(@CurrentUser() actor: AuthenticatedUser, @Param('id', { schema: AuditId }) id: string): Promise<void> {
     await this.remove.execute(actor, id)
+  }
+
+  /**
+   * Pasa la auditoría a otro manager. Solo el ADMIN (lo comprueba `audit-policy`, no CASL: el GERENTE también puede `read Audit`).
+   */
+  @Post(':id/transfer')
+  @HttpCode(200)
+  @Can('read', 'Audit')
+  @Responds(AuditView)
+  transfer(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', { schema: AuditId }) id: string,
+    @Body({ schema: TransferAudit }) body: TransferAuditT,
+  ) {
+    return this.transferAudit.execute(actor, id, body)
   }
 }

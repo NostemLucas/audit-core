@@ -1,5 +1,5 @@
 import { auditLifecycle } from '../domain/audit.lifecycle.js'
-import { type Actor, type AuditAccess, canOnAudit } from '../domain/audit-policy.js'
+import { type Actor, type AuditAccess, canOnAudit, canTransfer } from '../domain/audit-policy.js'
 
 /**
  * Lo derivado que el cliente necesita de una auditoría, junto a su fila: lo que puede hacer ahora (ciclo de vida ∩ permisos
@@ -14,6 +14,6 @@ export function withAccess<
     ...rest,
     evaluationCount: _count.evaluations,
     allowedActions: manage ? auditLifecycle.allowed(row.status) : [],
-    permissions: { manage, lead: canOnAudit('lead', actor, access) },
+    permissions: { manage, lead: canOnAudit('lead', actor, access), transfer: canTransfer(actor) },
   }
 }

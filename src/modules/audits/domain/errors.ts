@@ -42,12 +42,18 @@ export const AuditErrors = defineErrors({
   },
 
   // ── Equipo ─────────────────────────────────────────────────────────────────
+  /** El equipo (miembros y asignación de criterios) solo cambia con la auditoría en borrador o en curso (capacidad `staffable`). */
+  AUDIT_TEAM_LOCKED: { http: 409, message: 'El equipo solo puede cambiar con la auditoría en borrador o en curso' },
+  /** El nuevo manager de una transferencia debe poder dirigir auditorías (rol global GERENTE). */
+  AUDIT_MANAGER_INELIGIBLE: { http: 422, message: 'El nuevo manager debe tener el rol GERENTE' },
   /** La auditoría ya tiene líder (índice único parcial en la BD): dos designaciones simultáneas, o designar sin quitar al actual. */
   AUDIT_LEAD_ALREADY_ASSIGNED: {
     http: 409,
     message: 'La auditoría ya tiene un líder',
     onUnique: 'audit_members_one_lead',
   },
+  /** No se quita ni se hace líder a un miembro con criterios asignados: se reasignan antes. `details.count` = cuántos. */
+  MEMBER_HAS_ASSIGNED_EVALUATIONS: { http: 409, message: 'El miembro tiene criterios asignados; reasígnalos antes' },
   MEMBER_NOT_FOUND: { http: 404, message: 'Miembro no encontrado en la auditoría' },
   MEMBER_ALREADY_ASSIGNED: {
     http: 409,
@@ -63,6 +69,13 @@ export const AuditErrors = defineErrors({
   EVALUATION_INVALID_STATE: { http: 409, message: 'La evaluación no admite esa operación en su estado actual' },
   /** Capacidad `editable`: solo en IN_PROGRESS o RETURNED se modifican nivel, hallazgos y notas. */
   EVALUATION_NOT_EDITABLE: { http: 409, message: 'La evaluación no puede modificarse en su estado actual' },
+  /** Solo se asignan criterios a los AUDITORES (`MEMBER`) del equipo: `details.reason` = NOT_IN_TEAM o IS_LEAD (el líder revisa, no evalúa). */
+  EVALUATION_ASSIGNEE_INVALID: { http: 422, message: 'Solo se asignan criterios a los auditores del equipo' },
+  /** Un criterio enviado a revisión o aprobado no cambia de responsable (capacidad `reassignable`). `details.evaluationIds` = los que lo impiden. */
+  EVALUATION_NOT_REASSIGNABLE: {
+    http: 409,
+    message: 'No se puede cambiar la asignación de criterios enviados a revisión o aprobados',
+  },
   EVALUATION_NOT_ASSIGNED: { http: 403, message: 'La evaluación no está asignada a este usuario' },
   /** Completar exige el nivel alcanzado (o marcarla no aplicable). */
   EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para completar la evaluación' },

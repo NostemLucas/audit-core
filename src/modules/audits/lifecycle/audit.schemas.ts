@@ -21,7 +21,7 @@ export const AuditView = z.object({
   /** Lo que el ciclo de vida permite hacer ahora Y lo que el actor puede hacer sobre ESTA auditoría (docs/03 §2.3, regla 12). */
   allowedActions: z.array(z.enum(AUDIT_EVENTS)),
   /** Permisos contextuales del actor (docs/06 §1), para pintar la interfaz sin reimplementar reglas. */
-  permissions: z.object({ manage: z.boolean(), lead: z.boolean() }),
+  permissions: z.object({ manage: z.boolean(), lead: z.boolean(), transfer: z.boolean() }),
   plannedStart: CalendarDate.nullable(),
   plannedEnd: CalendarDate.nullable(),
   closedAt: Instant.nullable(),
@@ -86,5 +86,9 @@ export const ListAuditsQuery = z.object({
   mine: z.stringbool().optional(),
 })
 export type ListAuditsQueryT = z.infer<typeof ListAuditsQuery>
+
+/** Transferir la auditoría a otro manager (solo el ADMIN; docs/06 §1). */
+export const TransferAudit = z.object({ managerId: z.uuid() })
+export type TransferAuditT = z.infer<typeof TransferAudit>
 
 export const AuditId = z.uuid()

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 // Import directo del archivo puro: el `index` de platform/events arrastra el bus (Nest) y `domain/` no puede importar Nest.
 import { defineEvents } from '../../../platform/events/define-events.js'
+import { AuditRole } from '../../../shared/enums.js'
 
 /**
  * Eventos de la auditoría: lo que se guarda en `audit_events`. Cada payload lleva `auditId`; además, y solo si aplica:
@@ -19,6 +20,48 @@ export const AuditEvents = defineEvents({
   AuditUpdated: z.object({ ...audit, changed: z.array(z.enum(AUDIT_FIELDS)).min(1) }),
   ScopeItemAdded: z.object({ ...audit, scopeItemId: z.uuid(), name: z.string() }),
   ScopeItemRemoved: z.object({ ...audit, scopeItemId: z.uuid(), name: z.string() }),
+  // Equipo. Los nombres van en el evento (desnormalizados) porque el texto se genera al leer, sin consultar nada más.
+  MemberAssigned: z.object({
+    ...audit,
+    memberId: z.uuid(),
+    targetUserId: z.uuid(),
+    userName: z.string(),
+    role: z.enum(AuditRole),
+  }),
+  MemberRoleChanged: z.object({
+    ...audit,
+    memberId: z.uuid(),
+    targetUserId: z.uuid(),
+    userName: z.string(),
+    from: z.enum(AuditRole),
+    to: z.enum(AuditRole),
+  }),
+  MemberRemoved: z.object({
+    ...audit,
+    memberId: z.uuid(),
+    targetUserId: z.uuid(),
+    userName: z.string(),
+    role: z.enum(AuditRole),
+  }),
+  AuditTransferred: z.object({ ...audit, fromName: z.string(), targetUserId: z.uuid(), toName: z.string() }),
+  // Asignación de criterios: el sujeto es el criterio (evaluationId), para poder pedir su historia.
+  EvaluationAssigned: z.object({
+    ...audit,
+    evaluationId: z.uuid(),
+    controlTitle: z.string(),
+    targetUserId: z.uuid(),
+    userName: z.string(),
+    /** A quién estaba asignado antes, si alguien. */
+    previousUserName: z.string().nullable(),
+  }),
+  EvaluationUnassigned: z.object({
+    ...audit,
+    evaluationId: z.uuid(),
+    controlTitle: z.string(),
+    /** A quién estaba asignado: es el usuario afectado. */
+    targetUserId: z.uuid(),
+    previousUserName: z.string(),
+  }),
 })
 
 export const AUDIT_EVENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AuditEvents))

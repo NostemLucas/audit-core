@@ -45,7 +45,11 @@ describe('permisos y rutas', () => {
 
   it('cada endpoint declara la acción que le corresponde', () => {
     const declared = listRoutes(t.app().get(DiscoveryService), t.app().get(MetadataScanner), t.app().get(Reflector))
-      .filter((r) => r.handler.startsWith('AuditsController.') || r.handler.startsWith('ScopeController.'))
+      .filter((r) =>
+        ['AuditsController.', 'ScopeController.', 'TeamController.', 'EvaluationsController.'].some((c) =>
+          r.handler.startsWith(c),
+        ),
+      )
       .map(
         (r) =>
           `${r.method} ${r.path} → ${r.access?.kind === 'can' ? `${r.access.action} ${r.access.subject}` : r.access?.kind}`,
@@ -60,6 +64,13 @@ describe('permisos y rutas', () => {
         'DELETE /audits/:id → delete Audit',
         'POST /audits/:auditId/scope-items → update Audit',
         'DELETE /audits/:auditId/scope-items/:itemId → update Audit',
+        'POST /audits/:id/transfer → read Audit',
+        'GET /audits/:auditId/members → read AuditMember',
+        'POST /audits/:auditId/members → create AuditMember',
+        'PATCH /audits/:auditId/members/:memberId → update AuditMember',
+        'DELETE /audits/:auditId/members/:memberId → delete AuditMember',
+        'GET /audits/:auditId/evaluations → read Evaluation',
+        'PUT /audits/:auditId/assignments → update Evaluation',
       ].sort(),
     )
   })
@@ -92,7 +103,7 @@ describe('crear', () => {
       followUpNumber: 0,
       evaluationCount: 4,
       allowedActions: ['START'],
-      permissions: { manage: true, lead: false },
+      permissions: { manage: true, lead: false, transfer: false },
       organization: { id: lib.organization.id, name: 'ACME' },
       template: { id: lib.template.id },
       scale: { id: lib.scale.id, dimension: 'CONFORMITY' },
@@ -220,10 +231,10 @@ describe('ver', () => {
     const mine = await get(id)
     expect(mine.status).toBe(200)
     expect(mine.body.data.scopeItems.map((s: { name: string }) => s.name)).toEqual(['Zeta', 'Alfa'])
-    expect(mine.body.data.permissions).toEqual({ manage: true, lead: false })
+    expect(mine.body.data.permissions).toEqual({ manage: true, lead: false, transfer: false })
     const admin = await get(id, 'admin')
     expect(admin.status).toBe(200)
-    expect(admin.body.data.permissions).toEqual({ manage: false, lead: false })
+    expect(admin.body.data.permissions).toEqual({ manage: false, lead: false, transfer: true })
     expect(admin.body.data.allowedActions).toEqual([])
   })
 
@@ -231,7 +242,7 @@ describe('ver', () => {
     const id = await idOf()
     const res = await get(id, 'manager', 'otro')
     expect(res.status).toBe(200)
-    expect(res.body.data.permissions).toEqual({ manage: false, lead: false })
+    expect(res.body.data.permissions).toEqual({ manage: false, lead: false, transfer: false })
     expect(res.body.data.allowedActions).toEqual([])
   })
 
@@ -243,14 +254,14 @@ describe('ver', () => {
     await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'MEMBER' } })
     const ok = await get(id, 'auditor')
     expect(ok.status).toBe(200)
-    expect(ok.body.data.permissions).toEqual({ manage: false, lead: false })
+    expect(ok.body.data.permissions).toEqual({ manage: false, lead: false, transfer: false })
     expect(ok.body.data.allowedActions).toEqual([])
   })
 
   it('el líder ve permissions.lead = true', async () => {
     const id = await idOf()
     await db.auditMember.create({ data: { auditId: id, userId: await t.userId('auditor'), role: 'LEAD' } })
-    expect((await get(id, 'auditor')).body.data.permissions).toEqual({ manage: false, lead: true })
+    expect((await get(id, 'auditor')).body.data.permissions).toEqual({ manage: false, lead: true, transfer: false })
   })
 
   it('inexistente 404; id mal formado 400', async () => {
@@ -347,13 +358,13 @@ describe('listar', () => {
         .get(A)
         .set('authorization', await as('auditor'))
     ).body.data[0]
-    expect(asLead.permissions).toEqual({ manage: false, lead: true })
+    expect(asLead.permissions).toEqual({ manage: false, lead: true, transfer: false })
     const asOwner = (
       await api()
         .get(A)
         .set('authorization', await as('manager'))
     ).body.data[0]
-    expect(asOwner.permissions).toEqual({ manage: true, lead: false })
+    expect(asOwner.permissions).toEqual({ manage: true, lead: false, transfer: false })
   })
 })
 
