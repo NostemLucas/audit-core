@@ -244,7 +244,8 @@ model SuggestedFinding {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   control Control    @relation(fields: [controlId], references: [id], onDelete: Cascade)
-  level   ScaleLevel @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  /// Restrict: borrar una opción (o su escala) no debe destruir en silencio textos que alguien redactó.
+  level   ScaleLevel @relation(fields: [levelId], references: [id], onDelete: Restrict)
 
   @@unique([controlId, levelId])
   @@index([levelId])

@@ -16,6 +16,15 @@ export class RemoveScaleLevelUseCase {
       throw new DomainError(LibraryErrors.SCALE_LEVEL_NOT_FOUND, { scaleId, levelId })
     }
     await assertStructureEditable(this.tx, scaleId)
+    const findings = await this.tx.suggestedFinding.count({ where: { levelId } })
+    if (findings > 0) {
+      throw new DomainError(LibraryErrors.SCALE_LEVEL_IN_USE, {
+        scaleId,
+        levelId,
+        reason: 'SUGGESTED_FINDINGS',
+        findings,
+      })
+    }
     assertLevelsValid(
       scale.levels.filter((level) => level.id !== levelId).map((l) => ({ value: l.value.toNumber(), label: l.label })),
     )

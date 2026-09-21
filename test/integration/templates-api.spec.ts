@@ -62,6 +62,7 @@ describe('permisos', () => {
         'POST /templates/:id/publish → update Template',
         'POST /templates/:id/archive → update Template',
         'POST /templates/import → create Template',
+        'POST /templates/:id/clone → create Template',
         'GET /templates/:id/export → read Template',
         'GET /templates/:templateId/controls → read Template',
         'POST /templates/:templateId/controls → update Template',

@@ -18,6 +18,7 @@ import { Can } from '../../../platform/authz/index.js'
 import { Responds } from '../../../platform/http/index.js'
 import { LIMITS } from '../../../shared/limits.js'
 import { ArchiveTemplateUseCase } from './use-cases/archive-template.use-case.js'
+import { CloneTemplateUseCase } from './use-cases/clone-template.use-case.js'
 import { CreateTemplateUseCase } from './use-cases/create-template.use-case.js'
 import { DeleteTemplateUseCase } from './use-cases/delete-template.use-case.js'
 import { ExportTemplateUseCase } from './use-cases/export-template.use-case.js'
@@ -27,6 +28,8 @@ import { ListTemplatesUseCase } from './use-cases/list-templates.use-case.js'
 import { PublishTemplateUseCase } from './use-cases/publish-template.use-case.js'
 import { RenameTemplateUseCase } from './use-cases/rename-template.use-case.js'
 import {
+  CloneTemplate,
+  type CloneTemplateT,
   CreateTemplate,
   type CreateTemplateT,
   ImportTemplateBody,
@@ -54,6 +57,7 @@ export class TemplatesController {
     private readonly archiveTemplate: ArchiveTemplateUseCase,
     private readonly importTemplate: ImportTemplateUseCase,
     private readonly exportTemplate: ExportTemplateUseCase,
+    private readonly cloneTemplate: CloneTemplateUseCase,
   ) {}
 
   @Get()
@@ -97,6 +101,14 @@ export class TemplatesController {
   @Responds(TemplateView)
   publish(@Param('id', { schema: TemplateId }) id: string) {
     return this.publishTemplate.execute(id)
+  }
+
+  /** Copia la plantilla (árbol y hallazgos sugeridos) a una NUEVA en borrador; el origen no cambia. */
+  @Post(':id/clone')
+  @Can('create', 'Template')
+  @Responds(TemplateView, { status: 201 })
+  clone(@Param('id', { schema: TemplateId }) id: string, @Body({ schema: CloneTemplate }) body: CloneTemplateT) {
+    return this.cloneTemplate.execute(id, body)
   }
 
   @Post(':id/archive')

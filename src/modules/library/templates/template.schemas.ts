@@ -43,6 +43,10 @@ export const ImportTemplateResult = z.object({
 export const CreateTemplate = z.object({ name: Name })
 export type CreateTemplateT = z.infer<typeof CreateTemplate>
 
+/** Clonar: la copia es un borrador NUEVO; el nombre es obligatorio (identifica a la norma y no se puede repetir). */
+export const CloneTemplate = z.object({ name: Name })
+export type CloneTemplateT = z.infer<typeof CloneTemplate>
+
 export const UpdateTemplate = z.object({ name: Name })
 export type UpdateTemplateT = z.infer<typeof UpdateTemplate>
 

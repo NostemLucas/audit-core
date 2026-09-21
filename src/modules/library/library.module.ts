@@ -11,6 +11,11 @@ import { SetScaleAvailabilityUseCase } from './scales/use-cases/set-scale-availa
 import { UpdateScaleLevelUseCase } from './scales/use-cases/update-scale-level.use-case.js'
 
 import { ArchiveTemplateUseCase } from './templates/use-cases/archive-template.use-case.js'
+import { SuggestedFindingsController } from './templates/suggested-findings.controller.js'
+import { CloneTemplateUseCase } from './templates/use-cases/clone-template.use-case.js'
+import { GetSuggestedFindingsMatrixUseCase } from './templates/use-cases/get-suggested-findings-matrix.use-case.js'
+import { RemoveSuggestedFindingUseCase } from './templates/use-cases/remove-suggested-finding.use-case.js'
+import { SetSuggestedFindingUseCase } from './templates/use-cases/set-suggested-finding.use-case.js'
 import { ControlsController } from './templates/controls.controller.js'
 import { TemplatesController } from './templates/templates.controller.js'
 import { CreateControlUseCase } from './templates/use-cases/create-control.use-case.js'
@@ -28,7 +33,7 @@ import { RenameTemplateUseCase } from './templates/use-cases/rename-template.use
 import { UpdateControlUseCase } from './templates/use-cases/update-control.use-case.js'
 
 @Module({
-  controllers: [ScalesController, TemplatesController, ControlsController],
+  controllers: [ScalesController, TemplatesController, ControlsController, SuggestedFindingsController],
   providers: [
     ListScalesUseCase,
     GetScaleUseCase,
@@ -53,6 +58,10 @@ import { UpdateControlUseCase } from './templates/use-cases/update-control.use-c
     ArchiveTemplateUseCase,
     ImportTemplateUseCase,
     ExportTemplateUseCase,
+    CloneTemplateUseCase,
+    GetSuggestedFindingsMatrixUseCase,
+    SetSuggestedFindingUseCase,
+    RemoveSuggestedFindingUseCase,
   ],
 })
 export class LibraryModule {}

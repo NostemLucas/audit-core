@@ -7,7 +7,7 @@ export const LibraryErrors = defineErrors({
   SCALE_NAME_TAKEN: { http: 409, message: 'Ya existe una escala con ese nombre', onUnique: 'scales_name_lower_key' },
   SCALE_IN_USE: {
     http: 409,
-    message: 'La escala está en uso por alguna auditoría; desactívala en lugar de eliminarla',
+    message: 'La escala está en uso (por auditorías o por hallazgos sugeridos); desactívala en lugar de eliminarla',
     onForeignKeyDelete: 'audits_scaleId_fkey',
   },
   /**
@@ -33,8 +33,12 @@ export const LibraryErrors = defineErrors({
   },
   SCALE_LEVEL_IN_USE: {
     http: 409,
-    message: 'El nivel está en uso por alguna evaluación',
-    onForeignKeyDelete: ['evaluations_expectedLevelId_fkey', 'evaluations_achievedLevelId_fkey'],
+    message: 'La opción está en uso (por evaluaciones o por hallazgos sugeridos)',
+    onForeignKeyDelete: [
+      'evaluations_expectedLevelId_fkey',
+      'evaluations_achievedLevelId_fkey',
+      'suggested_findings_levelId_fkey',
+    ],
   },
 
   // ── Plantillas ─────────────────────────────────────────────────────────────

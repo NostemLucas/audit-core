@@ -366,7 +366,7 @@ ALTER TABLE "controls" ADD CONSTRAINT "controls_parentId_templateId_fkey" FOREIG
 ALTER TABLE "suggested_findings" ADD CONSTRAINT "suggested_findings_controlId_fkey" FOREIGN KEY ("controlId") REFERENCES "controls"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "suggested_findings" ADD CONSTRAINT "suggested_findings_levelId_fkey" FOREIGN KEY ("levelId") REFERENCES "scale_levels"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "suggested_findings" ADD CONSTRAINT "suggested_findings_levelId_fkey" FOREIGN KEY ("levelId") REFERENCES "scale_levels"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "audits" ADD CONSTRAINT "audits_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "templates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

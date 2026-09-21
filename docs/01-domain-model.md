@@ -167,6 +167,21 @@ debe valer 0" no se conserva: no protege ningún cálculo.
 **Fuera de alcance a propósito:** evaluar un mismo control por separado para cada elemento dentro de una misma
 auditoría. Añade una dimensión a `evaluations` y a los pesos. Si se necesita, una auditoría por elemento.
 
+## 3a. Plantillas: importar, exportar y clonar
+
+- **Excel**: se conserva, con un formato nuevo (`library/templates/domain/control-import.ts` es la
+  única lógica; `infrastructure/excel-*.ts` solo lee y escribe el libro):
+  - Hoja `Controles` con `Nivel`, `Referencia`, `Título`, `Descripción`, en orden de lectura; el padre de una fila es la fila
+    anterior de nivel menor (no depende de ninguna referencia). Hoja `Plantilla` (`Campo`/`Valor`) con `Nombre`.
+  - Se siguen aceptando los archivos del proyecto anterior (`Standards`, `Código`, `Código padre`) resolviendo el padre solo dentro
+    del archivo; la columna "Guía auditor" se ignora con un aviso. Los avisos no impiden importar.
+  - Importar **crea una plantilla nueva** en borrador (todo o nada); los errores se devuelven todos juntos con su fila
+    (`TEMPLATE_IMPORT_INVALID`, primeros 20 y el total). Exportar → importar reproduce el árbol tal cual.
+  - Tope de 5 MB y 5000 filas.
+- **Clonar** (`POST /templates/:id/clone`, con un `name` nuevo): copia el árbol (orden incluido) y los hallazgos sugeridos de una
+  plantilla en **cualquier estado** a otra NUEVA en borrador; el origen no cambia (no se archiva: una publicada sigue en uso por
+  auditorías en curso, y corregirla es clonar y publicar la nueva). Todo o nada; toma el bloqueo del origen.
+
 ## 4. Textos predefinidos → `suggested_findings` (D12)
 
 Qué hace hoy: cuando el auditor elige un nivel de madurez para un control, el sistema **copia un texto de
@@ -178,16 +193,18 @@ Qué se cambia:
 - El texto pertenece a un `scale_level`, por lo tanto solo aplica cuando la auditoría usa esa escala. La
   interfaz muestra la matriz de una plantilla **para una escala elegida**.
 - Se copia solo si `findings` está vacío y se guarda como texto normal; después no hay vínculo con la sugerencia.
-- Vive en la biblioteca junto a las plantillas (inmutable al publicar, igual que los controles).
-- Importación y exportación por Excel: se conservan, con un formato nuevo (`library/templates/domain/control-import.ts` es la
-  única lógica; `infrastructure/excel-*.ts` solo lee y escribe el libro):
-  - Hoja `Controles` con `Nivel`, `Referencia`, `Título`, `Descripción`, en orden de lectura; el padre de una fila es la fila
-    anterior de nivel menor (no depende de ninguna referencia). Hoja `Plantilla` (`Campo`/`Valor`) con `Nombre`.
-  - Se siguen aceptando los archivos del proyecto anterior (`Standards`, `Código`, `Código padre`) resolviendo el padre solo dentro
-    del archivo; la columna "Guía auditor" se ignora con un aviso. Los avisos no impiden importar.
-  - Importar **crea una plantilla nueva** en borrador (todo o nada); los errores se devuelven todos juntos con su fila
-    (`TEMPLATE_IMPORT_INVALID`, primeros 20 y el total). Exportar → importar reproduce el árbol tal cual.
-  - Tope de 5 MB y 5000 filas.
+- Vive en la biblioteca junto a las plantillas, pero **se edita en cualquier estado** de la plantilla (corrige lo dicho antes:
+  «inmutable al publicar»). El texto se copia al hallazgo cuando se usa y no queda vínculo, así que editarlo nunca altera una
+  auditoría existente; exigir clonar una plantilla para corregir una errata de una sugerencia no protegería nada. Tampoco lo
+  restringía el proyecto anterior.
+- Texto plano (el formato de los hallazgos de una evaluación se decide con las auditorías).
+- Solo las hojas admiten sugerencias. Si una hoja pasa a ser agrupadora, sus textos **no se borran**: se dejan de mostrar (la
+  matriz lista hojas) y reaparecen si se le quitan los hijos.
+- `suggested_findings.levelId` es FK **Restrict**: borrar una opción o una escala con sugerencias se rechaza
+  (`SCALE_LEVEL_IN_USE` / `SCALE_IN_USE`, `details.reason = SUGGESTED_FINDINGS`) en lugar de destruir texto redactado en cascada.
+- API: `GET /templates/:id/suggested-findings?scaleId=` (la matriz: una fila por hoja con su dominio y solo los textos que
+  existen), `PUT` y `DELETE /templates/:id/controls/:controlId/suggested-findings/:levelId` (quitar es idempotente).
+- Importación y exportación por Excel de estos textos: se conservan (formato de matriz por escala; se documenta al implementarse).
 
 ## 5. Qué se conserva del proyecto actual
 

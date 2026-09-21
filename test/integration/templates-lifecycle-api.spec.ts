@@ -362,6 +362,24 @@ describe('importar', () => {
     expect(await db.template.count()).toBe(0)
   })
 
+  it('un archivo en el tope de 5000 filas se importa completo (la inserción cabe en los límites de parámetros de Postgres)', async () => {
+    const rows: ExcelJS.CellValue[][] = [CONTROLS_HEADER]
+    for (let d = 0; d < 50; d++) {
+      rows.push([1, `D${d}`, `Dominio ${d}`, undefined])
+      for (let c = 0; c < 99; c++) rows.push([2, `D${d}.${c}`, `Criterio ${d}.${c}`, 'descripción'])
+    }
+    expect(rows.length - 1).toBe(5000)
+    const res = await upload(await workbook({ Controles: rows }), { name: 'En el tope' })
+    expect(res.status).toBe(201)
+    expect(res.body.data.template.controlCount).toBe(5000)
+    expect(await db.control.count({ where: { parentId: null } })).toBe(50)
+    const over = await upload(await workbook({ Controles: [...rows, [2, 'x', 'una más', undefined]] }), {
+      name: 'Pasado',
+    })
+    expect(over.status).toBe(422)
+    expect(over.body.error.details.errors[0].message).toMatch(/máximo de 5000/)
+  })
+
   it('un auditor no importa (403 antes de leer el archivo); sin token 401', async () => {
     const file = await workbook({ Controles: [CONTROLS_HEADER, [1, undefined, 'D', undefined]] })
     expect((await upload(file, { name: 'X' }, 'auditor')).status).toBe(403)
