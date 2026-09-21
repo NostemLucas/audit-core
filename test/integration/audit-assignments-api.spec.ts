@@ -68,7 +68,8 @@ describe('ver los criterios', () => {
       control: { id: expect.any(String), reference: 'A.5.1', title: 'Políticas', domain: 'Organizacionales' },
       status: 'NOT_STARTED',
       assignedUser: null,
-      expectedLevel: null,
+      // la escala de la fixture es CONFORMITY: el nivel esperado se fija solo, al puntaje más alto (docs/06 §2)
+      expectedLevel: { id: expect.any(String), value: 100, label: 'Cumple' },
       guidance: null,
     })
     expect(res.body.data[2].control.reference).toBeNull()

@@ -65,6 +65,10 @@ describe('permisos y rutas', () => {
         'POST /audits/:auditId/scope-items → update Audit',
         'DELETE /audits/:auditId/scope-items/:itemId → update Audit',
         'POST /audits/:id/transfer → read Audit',
+        'POST /audits/:id/start → update Audit',
+        'POST /audits/:id/close → update Audit',
+        'POST /audits/:id/archive → update Audit',
+        'PUT /audits/:auditId/expected-levels → update Evaluation',
         'GET /audits/:auditId/members → read AuditMember',
         'POST /audits/:auditId/members → create AuditMember',
         'PATCH /audits/:auditId/members/:memberId → update AuditMember',
@@ -115,8 +119,9 @@ describe('crear', () => {
 
     const rows = await db.evaluation.findMany({ where: { auditId: audit.id }, include: { control: true } })
     expect(rows.map((r) => r.control.title).sort()).toEqual([...LEAF_TITLES].sort())
+    // la escala de la fixture es CONFORMITY: el nivel esperado se fija solo, al puntaje más alto (docs/06 §2)
     expect(
-      rows.every((r) => r.status === 'NOT_STARTED' && r.expectedLevelId === null && r.assignedUserId === null),
+      rows.every((r) => r.status === 'NOT_STARTED' && r.expectedLevelId !== null && r.assignedUserId === null),
     ).toBe(true)
     expect((await db.audit.findUniqueOrThrow({ where: { id: audit.id } })).createdById).toBe(manager.id)
   })

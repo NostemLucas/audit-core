@@ -62,6 +62,19 @@ export const AuditEvents = defineEvents({
     targetUserId: z.uuid(),
     previousUserName: z.string(),
   }),
+  /** Lo fija el líder (uno a uno o en bloque); NO se publica cuando el sistema lo fija solo al crear una auditoría CONFORMITY
+   * (docs/06 §2): ahí no hay ninguna decisión que registrar. */
+  EvaluationExpectedLevelSet: z.object({
+    ...audit,
+    evaluationId: z.uuid(),
+    controlTitle: z.string(),
+    levelLabel: z.string(),
+    previousLevelLabel: z.string().nullable(),
+  }),
+  // Ciclo de vida de la auditoría.
+  AuditStarted: z.object({ ...audit }),
+  AuditClosed: z.object({ ...audit }),
+  AuditArchived: z.object({ ...audit }),
 })
 
 export const AUDIT_EVENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AuditEvents))

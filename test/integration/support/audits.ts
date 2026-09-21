@@ -19,15 +19,15 @@ export const AUDIT_TREE: SeedNode[] = [
 ]
 export const LEAF_TITLES = ['Políticas', 'Roles', 'Antecedentes', 'Contratos']
 
-/** Organización activa, plantilla PUBLICADA con su árbol y escala activa de conformidad. */
-export async function libraryFixture(db: Db, suffix = '') {
+/** Organización activa, plantilla PUBLICADA con su árbol y escala activa de conformidad (o de capacidad, con `dimension`). */
+export async function libraryFixture(db: Db, suffix = '', dimension: 'CONFORMITY' | 'MATURITY' = 'CONFORMITY') {
   const organization = await db.organization.create({ data: { name: `ACME${suffix}` } })
   const template = await db.template.create({ data: { name: `ISO/IEC 27001${suffix}`, status: 'PUBLISHED' } })
   await seedControls(db, template.id, AUDIT_TREE)
   const scale = await db.scale.create({
     data: {
-      name: `Conformidad${suffix}`,
-      dimension: 'CONFORMITY',
+      name: `${dimension === 'CONFORMITY' ? 'Conformidad' : 'Madurez'}${suffix}`,
+      dimension,
       levels: {
         create: [
           { value: 0, label: 'No cumple' },

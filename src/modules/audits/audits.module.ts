@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { LibraryModule } from '../library/index.js'
 import { OrganizationsModule } from '../organizations/index.js'
 import { EvaluationsController } from './evaluation/evaluations.controller.js'
+import { SetExpectedLevelUseCase } from './evaluation/use-cases/set-expected-level.use-case.js'
 import { AssignEvaluationsUseCase } from './evaluation/use-cases/assign-evaluations.use-case.js'
 import { ListEvaluationsUseCase } from './evaluation/use-cases/list-evaluations.use-case.js'
 import { AuditHistoryRecorder } from './audit-history.recorder.js'
@@ -10,6 +11,9 @@ import { CreateAuditUseCase } from './lifecycle/use-cases/create-audit.use-case.
 import { DeleteAuditUseCase } from './lifecycle/use-cases/delete-audit.use-case.js'
 import { GetAuditUseCase } from './lifecycle/use-cases/get-audit.use-case.js'
 import { ListAuditsUseCase } from './lifecycle/use-cases/list-audits.use-case.js'
+import { ArchiveAuditUseCase } from './lifecycle/use-cases/archive-audit.use-case.js'
+import { CloseAuditUseCase } from './lifecycle/use-cases/close-audit.use-case.js'
+import { StartAuditUseCase } from './lifecycle/use-cases/start-audit.use-case.js'
 import { TransferAuditUseCase } from './lifecycle/use-cases/transfer-audit.use-case.js'
 import { UpdateAuditUseCase } from './lifecycle/use-cases/update-audit.use-case.js'
 import { TeamController } from './team/team.controller.js'
@@ -41,6 +45,10 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     RemoveMemberUseCase,
     ListEvaluationsUseCase,
     AssignEvaluationsUseCase,
+    SetExpectedLevelUseCase,
+    StartAuditUseCase,
+    CloseAuditUseCase,
+    ArchiveAuditUseCase,
   ],
 })
 export class AuditsModule {}

@@ -7,10 +7,13 @@ import {
   AssignEvaluations,
   type AssignEvaluationsT,
   EvaluationView,
+  SetExpectedLevel,
+  type SetExpectedLevelT,
   ListEvaluationsQuery,
   type ListEvaluationsQueryT,
 } from './evaluation.schemas.js'
 import { AssignEvaluationsUseCase } from './use-cases/assign-evaluations.use-case.js'
+import { SetExpectedLevelUseCase } from './use-cases/set-expected-level.use-case.js'
 import { ListEvaluationsUseCase } from './use-cases/list-evaluations.use-case.js'
 
 /** Los criterios de una auditoría. El contenido de cada uno y su flujo de revisión llegan en 3d. */
@@ -19,6 +22,7 @@ export class EvaluationsController {
   constructor(
     private readonly list: ListEvaluationsUseCase,
     private readonly assign: AssignEvaluationsUseCase,
+    private readonly setExpectedLevel: SetExpectedLevelUseCase,
   ) {}
 
   @Get('evaluations')
@@ -43,5 +47,18 @@ export class EvaluationsController {
     @Body({ schema: AssignEvaluations }) body: AssignEvaluationsT,
   ) {
     return this.assign.execute(actor, auditId, body)
+  }
+
+  /** El líder fija el nivel esperado (y su guía) de uno o varios criterios. Devuelve los que cambiaron. */
+  @Put('expected-levels')
+  @HttpCode(200)
+  @Can('update', 'Evaluation')
+  @Responds(EvaluationView, { kind: 'list' })
+  putExpectedLevel(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('auditId', { schema: AuditId }) auditId: string,
+    @Body({ schema: SetExpectedLevel }) body: SetExpectedLevelT,
+  ) {
+    return this.setExpectedLevel.execute(actor, auditId, body)
   }
 }

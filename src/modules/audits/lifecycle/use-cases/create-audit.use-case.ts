@@ -31,7 +31,7 @@ export class CreateAuditUseCase {
   async execute(actor: Actor, input: CreateAuditT) {
     await this.organizations.getActive(input.organizationId)
     const template = await this.library.getUsableTemplate(input.templateId)
-    await this.library.getActiveScale(input.scaleId)
+    const scale = await this.library.getActiveScale(input.scaleId)
     if (input.plannedStart && input.plannedEnd && input.plannedEnd < input.plannedStart) {
       throw new DomainError(AuditErrors.AUDIT_DATES_INVALID, {
         plannedStart: input.plannedStart,
@@ -56,8 +56,13 @@ export class CreateAuditUseCase {
         scopeItems: { create: input.scopeItems.map((name) => ({ name })) },
       },
     })
+    // El nivel esperado se fija según la dimensión de la escala (docs/06 §2): en conformidad, la norma no deja margen y se
+    // espera el puntaje más alto sin que el líder tenga que hacer nada; en capacidad varía por criterio y lo fija el líder.
+    const maxLevelId = scale.dimension === 'CONFORMITY' ? scale.levels.at(-1)!.id : null
     await this.tx.evaluation.createMany({
-      data: template.tree.leaves().map((leaf) => ({ auditId: audit.id, controlId: leaf.id })),
+      data: template.tree
+        .leaves()
+        .map((leaf) => ({ auditId: audit.id, controlId: leaf.id, expectedLevelId: maxLevelId })),
     })
     await this.events.publish(AuditEvents.AuditCreated, { auditId: audit.id, code, name: audit.name })
 

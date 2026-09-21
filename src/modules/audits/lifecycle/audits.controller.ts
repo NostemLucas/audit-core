@@ -18,6 +18,9 @@ import { CreateAuditUseCase } from './use-cases/create-audit.use-case.js'
 import { DeleteAuditUseCase } from './use-cases/delete-audit.use-case.js'
 import { GetAuditUseCase } from './use-cases/get-audit.use-case.js'
 import { ListAuditsUseCase } from './use-cases/list-audits.use-case.js'
+import { ArchiveAuditUseCase } from './use-cases/archive-audit.use-case.js'
+import { CloseAuditUseCase } from './use-cases/close-audit.use-case.js'
+import { StartAuditUseCase } from './use-cases/start-audit.use-case.js'
 import { TransferAuditUseCase } from './use-cases/transfer-audit.use-case.js'
 import { UpdateAuditUseCase } from './use-cases/update-audit.use-case.js'
 
@@ -34,6 +37,9 @@ export class AuditsController {
     private readonly update: UpdateAuditUseCase,
     private readonly remove: DeleteAuditUseCase,
     private readonly transferAudit: TransferAuditUseCase,
+    private readonly startAudit: StartAuditUseCase,
+    private readonly closeAudit: CloseAuditUseCase,
+    private readonly archiveAudit: ArchiveAuditUseCase,
   ) {}
 
   @Get()
@@ -73,6 +79,30 @@ export class AuditsController {
   @Can('delete', 'Audit')
   async delete(@CurrentUser() actor: AuthenticatedUser, @Param('id', { schema: AuditId }) id: string): Promise<void> {
     await this.remove.execute(actor, id)
+  }
+
+  @Post(':id/start')
+  @HttpCode(200)
+  @Can('update', 'Audit')
+  @Responds(AuditView)
+  start(@CurrentUser() actor: AuthenticatedUser, @Param('id', { schema: AuditId }) id: string) {
+    return this.startAudit.execute(actor, id)
+  }
+
+  @Post(':id/close')
+  @HttpCode(200)
+  @Can('update', 'Audit')
+  @Responds(AuditView)
+  close(@CurrentUser() actor: AuthenticatedUser, @Param('id', { schema: AuditId }) id: string) {
+    return this.closeAudit.execute(actor, id)
+  }
+
+  @Post(':id/archive')
+  @HttpCode(200)
+  @Can('update', 'Audit')
+  @Responds(AuditView)
+  archive(@CurrentUser() actor: AuthenticatedUser, @Param('id', { schema: AuditId }) id: string) {
+    return this.archiveAudit.execute(actor, id)
   }
 
   /**

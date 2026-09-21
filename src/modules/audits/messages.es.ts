@@ -28,4 +28,11 @@ export const auditMessages = defineMessages(AuditEvents, {
       ? `Reasignó «${p.controlTitle}» de ${p.previousUserName} a ${p.userName}`
       : `Asignó «${p.controlTitle}» a ${p.userName}`,
   EvaluationUnassigned: (p) => `Quitó la asignación de «${p.controlTitle}» (era de ${p.previousUserName})`,
+  EvaluationExpectedLevelSet: (p) =>
+    p.previousLevelLabel
+      ? `Cambió el nivel esperado de «${p.controlTitle}» de ${p.previousLevelLabel} a ${p.levelLabel}`
+      : `Fijó el nivel esperado de «${p.controlTitle}» en ${p.levelLabel}`,
+  AuditStarted: () => 'Inició la auditoría',
+  AuditClosed: () => 'Cerró la auditoría',
+  AuditArchived: () => 'Archivó la auditoría',
 })

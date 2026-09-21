@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { DecimalNumber } from '../../../platform/http/index.js'
 import { EvaluationStatus } from '../../../shared/enums.js'
 import { LIMITS } from '../../../shared/limits.js'
+import { optionalText } from '../../../shared/schemas.js'
 
 /**
  * Un criterio de la auditoría (una hoja de la plantilla) en la lista plana, en orden de lectura. `control` da el contexto sin
@@ -31,3 +32,14 @@ export const AssignEvaluations = z.object({
   userId: z.uuid().nullable(),
 })
 export type AssignEvaluationsT = z.infer<typeof AssignEvaluations>
+
+/**
+ * Fijar el nivel esperado de uno o varios criterios (el líder, uno a uno o en bloque, docs/06 §3). `guidance` es opcional: si
+ * no se envía, no se toca; enviarlo vacío lo borra.
+ */
+export const SetExpectedLevel = z.object({
+  evaluationIds: z.array(z.uuid()).min(1).max(LIMITS.assignBatch),
+  expectedLevelId: z.uuid(),
+  guidance: optionalText().optional(),
+})
+export type SetExpectedLevelT = z.infer<typeof SetExpectedLevel>

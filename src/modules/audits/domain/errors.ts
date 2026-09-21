@@ -7,11 +7,17 @@ export const AuditErrors = defineErrors({
   AUDIT_INVALID_STATE: { http: 409, message: 'La auditoría no admite esa operación en su estado actual' },
   /** Capacidad `editable` (docs/03): solo una auditoría en borrador se edita o se elimina. */
   AUDIT_NOT_EDITABLE: { http: 409, message: 'Solo una auditoría en borrador puede modificarse o eliminarse' },
-  /** Iniciar exige nivel esperado en cada control evaluable. `details.missing` = cuántos faltan. */
-  AUDIT_EXPECTED_LEVELS_MISSING: { http: 422, message: 'Faltan niveles esperados en algunos controles' },
+  /** Iniciar exige nivel esperado en cada control evaluable. `details.missing` = cuántos faltan. Solo puede darse en una
+   * auditoría MATURITY: en CONFORMITY el nivel esperado se fija solo, al crear (docs/06 §2). */
+  AUDIT_EXPECTED_LEVELS_MISSING: { http: 422, message: 'Faltan niveles esperados en algunos criterios' },
+  /** Iniciar exige que todo criterio tenga responsable. `details.missing` = cuántos faltan. */
+  AUDIT_UNASSIGNED_EVALUATIONS: { http: 422, message: 'Hay criterios sin asignar a un auditor' },
+  /** Iniciar exige un líder designado. */
+  AUDIT_HAS_NO_LEAD: { http: 422, message: 'La auditoría necesita un líder para iniciarse' },
   /** La fecha de fin prevista es anterior a la de inicio. */
   AUDIT_DATES_INVALID: { http: 422, message: 'La fecha de fin prevista no puede ser anterior a la de inicio' },
-  AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un miembro para iniciarse' },
+  /** Iniciar exige al menos un auditor (además del líder). */
+  AUDIT_HAS_NO_MEMBERS: { http: 422, message: 'La auditoría necesita al menos un auditor para iniciarse' },
   AUDIT_HAS_PENDING_EVALUATIONS: {
     http: 422,
     message: 'Hay evaluaciones sin aprobar; no se puede cerrar la auditoría',
@@ -81,6 +87,12 @@ export const AuditErrors = defineErrors({
   EVALUATION_INCOMPLETE: { http: 422, message: 'Faltan datos para completar la evaluación' },
   EVALUATION_LEVEL_NOT_IN_SCALE: { http: 422, message: 'El nivel no pertenece a la escala de la auditoría' },
   NOT_APPLICABLE_REASON_REQUIRED: { http: 422, message: 'Marcar como no aplicable requiere un motivo' },
+  /** Un criterio enviado a revisión o aprobado no cambia de nivel esperado (mismo motivo que EVALUATION_NOT_REASSIGNABLE: cambiar
+   * el objetivo después de evaluar invalidaría lo ya enviado). `details.evaluationIds` = los que lo impiden. */
+  EVALUATION_EXPECTED_LEVEL_LOCKED: {
+    http: 409,
+    message: 'No se puede cambiar el nivel esperado de criterios enviados a revisión o aprobados',
+  },
 
   // ── Evidencia ──────────────────────────────────────────────────────────────
   EVIDENCE_NOT_FOUND: { http: 404, message: 'Evidencia no encontrada' },

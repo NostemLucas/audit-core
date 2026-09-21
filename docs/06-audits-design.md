@@ -55,11 +55,21 @@ Permisos contextuales (`audits/domain/audit-policy.ts`, función pura):
 
 Es el de `03` §2.4. Puntos concretos:
 
-- **Las evaluaciones se crean con la auditoría** (una por hoja de la plantilla), para poder fijar niveles esperados y asignar
-  criterios mientras está en borrador.
+- **Las evaluaciones se crean con la auditoría** (una por hoja de la plantilla), para poder asignar criterios mientras está en
+  borrador. **El nivel esperado de cada una se fija según la dimensión de la escala elegida** (la dimensión es una propiedad de
+  la ESCALA, no del estándar: quien crea la escala en la biblioteca decide a cuál de las dos se parece su comportamiento; un
+  estándar nuevo —COBIT, SIM3, lo que sea— no exige tocar código, solo elegir la dimensión correcta al crear su escala):
+  - **`CONFORMITY`**: se fija sola, al puntaje **más alto** de la escala, en el momento de crear la auditoría. El líder no hace
+    nada. La norma no deja margen: se espera el cumplimiento total, sin un juicio que tomar criterio por criterio. El líder
+    puede cambiarlo si hay una excepción real (un sistema legado que se acepta con menos), con su motivo (`guidance`), pero
+    nunca queda vacío otra vez.
+  - **`MATURITY`**: queda **vacío** al crear. El líder lo fija **criterio por criterio**, con su guía: el nivel exigido varía
+    según qué tan crítico es cada proceso (un CSIRT nacional necesita más madurez en un parámetro que un equipo interno; un
+    proceso central de COBIT pesa más que uno secundario). Es trabajo real del líder, uno por uno o en bloque.
 - **La plantilla, la organización y la escala no se cambian** tras crear el borrador.
 - **Iniciar** (manager) exige: un **líder** y al menos **un auditor**; **nivel esperado** en todas las hojas
-  (`AUDIT_EXPECTED_LEVELS_MISSING`); y **todos los criterios asignados** (`AUDIT_UNASSIGNED_EVALUATIONS`).
+  (`AUDIT_EXPECTED_LEVELS_MISSING` — en la práctica solo bloquea a las auditorías `MATURITY`: en `CONFORMITY` ya está resuelto
+  desde la creación); y **todos los criterios asignados** (`AUDIT_UNASSIGNED_EVALUATIONS`).
 - **Cerrar** (manager) exige todos los criterios **aprobados**, incluidos los «no aplica» (`AUDIT_HAS_PENDING_EVALUATIONS`).
 - **Crear** exige plantilla **publicada**, escala **activa**, organización **activa** y fechas coherentes.
 - El código `AUD-AAAA-NNNNN` sale de la secuencia `audit_code_seq`.
@@ -120,7 +130,7 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3a** (hecho) | Auditorías (crear, ver, listar, editar, eliminar), alcance, historial, lectores públicos |
 | **3b-0** (hecho) | Ajustes de este diseño sobre lo hecho: esquema (lo de §6), permisos del ADMIN, política de permisos |
 | **3b** (hecho) | Equipo: lector de usuarios (`identity`), designar líder y auditores, transferir el manager; asignar criterios |
-| **3c** | Nivel esperado y guía por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
+| **3c** (hecho) | Nivel esperado y guía por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
 | **3d** | Flujo del criterio (iniciar, editar, completar, aprobar, devolver, reabrir) con su historia |
 | **3e** | `scoring.ts` (distribución por opción, promedios esperado/alcanzado, brecha) y lecturas: estadísticas, gráficas, brechas, historial |
 | **3f** | Seguimientos (qué criterios incluir: pendiente de decidir, ver `05` §6) |
