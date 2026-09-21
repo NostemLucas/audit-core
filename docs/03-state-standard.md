@@ -137,7 +137,7 @@ Borrar: solo `DRAFT` y sin uso (la FK lo garantiza). Corregir una publicada = cl
 | `CLOSED` | `ARCHIVE` | `ARCHIVED` | — |
 
 Capacidades: `DRAFT` → `editable`; `IN_PROGRESS` → `evaluable` (se evalúa y se adjunta evidencia).
-`CLOSED` es el único estado desde el que se crea un seguimiento. `ARCHIVED` es final. Sin transiciones hacia atrás.
+Una auditoría `CLOSED` o `ARCHIVED` es `followable` (se puede tomar de referencia para un seguimiento). `ARCHIVED` es final. Sin transiciones hacia atrás.
 
 **Evaluation**
 | Desde | Evento | Hacia | Efectos / precondiciones |

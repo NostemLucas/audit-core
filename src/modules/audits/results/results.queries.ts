@@ -5,6 +5,7 @@ interface ResultRow {
   controlId: string
   status: string
   isNotApplicable: boolean
+  carriedFromId: string | null
   expectedLevel: { value: { toNumber(): number } } | null
   achievedLevel: { id: string; value: { toNumber(): number } } | null
 }
@@ -18,5 +19,6 @@ export function toScoredLeaves(rows: readonly ResultRow[], template: TemplateFor
     expected: row.expectedLevel?.value.toNumber() ?? null,
     achieved: row.achievedLevel?.value.toNumber() ?? null,
     achievedLevelId: row.achievedLevel?.id ?? null,
+    carriedOver: row.carriedFromId !== null,
   }))
 }

@@ -28,9 +28,9 @@ Estado: **propuesta para revisión**. Nada de esto está implementado. Reemplaza
 | D4 | Un único árbol de **controles** por plantilla. **Evaluable = hoja.** Se eliminan `level` e `isAuditable`. | Hoy hay dos reglas para lo mismo (`isAuditable` en 28 sitios; el inicializador usa "hoja"). La profundidad se calcula al armar el árbol en memoria. |
 | D5 | Se mantiene una tabla `templates` mínima (cabecera) en vez de un nodo raíz en el árbol. Los capítulos de primer nivel tienen `parentId = NULL`. | La cabecera lleva el `status`. En un nodo raíz, ese campo quedaría nulo en todos los demás nodos y haría falta un trigger para asegurar que la auditoría apunte a una raíz. |
 | D6 | `AuditResponse` + `AuditEvaluation` se fusionan en **`evaluations`**: la evaluación de un control dentro de una auditoría. El estado vigente vive en la fila; el historial de un criterio (envíos, devoluciones, aprobaciones, con el contenido enviado) sale de `audit_events` (`06` §4): no hay tabla de revisiones. | Hoy hay dos fuentes de verdad (`isCurrent` y `currentEvaluationId`) y un servicio solo para sincronizarlas. "Response" además no dice qué es. |
-| D7 | "Revisión" se separa: **seguimiento** (`audits.parentAuditId`, nueva auditoría sobre una cerrada) y **revisión de un criterio** (devolver/aprobar, en el historial). **No hay rondas** (`round` se elimina: `06` §6). | Hoy una sola palabra nombra ambas cosas. |
+| D7 | "Revisión" se separa: **seguimiento** (`audits.previousAuditId`, una auditoría normal con un enlace a la cerrada que toma de referencia; `06` §9) y **revisión de un criterio** (devolver/aprobar, en el historial). **No hay rondas** (`round` se elimina: `06` §6). | Hoy una sola palabra nombra ambas cosas. |
 | D8 | `frameworks`/`framework_levels` pasan a **`scales`/`scale_levels`**, y quedan **mínimas**: `name` + `dimension` (`CONFORMITY | MATURITY`) + `isActive`; opciones con `value` (su **puntaje**), `label`, `description?`. Sin `type`, `code`, `description`, `color`, `shortName` ni `position`. La escala es donde vive el concepto de "cómo se puntúa" (`05` §11). | "Framework" se confundía con la norma. Y lo que quedaba era presentación o derivable: el `type` solo lo leía un validador (`BINARY` = 2 niveles; `RANGE` = enteros consecutivos, que no cambia ningún cálculo); el orden es el del `value`; el color lo deriva el frontend. Los informes solo leen `name`, `label`, `value` y `description`. Ver §2.2. |
-| D9 | **Alcance propio de la auditoría**: `audit_scope_items` (solo un nombre) dentro de cada auditoría. Sin catálogo de activos por organización, sin `scopeMode`. | Se define **en el momento** de la auditoría qué se audita. Un seguimiento hereda una **copia** del alcance y no puede ampliarlo: incluir algo distinto ya no es seguimiento, es otra auditoría. Con un catálogo reutilizable ese rechazo no tendría fundamento. Ver §3. |
+| D9 | **Alcance propio de la auditoría**: `audit_scope_items` (solo un nombre) dentro de cada auditoría. Sin catálogo de activos por organización, sin `scopeMode`. | Se define **en el momento** de la auditoría qué se audita. Un seguimiento parte de una **copia** del alcance; si además **traslada criterios** de la anterior, no puede cambiarlo (lo trasladado vale para ESE alcance). Ver §3 y `06` §9. |
 | D10 | **Se eliminan `global_feed` y `notifications`** del alcance inicial. Queda **`audit_events`**, el historial de cada auditoría. | Definir qué notificar y a quién es una decisión de producto que hoy no está tomada; las tablas solo agregan peso. El historial de auditoría sí se usa (19 puntos de escritura). Se agregan después vía §6. |
 | D11 | Los eventos se guardan como **`type + payload`**, sin texto. El mensaje se genera al leer. | Congelar prosa en español impide cambiar redacción o idioma. |
 | D12 | **Textos predefinidos → `suggested_findings`** (hallazgo sugerido por control y nivel). Solo existen filas con texto real. | Ver §4. |
@@ -80,7 +80,7 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 - **audits**: `code` UQ (secuencia de Postgres, sin `findByCode` + reintento), `name`, `introduction?`,
   `scopeNotes?`, `objectives?` (los tres, texto plano: si se quisiera formato enriquecido se decide con los informes, con un
   sanitizador), `templateId` FK, `organizationId` FK, `scaleId` FK, `managerId` FK→users,
-  `parentAuditId?` FK→audits, `followUpNumber` (0 = inicial), `status` (`DRAFT|IN_PROGRESS|CLOSED|ARCHIVED`),
+  `previousAuditId?` FK→audits (seguimiento), `status` (`DRAFT|IN_PROGRESS|CLOSED|ARCHIVED`),
   `plannedStart?`, `plannedEnd?`, `closedAt?`,
   `storageFolderId?` (la ruta se deriva del `code`; se revisa en la fase de evidencia), `version` (bloqueo optimista).
   Se eliminan `description`, `publishedAt`, `archivedAt`, `startedAt`, `scopeMode`, `overallScore`, `finalScore` y
@@ -114,14 +114,14 @@ El SQL exacto (incluidas las restricciones que Prisma no modela) está en
 | No se borra una organización / plantilla / escala / control en uso | FK `onDelete: Restrict` (la cascada plantilla → controles también se bloquea si hay evaluaciones) |
 | Una evaluación por control y auditoría; un miembro por auditoría | UNIQUE |
 | N/A exige motivo | CHECK en `evaluations` |
-| Seguimiento coherente: `parentAuditId` nulo ⇔ `followUpNumber = 0`; no es su propio padre; fechas ordenadas | CHECK en `audits` |
+| Una auditoría no es su propia anterior; fechas ordenadas | CHECK en `audits` |
 | `email` y `username` en minúsculas | CHECK en `users` |
 | Puntaje de una opción ≥ 0; `payload` y `snapshot` son objetos JSON | CHECK |
 | Código de auditoría correlativo sin carreras | Secuencia `audit_code_seq` |
 | Orden de los nombres que se listan (`organizations.name`; las demás columnas de nombre al llegar su módulo) | Collation ICU `und-x-icu` en la columna: sin ella el orden depende de cómo se creó la base (con la de la imagen de prueba `alfa` iba después de `Delta`). Prisma no la modela; está en el bloque manual de la migración |
 
 Lo que **no** se puede expresar en la BD y queda como regla de dominio: el
-nivel elegido pertenece a la escala de la auditoría; las invariantes de la escala (§2.2); el alcance solo se edita en `DRAFT` y un seguimiento no puede modificarlo;
+nivel elegido pertenece a la escala de la auditoría; las invariantes de la escala (§2.2); el alcance solo se edita en `DRAFT` y con criterios trasladados no puede modificarse;
 solo se evalúan hojas.
 
 ### 2.2 Escalas: invariantes (reemplazan a los antiguos tipos RANGE / BINARY / QUALITATIVE)
@@ -155,10 +155,11 @@ debe valer 0" no se conserva: no protege ningún cálculo.
   ("ERP", "Sede Sur", "Proceso de compras"). `scopeNotes` sigue siendo el texto libre para el redactado del informe.
 - **Sin elementos = toda la organización.** No hay un `scopeMode`: se deriva de los elementos (estándar `03` §1).
 - Solo se edita con la auditoría en `DRAFT` (capacidad `editable`).
-- **Un seguimiento hereda una copia del alcance** de la auditoría a la que sigue y **no puede modificarlo**
-  (`AUDIT_SCOPE_INHERITED`). Si el cliente quiere incluir algo que no estaba, ya no es un seguimiento: es otra auditoría.
+- **Un seguimiento parte de una copia del alcance** de la auditoría anterior. Si **traslada criterios** no puede modificarlo
+  (`AUDIT_SCOPE_INHERITED`): «cumple» valía para ese alcance. Si el cliente pide A y B, se crea sin trasladar (`carryOver:
+  false`) y el alcance se edita como en cualquier borrador.
 - No hay catálogo de activos por organización. La consulta "todas las auditorías donde se evaluó el activo X" deja de
-  existir; el historial de un alcance se sigue por la cadena de seguimientos (`parentAuditId`).
+  existir; el historial de un alcance se sigue por la cadena de seguimientos (`previousAuditId`).
 
 **Fuera de alcance a propósito:** evaluar un mismo control por separado para cada elemento dentro de una misma
 auditoría. Añade una dimensión a `evaluations` y a los pesos. Si se necesita, una auditoría por elemento.

@@ -12,6 +12,8 @@ export interface ScoredLeaf {
   readonly achieved: number | null
   /** El nivel alcanzado, para la distribución (las escalas repiten puntajes solo si son de otra escala: aquí es una). */
   readonly achievedLevelId: string | null
+  /** Trasladado de la auditoría anterior sin volver a evaluarlo (docs/06 §9). Cuenta como cualquier otro; solo se cuenta aparte. */
+  readonly carriedOver: boolean
 }
 
 export interface LevelRef {
@@ -33,6 +35,8 @@ export interface Tally {
   readonly meets: number
   /** Evaluados con alcanzado < esperado (cada uno es una no conformidad de ESE criterio, no del dominio). */
   readonly below: number
+  /** Cuántos de los criterios vienen trasladados de la auditoría anterior (ya cuentan en `meets`/`evaluated`). */
+  readonly carriedOver: number
 }
 
 export interface DomainAverages {
@@ -81,6 +85,9 @@ const average = (values: readonly number[]): number | null =>
 const isEvaluated = (leaf: ScoredLeaf): leaf is ScoredLeaf & { expected: number; achieved: number } =>
   !leaf.isNotApplicable && leaf.achieved !== null && leaf.expected !== null
 
+/** ¿Un nivel alcanzado cumple lo esperado? Única definición: la usan los conteos y el traslado de un seguimiento. */
+export const meetsExpected = (expected: number, achieved: number): boolean => achieved >= expected
+
 /** Brecha de un criterio: `alcanzado − esperado`. Negativa = no conformidad de ese criterio. */
 export function gapOf(expected: number, achieved: number): number {
   return round2(achieved - expected)
@@ -94,7 +101,7 @@ export function leafGap(leaf: ScoredLeaf): number | null {
 export function tally(leaves: readonly ScoredLeaf[]): Tally {
   const notApplicable = leaves.filter((l) => l.isNotApplicable).length
   const evaluated = leaves.filter(isEvaluated)
-  const below = evaluated.filter((l) => l.achieved < l.expected).length
+  const below = evaluated.filter((l) => !meetsExpected(l.expected, l.achieved)).length
   return {
     total: leaves.length,
     notApplicable,
@@ -102,6 +109,7 @@ export function tally(leaves: readonly ScoredLeaf[]): Tally {
     evaluated: evaluated.length,
     meets: evaluated.length - below,
     below,
+    carriedOver: leaves.filter((l) => l.carriedOver).length,
   }
 }
 

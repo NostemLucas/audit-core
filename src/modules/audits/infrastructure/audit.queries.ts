@@ -11,6 +11,7 @@ export const AUDIT_INCLUDE = {
   template: { select: { id: true, name: true } },
   scale: { select: { id: true, name: true, dimension: true } },
   manager: { select: { id: true, name: true } },
+  previousAudit: { select: { id: true, code: true, name: true } },
   scopeItems: { select: { id: true, name: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   _count: { select: { evaluations: true } },
 } satisfies Prisma.AuditInclude

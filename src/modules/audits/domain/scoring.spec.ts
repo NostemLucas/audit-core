@@ -21,6 +21,7 @@ function leaf(
     expected: expected ? at(expected).value : null,
     achieved: achieved ? at(achieved).value : null,
     achievedLevelId: achieved,
+    carriedOver: false,
     ...extra,
   } satisfies ScoredLeaf
 }
@@ -45,7 +46,7 @@ describe('tally', () => {
       leaf('a', null), // pendiente
       leaf('a', null, 'l100', { isNotApplicable: true }), // no aplica
     ])
-    expect(t).toEqual({ total: 5, notApplicable: 1, pending: 1, evaluated: 3, meets: 1, below: 2 })
+    expect(t).toEqual({ total: 5, notApplicable: 1, pending: 1, evaluated: 3, meets: 1, below: 2, carriedOver: 0 })
     expect(t.evaluated + t.pending + t.notApplicable).toBe(t.total)
   })
 
@@ -64,8 +65,25 @@ describe('tally', () => {
     })
   })
 
+  it('los trasladados cuentan como cualquier otro (evaluados, cumplen) y además se cuentan aparte', () => {
+    const t = tally([
+      leaf('a', 'l100', 'l100', { carriedOver: true }),
+      leaf('a', 'l100'),
+      leaf('a', 'l50', 'l100', { carriedOver: true }),
+    ])
+    expect(t).toMatchObject({ total: 3, evaluated: 3, meets: 2, below: 1, carriedOver: 2 })
+  })
+
   it('vacío: todo en cero', () => {
-    expect(tally([])).toEqual({ total: 0, notApplicable: 0, pending: 0, evaluated: 0, meets: 0, below: 0 })
+    expect(tally([])).toEqual({
+      total: 0,
+      notApplicable: 0,
+      pending: 0,
+      evaluated: 0,
+      meets: 0,
+      below: 0,
+      carriedOver: 0,
+    })
   })
 })
 

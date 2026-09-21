@@ -16,7 +16,14 @@ export const AUDIT_FIELDS = ['name', 'introduction', 'scopeNotes', 'objectives',
 export type AuditField = (typeof AUDIT_FIELDS)[number]
 
 export const AuditEvents = defineEvents({
-  AuditCreated: z.object({ ...audit, code: z.string(), name: z.string() }),
+  AuditCreated: z.object({
+    ...audit,
+    code: z.string(),
+    name: z.string(),
+    /** Solo un seguimiento: el código de la anterior y cuántos criterios se trasladaron (docs/06 §9). */
+    previousAuditCode: z.string().optional(),
+    carriedOver: z.int().optional(),
+  }),
   AuditUpdated: z.object({ ...audit, changed: z.array(z.enum(AUDIT_FIELDS)).min(1) }),
   ScopeItemAdded: z.object({ ...audit, scopeItemId: z.uuid(), name: z.string() }),
   ScopeItemRemoved: z.object({ ...audit, scopeItemId: z.uuid(), name: z.string() }),

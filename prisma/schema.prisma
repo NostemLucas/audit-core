@@ -95,11 +95,11 @@ model User {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  managedAudits       Audit[]            @relation("AuditManager")
+  managedAudits       Audit[]       @relation("AuditManager")
   memberships         AuditMember[]
   assignedEvaluations Evaluation[]
-  eventsActed         AuditEvent[]       @relation("EventActor")
-  eventsTargeted      AuditEvent[]       @relation("EventTarget")
+  eventsActed         AuditEvent[]  @relation("EventActor")
+  eventsTargeted      AuditEvent[]  @relation("EventTarget")
 
   @@map("users")
 }
@@ -265,10 +265,9 @@ model Audit {
   scaleId        String @db.Uuid
   managerId      String @db.Uuid
 
-  /// Seguimiento: auditoría cerrada a la que esta da continuidad
-  parentAuditId  String? @db.Uuid
-  /// 0 = auditoría inicial
-  followUpNumber Int     @default(0)
+  /// Seguimiento: la auditoría cerrada que esta toma de referencia (docs/06 §9). Una auditoría normal con un enlace:
+  /// misma plantilla, escala y organización; nada más la distingue.
+  previousAuditId String? @db.Uuid
 
   status AuditStatus @default(DRAFT)
 
@@ -287,12 +286,12 @@ model Audit {
   createdById String?  @db.Uuid
   updatedById String?  @db.Uuid
 
-  template     Template     @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  scale        Scale        @relation(fields: [scaleId], references: [id], onDelete: Restrict)
-  manager      User         @relation("AuditManager", fields: [managerId], references: [id], onDelete: Restrict)
-  parentAudit  Audit?       @relation("AuditFollowUp", fields: [parentAuditId], references: [id], onDelete: Restrict)
-  followUps    Audit[]      @relation("AuditFollowUp")
+  template      Template     @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  scale         Scale        @relation(fields: [scaleId], references: [id], onDelete: Restrict)
+  manager       User         @relation("AuditManager", fields: [managerId], references: [id], onDelete: Restrict)
+  previousAudit Audit?       @relation("AuditFollowUp", fields: [previousAuditId], references: [id], onDelete: Restrict)
+  followUps     Audit[]      @relation("AuditFollowUp")
 
   scopeItems  AuditScopeItem[]
   members     AuditMember[]
@@ -300,7 +299,6 @@ model Audit {
   reports     Report[]
   events      AuditEvent[]
 
-  @@unique([parentAuditId, followUpNumber])
   @@index([organizationId, status])
   @@index([templateId])
   @@index([managerId])
@@ -351,11 +349,11 @@ model Evaluation {
   controlId String @db.Uuid
 
   /// Opción esperada para ESTE control (varía por control). Obligatoria antes de iniciar la auditoría; nulo solo en DRAFT.
-  expectedLevelId     String? @db.Uuid
+  expectedLevelId String? @db.Uuid
   /// La guía del líder para este criterio: contexto para el auditor y porqué se espera esa opción (p. ej. "criticidad alta según
   /// el análisis de riesgos"). Opcional.
-  guidance            String?
-  assignedUserId      String? @db.Uuid
+  guidance        String?
+  assignedUserId  String? @db.Uuid
 
   status EvaluationStatus @default(NOT_STARTED)
 
@@ -366,6 +364,10 @@ model Evaluation {
   isNotApplicable     Boolean @default(false)
   notApplicableReason String?
 
+  /// Seguimiento: el criterio de la auditoría anterior del que viene este resultado, TRASLADADO sin volver a evaluarlo (nace
+  /// `APPROVED`). Nulo si se evalúa en esta auditoría. Reabrirlo lo borra: ya se está evaluando aquí (docs/06 §9).
+  carriedFromId String? @db.Uuid
+
   /// Bloqueo optimista
   version Int @default(0)
 
@@ -374,15 +376,18 @@ model Evaluation {
   createdById String?  @db.Uuid
   updatedById String?  @db.Uuid
 
-  audit         Audit       @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  control       Control     @relation(fields: [controlId], references: [id], onDelete: Restrict)
-  expectedLevel ScaleLevel? @relation("EvaluationExpectedLevel", fields: [expectedLevelId], references: [id], onDelete: Restrict)
-  achievedLevel ScaleLevel? @relation("EvaluationAchievedLevel", fields: [achievedLevelId], references: [id], onDelete: Restrict)
-  assignedUser  User?       @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  audit         Audit        @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  carriedFrom   Evaluation?  @relation("EvaluationCarried", fields: [carriedFromId], references: [id], onDelete: Restrict)
+  carriedTo     Evaluation[] @relation("EvaluationCarried")
+  control       Control      @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  expectedLevel ScaleLevel?  @relation("EvaluationExpectedLevel", fields: [expectedLevelId], references: [id], onDelete: Restrict)
+  achievedLevel ScaleLevel?  @relation("EvaluationAchievedLevel", fields: [achievedLevelId], references: [id], onDelete: Restrict)
+  assignedUser  User?        @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
 
   evidences Evidence[]
 
   @@unique([auditId, controlId])
+  @@index([carriedFromId])
   @@index([auditId, status])
   @@index([assignedUserId, status])
   @@index([controlId])

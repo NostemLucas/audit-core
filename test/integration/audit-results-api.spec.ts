@@ -64,7 +64,7 @@ describe('GET /audits/:id/results', () => {
     const ctx = await startedAudit(t)
     const { overall } = (await get(`${A}/${ctx.auditId}/results`)).body.data
     expect(Object.keys(overall).sort()).toEqual(
-      ['distribution', 'evaluated', 'meets', 'notApplicable', 'pending', 'total', 'below'].sort(),
+      ['carriedOver', 'distribution', 'evaluated', 'meets', 'notApplicable', 'pending', 'total', 'below'].sort(),
     )
   })
 

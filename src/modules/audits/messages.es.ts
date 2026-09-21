@@ -15,7 +15,10 @@ const ROLE_LABELS: Record<AuditRole, string> = { LEAD: 'líder', MEMBER: 'audito
 
 /** Texto de cada evento de la auditoría. Sin él no compila (el mapa es exhaustivo). */
 export const auditMessages = defineMessages(AuditEvents, {
-  AuditCreated: (p) => `Creó la auditoría ${p.code} — ${p.name}`,
+  AuditCreated: (p) =>
+    p.previousAuditCode
+      ? `Creó la auditoría ${p.code} — ${p.name}, seguimiento de ${p.previousAuditCode} (${p.carriedOver ?? 0} criterios trasladados)`
+      : `Creó la auditoría ${p.code} — ${p.name}`,
   AuditUpdated: (p) => `Modificó ${p.changed.map((field) => FIELD_LABELS[field]).join(', ')}`,
   ScopeItemAdded: (p) => `Agregó "${p.name}" al alcance`,
   ScopeItemRemoved: (p) => `Quitó "${p.name}" del alcance`,

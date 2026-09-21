@@ -109,8 +109,7 @@ describe('crear', () => {
       plannedStart: '2026-10-01',
       plannedEnd: '2026-12-31',
       closedAt: null,
-      parentAuditId: null,
-      followUpNumber: 0,
+      previousAudit: null,
       evaluationCount: 4,
       allowedActions: ['START'],
       permissions: { manage: true, lead: false, transfer: false },
@@ -565,16 +564,5 @@ describe('alcance', () => {
     expect((await addScope(id, 'x')).body.error.code).toBe('AUDIT_NOT_EDITABLE')
     expect((await removeScope(id, item.id)).body.error.code).toBe('AUDIT_NOT_EDITABLE')
     expect(await db.auditScopeItem.count()).toBe(1)
-  })
-
-  it('un seguimiento hereda el alcance y no lo puede modificar: 409 AUDIT_SCOPE_INHERITED', async () => {
-    const parent = await idOf(auditBody(lib, { scopeItems: ['ERP'] }))
-    await db.audit.update({ where: { id: parent }, data: { status: 'CLOSED' } })
-    const followUp = await idOf(auditBody(lib, { name: 'Seguimiento', scopeItems: ['ERP'] }))
-    await db.audit.update({ where: { id: followUp }, data: { parentAuditId: parent, followUpNumber: 1 } })
-    const item = await db.auditScopeItem.findFirstOrThrow({ where: { auditId: followUp } })
-    expect((await addScope(followUp, 'Otro')).body.error.code).toBe('AUDIT_SCOPE_INHERITED')
-    expect((await removeScope(followUp, item.id)).body.error.code).toBe('AUDIT_SCOPE_INHERITED')
-    expect(await db.auditScopeItem.count({ where: { auditId: followUp } })).toBe(1)
   })
 })

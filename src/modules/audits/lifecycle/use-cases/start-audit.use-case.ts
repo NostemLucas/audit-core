@@ -31,7 +31,8 @@ export class StartAuditUseCase {
       this.tx.auditMember.count({ where: { auditId: id, role: 'LEAD' } }),
       this.tx.auditMember.count({ where: { auditId: id, role: 'MEMBER' } }),
       this.tx.evaluation.count({ where: { auditId: id, expectedLevelId: null } }),
-      this.tx.evaluation.count({ where: { auditId: id, assignedUserId: null } }),
+      // Los trasladados de la auditoría anterior ya nacen aprobados: no hay nadie a quien asignarlos.
+      this.tx.evaluation.count({ where: { auditId: id, assignedUserId: null, carriedFromId: null } }),
     ])
     if (leads === 0) throw new DomainError(AuditErrors.AUDIT_HAS_NO_LEAD, { auditId: id })
     if (members === 0) throw new DomainError(AuditErrors.AUDIT_HAS_NO_MEMBERS, { auditId: id })

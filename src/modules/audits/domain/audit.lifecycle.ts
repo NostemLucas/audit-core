@@ -7,7 +7,7 @@ import { AuditErrors } from './errors.js'
  *  - `editable`: solo en borrador se cambian datos y alcance, o se elimina.
  *  - `staffable`: el equipo se arma y se cambia en borrador y en curso.
  *  - `evaluable`: solo en curso se evalúa y se adjunta evidencia.
- *  - `followable`: solo una auditoría cerrada admite un seguimiento.
+ *  - `followable`: una auditoría cerrada (o ya archivada) puede tomarse de referencia para un seguimiento (docs/06 §9).
  */
 export const AUDIT_EVENTS = ['START', 'CLOSE', 'ARCHIVE'] as const
 export type AuditEvent = (typeof AUDIT_EVENTS)[number]
@@ -20,7 +20,7 @@ export const auditLifecycle = defineLifecycle<AuditStatus, AuditEvent, AuditTag>
     DRAFT: { on: { START: 'IN_PROGRESS' }, tags: ['editable', 'staffable'] },
     IN_PROGRESS: { on: { CLOSE: 'CLOSED' }, tags: ['staffable', 'evaluable'] },
     CLOSED: { on: { ARCHIVE: 'ARCHIVED' }, tags: ['followable'] },
-    ARCHIVED: { on: {}, tags: [] },
+    ARCHIVED: { on: {}, tags: ['followable'] },
   },
 })
 

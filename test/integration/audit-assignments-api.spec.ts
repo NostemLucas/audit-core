@@ -77,6 +77,7 @@ describe('ver los criterios', () => {
       isNotApplicable: false,
       notApplicableReason: null,
       evidenceCount: 0,
+      carriedFromId: null,
     })
     expect(res.body.data[2].control.reference).toBeNull()
   })

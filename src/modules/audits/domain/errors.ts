@@ -22,12 +22,9 @@ export const AuditErrors = defineErrors({
     http: 422,
     message: 'Hay evaluaciones sin aprobar; no se puede cerrar la auditoría',
   },
-  AUDIT_CANNOT_FOLLOW_UP: { http: 409, message: 'Solo una auditoría cerrada admite seguimiento' },
-  /** Dos seguimientos de la misma auditoría se crearon a la vez y chocaron en el correlativo. */
-  AUDIT_FOLLOW_UP_CONFLICT: {
+  AUDIT_CANNOT_FOLLOW_UP: {
     http: 409,
-    message: 'Se creó otro seguimiento al mismo tiempo; vuelve a intentarlo',
-    onUnique: 'audits_parentAuditId_followUpNumber_key',
+    message: 'Solo una auditoría cerrada o archivada puede tomarse de referencia para un seguimiento',
   },
   /** Permiso contextual: el actor no es miembro (con el rol necesario) de esta auditoría. */
   AUDIT_ACCESS_DENIED: { http: 403, message: 'No participas en esta auditoría con el rol necesario' },
@@ -42,11 +39,11 @@ export const AuditErrors = defineErrors({
     message: 'La auditoría ya tiene un elemento de alcance con ese nombre',
     onUnique: 'audit_scope_items_auditId_name_key',
   },
-  /** Un seguimiento hereda el alcance de la auditoría que sigue; incluir algo distinto es otra auditoría. */
+  /** Con criterios trasladados el resultado vale para ESE alcance: cambiarlo invalidaría lo trasladado (docs/06 §9). */
   AUDIT_SCOPE_INHERITED: {
     http: 409,
     message:
-      'Un seguimiento hereda el alcance de la auditoría original; para incluir otros elementos crea una auditoría nueva',
+      'Esta auditoría traslada criterios de la anterior y hereda su alcance; para auditar otro alcance crea la auditoría sin trasladar criterios',
   },
 
   // ── Equipo ─────────────────────────────────────────────────────────────────

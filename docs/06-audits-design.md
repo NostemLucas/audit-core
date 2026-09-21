@@ -140,7 +140,7 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3c** (hecho) | Nivel esperado y guía por criterio (uno a uno y masivo); iniciar, cerrar y archivar |
 | **3d** (hecho) | Flujo del criterio (iniciar al primer edit, editar, completar, aprobar, devolver, reabrir) con su historia |
 | **3e** (hecho) | `scoring.ts` (conteos, distribución por opción, promedios esperado/alcanzado por dominio, brecha; **sin nota global**, `05` §6) y lecturas: `GET results`, `GET gaps`, `GET history` (de la auditoría) y `GET evaluations/:id/history` (de un criterio) |
-| **3f** | Seguimientos (qué criterios incluir: pendiente de decidir, ver `05` §6) |
+| **3f** (hecho) | Seguimientos como auditoría normal con enlace a la anterior (§9) |
 
 La **evidencia** (subir archivos, Nextcloud) y los **informes** son la Fase 4. La regla de evidencia de §3 se aplica contando los
 registros de evidencia; hasta la Fase 4 no hay forma real de crearlos (las pruebas los insertan directamente).
@@ -161,3 +161,31 @@ lectura: se muestra su tipo (§4).
 
 Sin pesos ni puntajes guardados (`05` §6, §11); una sola escala por auditoría; «no aplica» es una marca de la evaluación con
 motivo, no una opción de la escala; el nivel esperado es **por criterio**.
+
+## 9. Seguimientos
+
+**Un seguimiento es una auditoría normal con un enlace a la anterior.** No hay entidad ni estado propios, ni se crean filas solo
+para algunos criterios (eso complicaba el proyecto anterior): todo lo demás —equipo, evaluación, revisión, cierre, resultados,
+historial— funciona igual. Decidido con el usuario, 2026-09-21.
+
+- **Crear** (`POST /audits` con `previousAuditId`): la anterior debe estar **cerrada o archivada** (`followable`,
+  `AUDIT_CANNOT_FOLLOW_UP`). Plantilla, escala y organización **se toman de la anterior** (no se indican: `400` si se
+  mandan): es la misma medición, así que siguen valiendo aunque la plantilla se haya archivado o la escala desactivado después.
+  La organización sí debe seguir activa. Puede haber varios seguimientos de la misma anterior.
+- **`carryOver`** (por defecto `true`; solo con `previousAuditId`):
+  - **`true`**: cada criterio que allí **cumplió** (alcanzado ≥ esperado) o **no aplicaba** nace **`APPROVED`** con el resultado
+    copiado (nivel, hallazgo, notas, «no aplica» y su motivo) y `carriedFromId` apuntando al criterio de la anterior. El resto
+    nace `NOT_STARTED`, limpio.
+  - **`false`**: se evalúa todo de nuevo; la anterior queda como referencia.
+- **Nivel esperado y guía**: todos los criterios los heredan de la anterior (el líder no parte de cero en madurez).
+- **Sin estado nuevo:** trasladado = `APPROVED` + `carriedFromId`. Por eso **cerrar** funciona solo (ya está aprobado) y **iniciar
+  no exige asignarlo** (no tiene a quién). Los resultados cuentan `carriedOver` (siguen contando como evaluados/cumplen; solo se
+  cuentan aparte para no hacerlos pasar por verificados en esta auditoría). Su historia se pide en la auditoría anterior.
+- **Re-evaluar uno trasladado** = el **reabrir** que ya existe (líder, con comentario): pasa a `RETURNED`, **deja de ser trasladado**
+  (`carriedFromId` se borra), conserva su contenido y hay que asignarlo para trabajarlo. Al enviarlo, la regla de evidencia
+  aplica como siempre: la evidencia de la anterior no se copia.
+- **Alcance**: se copia el de la anterior. Si **se trasladan criterios**, no se puede indicar otro ni modificarlo
+  (`AUDIT_SCOPE_INHERITED`): «cumple» valía para ese alcance (el alcance son nombres sueltos, no están ligados a criterios, así
+  que no se puede saber cuáles siguen valiendo). Si el cliente pide A y B, se crea con `carryOver: false` (o sin nada que
+  trasladar) y el alcance se indica o edita como en cualquier borrador.
+- **En un seguimiento de un seguimiento**, `previousAuditId` es la anterior **inmediata**.

@@ -22,6 +22,8 @@ export const EvaluationView = z.object({
   notApplicableReason: z.string().nullable(),
   /** Cuántas evidencias tiene adjuntas (la Fase 4 trae el detalle; aquí solo el conteo, para saber si puede enviarse). */
   evidenceCount: z.int(),
+  /** Seguimiento: el criterio de la auditoría anterior del que viene este resultado (trasladado, no evaluado aquí). Su historia se pide con el endpoint del criterio, en esa auditoría. */
+  carriedFromId: z.uuid().nullable(),
 })
 
 export const ListEvaluationsQuery = z.object({

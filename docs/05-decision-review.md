@@ -162,8 +162,9 @@ Lo que se describió como práctica de sus auditores reemplaza a la fórmula her
 - **Los resultados de una auditoría cerrada deben ser reproducibles.** Sin instantánea guardada, dependen de los valores de los
   niveles de la escala: se debe **impedir editar el `value` de un nivel** de una escala ya usada por alguna auditoría (hoy solo se
   impide borrarlo). Error nuevo: `SCALE_LEVEL_IN_USE` también para la edición del valor.
-- **Un seguimiento (y una auditoría parcial) elige qué criterios incluye**, por defecto los que no cumplieron. Como las
-  evaluaciones son una por (auditoría, hoja), basta con crear filas solo para los criterios incluidos. Pendiente de confirmar.
+- **Un seguimiento NO elige criterios: es una auditoría normal con un enlace a la anterior** (decidido con el usuario,
+  2026-09-21; ver `06` §9). Se crean todas las hojas; lo que cumplió antes se traslada ya aprobado y solo se evalúa lo demás
+  (o todo de nuevo con `carryOver: false`). Se descarta crear filas solo para algunos criterios: complicaba el proyecto anterior.
 - `01` (modelo de datos) todavía describe `weight`, `score` y `finalScore`; se actualizará junto con el schema al empezar la
   Fase 2, una vez confirmado esto.
 

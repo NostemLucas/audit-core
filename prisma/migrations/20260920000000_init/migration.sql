@@ -128,8 +128,7 @@ CREATE TABLE "audits" (
     "organizationId" UUID NOT NULL,
     "scaleId" UUID NOT NULL,
     "managerId" UUID NOT NULL,
-    "parentAuditId" UUID,
-    "followUpNumber" INTEGER NOT NULL DEFAULT 0,
+    "previousAuditId" UUID,
     "status" "AuditStatus" NOT NULL DEFAULT 'DRAFT',
     "plannedStart" DATE,
     "plannedEnd" DATE,
@@ -180,6 +179,7 @@ CREATE TABLE "evaluations" (
     "notes" TEXT,
     "isNotApplicable" BOOLEAN NOT NULL DEFAULT false,
     "notApplicableReason" TEXT,
+    "carriedFromId" UUID,
     "version" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
@@ -281,9 +281,6 @@ CREATE INDEX "audits_managerId_idx" ON "audits"("managerId");
 CREATE INDEX "audits_status_plannedEnd_idx" ON "audits"("status", "plannedEnd");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "audits_parentAuditId_followUpNumber_key" ON "audits"("parentAuditId", "followUpNumber");
-
--- CreateIndex
 CREATE UNIQUE INDEX "audit_scope_items_auditId_name_key" ON "audit_scope_items"("auditId", "name");
 
 -- CreateIndex
@@ -291,6 +288,9 @@ CREATE INDEX "audit_members_userId_idx" ON "audit_members"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "audit_members_auditId_userId_key" ON "audit_members"("auditId", "userId");
+
+-- CreateIndex
+CREATE INDEX "evaluations_carriedFromId_idx" ON "evaluations"("carriedFromId");
 
 -- CreateIndex
 CREATE INDEX "evaluations_auditId_status_idx" ON "evaluations"("auditId", "status");
@@ -356,7 +356,7 @@ ALTER TABLE "audits" ADD CONSTRAINT "audits_scaleId_fkey" FOREIGN KEY ("scaleId"
 ALTER TABLE "audits" ADD CONSTRAINT "audits_managerId_fkey" FOREIGN KEY ("managerId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "audits" ADD CONSTRAINT "audits_parentAuditId_fkey" FOREIGN KEY ("parentAuditId") REFERENCES "audits"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "audits" ADD CONSTRAINT "audits_previousAuditId_fkey" FOREIGN KEY ("previousAuditId") REFERENCES "audits"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "audit_scope_items" ADD CONSTRAINT "audit_scope_items_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "audits"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -369,6 +369,9 @@ ALTER TABLE "audit_members" ADD CONSTRAINT "audit_members_userId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "audits"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_carriedFromId_fkey" FOREIGN KEY ("carriedFromId") REFERENCES "evaluations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_controlId_fkey" FOREIGN KEY ("controlId") REFERENCES "controls"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -396,7 +399,6 @@ ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_actorId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_targetUserId_fkey" FOREIGN KEY ("targetUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Objetos que Prisma no modela (fuente única de estas reglas de integridad).
@@ -429,8 +431,7 @@ ALTER TABLE "scale_levels"
 
 -- audits
 ALTER TABLE "audits"
-  ADD CONSTRAINT "audits_followup_consistency" CHECK (("parentAuditId" IS NULL) = ("followUpNumber" = 0)),
-  ADD CONSTRAINT "audits_not_own_parent"       CHECK ("parentAuditId" IS NULL OR "parentAuditId" <> "id"),
+  ADD CONSTRAINT "audits_not_own_previous"     CHECK ("previousAuditId" IS NULL OR "previousAuditId" <> "id"),
   ADD CONSTRAINT "audits_planned_dates"        CHECK ("plannedStart" IS NULL OR "plannedEnd" IS NULL OR "plannedEnd" >= "plannedStart");
 
 -- audit_members: UN SOLO líder por auditoría (docs/06 §1). Índice único parcial: lo garantiza la BD, sin bloqueos de fila
@@ -439,7 +440,8 @@ CREATE UNIQUE INDEX "audit_members_one_lead" ON "audit_members"("auditId") WHERE
 
 -- evaluations
 ALTER TABLE "evaluations"
-  ADD CONSTRAINT "evaluations_na_reason"     CHECK (NOT "isNotApplicable" OR "notApplicableReason" IS NOT NULL);
+  ADD CONSTRAINT "evaluations_na_reason"     CHECK (NOT "isNotApplicable" OR "notApplicableReason" IS NOT NULL),
+  ADD CONSTRAINT "evaluations_not_own_carry" CHECK ("carriedFromId" IS NULL OR "carriedFromId" <> "id");
 
 -- evidences
 ALTER TABLE "evidences"

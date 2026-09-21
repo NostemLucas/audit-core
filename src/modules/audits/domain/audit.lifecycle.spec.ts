@@ -34,7 +34,7 @@ describe('ciclo de vida de la auditoría (docs/03 §2.4)', () => {
     }
   })
 
-  it('capacidades: editable solo en borrador; equipo en borrador y en curso; evaluable solo en curso; seguimiento solo cerrada', () => {
+  it('capacidades: editable solo en borrador; equipo en borrador y en curso; evaluable solo en curso; seguimiento de una cerrada o archivada', () => {
     const tags = (['DRAFT', 'IN_PROGRESS', 'CLOSED', 'ARCHIVED'] as const).map((status) => [
       status,
       (['editable', 'staffable', 'evaluable', 'followable'] as const).filter((tag) => auditLifecycle.has(status, tag)),
@@ -43,7 +43,7 @@ describe('ciclo de vida de la auditoría (docs/03 §2.4)', () => {
       ['DRAFT', ['editable', 'staffable']],
       ['IN_PROGRESS', ['staffable', 'evaluable']],
       ['CLOSED', ['followable']],
-      ['ARCHIVED', []],
+      ['ARCHIVED', ['followable']],
     ])
   })
 

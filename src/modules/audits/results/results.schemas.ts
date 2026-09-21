@@ -12,6 +12,8 @@ const Tally = {
   meets: z.int(),
   /** Evaluados con alcanzado < esperado. */
   below: z.int(),
+  /** De ellos, cuántos vienen trasladados de la auditoría anterior sin volver a evaluarse (seguimiento). */
+  carriedOver: z.int(),
 }
 
 /** Cuántos criterios quedaron en cada opción de la escala (todas las opciones, también las que nadie eligió). */

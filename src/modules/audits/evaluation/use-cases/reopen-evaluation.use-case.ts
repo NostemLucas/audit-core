@@ -27,7 +27,8 @@ export class ReopenEvaluationUseCase {
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
     const to = evaluationLifecycle.next(evaluation.status, 'REOPEN')
 
-    await this.tx.evaluation.update({ where: { id: evaluationId }, data: { status: to } })
+    // Reabrir un criterio trasladado lo vuelve a evaluar AQUÍ: deja de ser un traslado (docs/06 §9).
+    await this.tx.evaluation.update({ where: { id: evaluationId }, data: { status: to, carriedFromId: null } })
     const template = await this.library.getTemplate(audit.templateId)
     await this.events.publish(AuditEvents.EvaluationReopened, {
       auditId,

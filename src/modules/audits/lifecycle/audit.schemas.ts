@@ -25,8 +25,8 @@ export const AuditView = z.object({
   plannedStart: CalendarDate.nullable(),
   plannedEnd: CalendarDate.nullable(),
   closedAt: Instant.nullable(),
-  parentAuditId: z.uuid().nullable(),
-  followUpNumber: z.int(),
+  /** Seguimiento: la auditoría anterior que toma de referencia (docs/06 §9). */
+  previousAudit: z.object({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
   organization: z.object({ id: z.uuid(), name: z.string() }),
   template: z.object({ id: z.uuid(), name: z.string() }),
   scale: z.object({ id: z.uuid(), name: z.string(), dimension: z.enum(ScaleDimension) }),
@@ -43,23 +43,47 @@ export const AuditView = z.object({
  * Crear una auditoría. La plantilla, la organización y la escala se eligen aquí y NO se cambian después (docs/06 §2): las
  * evaluaciones se crean con la auditoría, una por hoja de la plantilla.
  */
-export const CreateAudit = z.object({
-  name: Name,
-  introduction: Text.optional(),
-  scopeNotes: Text.optional(),
-  objectives: Text.optional(),
-  templateId: z.uuid(),
-  organizationId: z.uuid(),
-  scaleId: z.uuid(),
-  plannedStart: Day.optional(),
-  plannedEnd: Day.optional(),
-  /** Qué se audita (un sistema, una sede, un proceso…). Sin elementos = toda la organización. */
-  scopeItems: z
-    .array(Name)
-    .max(LIMITS.scopeItems)
-    .default([])
-    .refine((names) => new Set(names).size === names.length, { message: 'Hay elementos de alcance repetidos' }),
-})
+export const CreateAudit = z
+  .object({
+    name: Name,
+    introduction: Text.optional(),
+    scopeNotes: Text.optional(),
+    objectives: Text.optional(),
+    /** Plantilla, organización y escala: se eligen aquí, salvo en un seguimiento (`previousAuditId`), que las toma de la anterior. */
+    templateId: z.uuid().optional(),
+    organizationId: z.uuid().optional(),
+    scaleId: z.uuid().optional(),
+    /** Seguimiento (docs/06 §9): una auditoría cerrada o archivada que esta toma de referencia. */
+    previousAuditId: z.uuid().optional(),
+    /** Solo con `previousAuditId`. Por defecto sí: lo que cumplió antes se traslada ya aprobado y solo se evalúa lo demás. */
+    carryOver: z.boolean().optional(),
+    plannedStart: Day.optional(),
+    plannedEnd: Day.optional(),
+    /** Qué se audita (un sistema, una sede, un proceso…). Sin elementos = toda la organización. */
+    scopeItems: z
+      .array(Name)
+      .max(LIMITS.scopeItems)
+      .default([])
+      .refine((names) => new Set(names).size === names.length, { message: 'Hay elementos de alcance repetidos' }),
+  })
+  .superRefine((body, ctx) => {
+    const own = [body.templateId, body.organizationId, body.scaleId]
+    if (body.previousAuditId) {
+      if (own.some((value) => value !== undefined)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Un seguimiento toma la plantilla, la escala y la organización de la anterior',
+        })
+      }
+    } else {
+      if (own.some((value) => value === undefined)) {
+        ctx.addIssue({ code: 'custom', message: 'Indica la plantilla, la organización y la escala' })
+      }
+      if (body.carryOver !== undefined) {
+        ctx.addIssue({ code: 'custom', path: ['carryOver'], message: 'Solo un seguimiento puede trasladar criterios' })
+      }
+    }
+  })
 export type CreateAuditT = z.infer<typeof CreateAudit>
 
 export const UpdateAudit = z
