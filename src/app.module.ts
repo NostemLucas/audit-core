@@ -16,6 +16,7 @@ import { DbModule } from './platform/db/index.js'
 import { EventsModule } from './platform/events/index.js'
 import { HealthController } from './platform/health/health.controller.js'
 import { LoggingModule } from './platform/logging/index.js'
+import { NextcloudModule } from './platform/nextcloud/index.js'
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { LoggingModule } from './platform/logging/index.js'
     ContextModule,
     EventsModule,
     ClockModule,
+    NextcloudModule,
     AuthModule,
     AuthzModule,
     IdentityModule,

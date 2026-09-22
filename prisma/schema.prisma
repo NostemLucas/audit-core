@@ -275,9 +275,6 @@ model Audit {
   plannedEnd   DateTime? @db.Date
   closedAt     DateTime? @db.Timestamptz(3)
 
-  /// Id de la carpeta en Nextcloud. La ruta se deriva de `code` (storage-paths.ts)
-  storageFolderId String?
-
   /// Bloqueo optimista (se incrementa en cada update desde el adaptador)
   version Int @default(0)
 

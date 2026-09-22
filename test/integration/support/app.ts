@@ -5,6 +5,7 @@ import { AppModule } from '../../../src/app.module.js'
 import { configureApp } from '../../../src/configure-app.js'
 import { JWT_KEYS } from '../../../src/platform/auth/index.js'
 import { ENV } from '../../../src/platform/config/index.js'
+import { FILE_STORAGE, type FileStoragePort } from '../../../src/platform/nextcloud/index.js'
 import { LOG_DESTINATION } from '../../../src/platform/logging/index.js'
 import type { JWTVerifyGetKey } from 'jose'
 import { testEnv } from '../../support/env.js'
@@ -20,6 +21,8 @@ export async function createTestApp(
     jwtKeys?: JWTVerifyGetKey
     /** Captura las líneas de log. */
     logSink?: (line: Record<string, unknown>) => void
+    /** Sustituye el cliente de Nextcloud (p. ej. `FakeFileStorage`). Sin esto, el adaptador real intenta hablar por red. */
+    fileStorage?: FileStoragePort
   } = {},
 ): Promise<NestExpressApplication> {
   // En test el nivel por defecto es `silent`; si el test quiere capturar logs, se sube.
@@ -35,6 +38,7 @@ export async function createTestApp(
     .overrideProvider(ENV)
     .useValue(env)
   if (extra.jwtKeys) builder = builder.overrideProvider(JWT_KEYS).useValue(extra.jwtKeys)
+  if (extra.fileStorage) builder = builder.overrideProvider(FILE_STORAGE).useValue(extra.fileStorage)
   const sink = extra.logSink
   if (sink)
     builder = builder.overrideProvider(LOG_DESTINATION).useValue({ write: (line: string) => sink(JSON.parse(line)) })

@@ -40,6 +40,13 @@ export const envSchema = z.object({
   THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
   /** Peticiones máximas por ventana y por cliente. */
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
+  /** Raíz del servidor Nextcloud (WebDAV y OCS cuelgan de ahí; sin `/` final). */
+  NEXTCLOUD_BASE_URL: z.url(),
+  /** Cuenta de servicio con la que el backend habla con Nextcloud (Basic Auth). */
+  NEXTCLOUD_SERVICE_USER: z.string().min(1),
+  NEXTCLOUD_SERVICE_PASSWORD: z.string().min(1),
+  /** Firma HMAC del webhook de evidencia (docs/07 §1.2). */
+  NEXTCLOUD_WEBHOOK_SECRET: z.string().min(1),
 })
 
 /** Aplica los valores por defecto que dependen de `NODE_ENV`. */

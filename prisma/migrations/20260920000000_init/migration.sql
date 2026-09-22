@@ -133,7 +133,6 @@ CREATE TABLE "audits" (
     "plannedStart" DATE,
     "plannedEnd" DATE,
     "closedAt" TIMESTAMPTZ(3),
-    "storageFolderId" TEXT,
     "version" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
