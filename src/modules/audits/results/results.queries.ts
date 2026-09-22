@@ -45,3 +45,12 @@ export function computeGapViews(rows: readonly ResultRow[], template: TemplateFo
     .map((view) => ({ ...view, gap: gapById.get(view.id)! }))
     .sort((a, b) => a.gap - b.gap)
 }
+
+/** Cuántas brechas hay de cada gravedad (las sin clasificar no cuentan en ninguna): resumen para el informe (docs/07 §2). */
+export function countBySeverity(
+  gaps: readonly { severity: EvaluationSeverity | null }[],
+): Record<EvaluationSeverity, number> {
+  const counts: Record<EvaluationSeverity, number> = { MAJOR: 0, MINOR: 0, OBSERVATION: 0 }
+  for (const gap of gaps) if (gap.severity) counts[gap.severity] += 1
+  return counts
+}

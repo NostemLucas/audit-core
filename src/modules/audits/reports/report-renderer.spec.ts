@@ -13,6 +13,9 @@ const DATA: ReportData = {
   below: 1,
   notApplicable: 1,
   pending: 0,
+  majorCount: 0,
+  minorCount: 1,
+  observationCount: 0,
   domains: [{ title: 'Organizacionales', averageExpected: 100, averageAchieved: 75, gap: -25 }],
   gaps: [
     {
@@ -43,6 +46,7 @@ describe('renderReport', () => {
     expect(xml).toContain('Organización: ACME')
     expect(xml).toContain('Generado: 2026-09-22')
     expect(xml).toContain('Evaluados: 4 · Cumplen: 2 · Por debajo: 1 · No aplica: 1 · Pendientes: 0')
+    expect(xml).toContain('Gravedad de las brechas: 0 mayor(es) · 1 menor(es) · 0 observación(es)')
     expect(xml).toContain('[No conformidad menor] Organizacionales / A.5.2 Roles')
   })
 

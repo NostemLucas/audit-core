@@ -19,6 +19,7 @@ const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     ${paragraph('Generado: {generatedAt}')}
     ${paragraph('Resultados', 'Heading1')}
     ${paragraph('Evaluados: {evaluated} · Cumplen: {meets} · Por debajo: {below} · No aplica: {notApplicable} · Pendientes: {pending}')}
+    ${paragraph('Gravedad de las brechas: {majorCount} mayor(es) · {minorCount} menor(es) · {observationCount} observación(es)')}
     ${paragraph('Por dominio', 'Heading1')}
     ${paragraph('{#domains}')}
     ${paragraph('{title}: esperado {averageExpected}, alcanzado {averageAchieved}, brecha {gap}')}

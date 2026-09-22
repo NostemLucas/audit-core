@@ -61,7 +61,7 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
     await api()
       .patch(`${A}/${ctx.auditId}/evaluations/${roles.id}`)
       .set('authorization', ana)
-      .send({ achievedLevelId: parcial.id, findings: 'Cubre solo la mitad', version: roles.version })
+      .send({ achievedLevelId: parcial.id, findings: 'Cubre solo la mitad', severity: 'MINOR', version: roles.version })
 
     const [resultsRes, gapsRes, reportRes] = await Promise.all([
       api()
@@ -80,9 +80,11 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
     expect(xml).toContain(`Evaluados: ${overall.evaluated}`)
     expect(xml).toContain(`Cumplen: ${overall.meets}`)
     expect(xml).toContain(`Por debajo: ${overall.below}`)
+    expect(xml).toContain('Gravedad de las brechas: 0 mayor(es) · 1 menor(es) · 0 observación(es)')
 
     const [gap] = gapsRes.body.data
     expect(gap.control.title).toBe('Roles')
+    expect(gap.severity).toBe('MINOR')
     expect(xml).toContain('Roles')
     expect(xml).toContain('Cubre solo la mitad')
     expect(xml).toContain(gap.expectedLevel.label)

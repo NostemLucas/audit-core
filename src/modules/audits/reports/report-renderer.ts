@@ -20,6 +20,10 @@ export interface ReportData {
   readonly below: number
   readonly notApplicable: number
   readonly pending: number
+  /** Conteo de brechas por gravedad (docs/06 §3, docs/07 §2): las sin clasificar no están en ninguno de los tres. */
+  readonly majorCount: number
+  readonly minorCount: number
+  readonly observationCount: number
   readonly domains: ReadonlyArray<{
     readonly title: string
     readonly averageExpected: number | null

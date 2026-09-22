@@ -109,6 +109,7 @@ notación de punto**:
 ```
 {auditCode} {auditName} {organizationName} {generatedAt}
 {evaluated} {meets} {below} {notApplicable} {pending}
+{majorCount} {minorCount} {observationCount}
 {#domains} {title} {averageExpected} {averageAchieved} {gap} {/domains}
 {#gaps} {severity} {domain} {reference} {title} {expectedLabel} {achievedLabel} {findings} {/gaps}
 ```
@@ -128,6 +129,12 @@ un fallo de la plantilla.
 mismo puerto) y `GET .../reports/:id` los ve quien ve la auditoría. La lista de brechas es la MISMA función
 (`results/results.queries.ts`, `computeGapViews`) que usa `GET /gaps`: no hay dos sitios que decidan qué es una
 brecha.
+
+**Conteo de gravedad** (`06` §3, decidido 2026-09-22): además de listar cada brecha con su gravedad, el informe agrega
+un resumen — cuántas mayores, menores y observaciones hay en total (`countBySeverity`, misma función `results.queries.ts`;
+las brechas sin clasificar, siempre el caso en madurez, no cuentan en ninguno de los tres). Solo en el informe: `GET
+/gaps` no cambia de forma, el resumen es una decisión de presentación del documento, no un dato nuevo que el frontend
+necesite por API (puede sumarlo él mismo con lo que ya recibe).
 
 ## 3. El puerto (`FileStoragePort`)
 

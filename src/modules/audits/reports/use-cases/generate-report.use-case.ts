@@ -12,7 +12,7 @@ import { computeResults } from '../../domain/scoring.js'
 import { SEVERITY_LABELS } from '../../messages.es.js'
 import { findEvaluations } from '../../evaluation/evaluation.queries.js'
 import { accessOf, loadAuditView } from '../../infrastructure/audit.queries.js'
-import { computeGapViews, toScoredLeaves } from '../../results/results.queries.js'
+import { computeGapViews, countBySeverity, toScoredLeaves } from '../../results/results.queries.js'
 import { loadReport } from '../reports.queries.js'
 import { renderReport } from '../report-renderer.js'
 import { loadDefaultTemplate } from '../report.template.js'
@@ -51,6 +51,7 @@ export class GenerateReportUseCase {
       scale.levels,
     )
     const gaps = computeGapViews(rows, template)
+    const severityCounts = countBySeverity(gaps)
 
     const title = input.title ?? audit.name
     const buffer = renderReport(loadDefaultTemplate(), {
@@ -63,6 +64,9 @@ export class GenerateReportUseCase {
       below: results.overall.below,
       notApplicable: results.overall.notApplicable,
       pending: results.overall.pending,
+      majorCount: severityCounts.MAJOR,
+      minorCount: severityCounts.MINOR,
+      observationCount: severityCounts.OBSERVATION,
       domains: results.domains.map(({ domainId: _domainId, ...domain }, index) => ({
         title: roots[index]!.title,
         ...domain,
