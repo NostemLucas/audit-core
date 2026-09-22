@@ -7,7 +7,9 @@ import { AppLogger } from './platform/logging/index.js'
 
 // Un entorno inválido falla aquí, en NestFactory.create (el proveedor ENV lo valida al instanciarse).
 // `bufferLogs` retiene los logs del arranque hasta tener el logger propio, para que salgan todos por el mismo canal.
-const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true })
+// `rawBody: true` deja los bytes crudos en `request.rawBody` (webhook de Nextcloud: la firma es sobre el cuerpo sin
+// parsear, docs/07 §1.2), sin montar un body-parser propio.
+const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true, rawBody: true })
 const logger = app.get(AppLogger)
 app.useLogger(logger)
 

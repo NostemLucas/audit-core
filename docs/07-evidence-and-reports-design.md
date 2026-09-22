@@ -158,11 +158,24 @@ la de la BD): no bloquea el arranque, informa `checks.nextcloud: 'up' | 'down'` 
   operación que dependa de que la carpeta exista antes.
 - **Editar `Evidence.title`/`description` después de subida.** No hay caso de uso todavía; se agrega si se pide.
 
+### Detalle de 4b (webhook, permisos, pruebas)
+
+- **`useTestApi()` usa `FakeFileStorage` por defecto** en todas las pruebas de integración (antes usaba sin querer el
+  adaptador real, que nunca llegaba a ejecutarse porque nada tocaba `FILE_STORAGE`): ningún test habla con una red real,
+  y expone `t.storage` para inspeccionar lo que se le pidió (`uploadTargets`, `uploaded`, `readShares`). Se vacía en
+  cada test (`beforeEach`, junto con `resetDb`).
+- **`rawBody: true`** (`main.ts` y el bootstrap de test) deja los bytes crudos en `request.rawBody`, sin montar un
+  body-parser propio: es soporte nativo de Nest 12, no una capa nuestra.
+- **El contrato del webhook es propio de este backend** (no de Nextcloud, que no tiene un formato fijo): quien
+  administre Nextcloud configura una regla de *Flow* que lo cumpla.
+- **Todas las rutas de esta fase pasan por `@Responds(schema)`** (incluida la del webhook, con `@Req()` para leer la
+  firma): sin eso, `size` (`BigInt`) rompe la serialización JSON — se encontró probando, no se dio por hecho.
+
 ## 6. Cómo se construye (un commit y una etiqueta por paso)
 
 | Paso | Contenido |
 |---|---|
-| **4a** | `platform/nextcloud/` (puerto, adaptador HTTP, firma del webhook), env vars, `storageFolderId` fuera del esquema |
-| **4b** | `audits/evidence/`: pedir lugar de subida, webhook, listar, eliminar |
+| **4a** (hecho) | `platform/nextcloud/` (puerto, adaptador HTTP, firma del webhook), env vars, `storageFolderId` fuera del esquema |
+| **4b** (hecho) | `audits/evidence/`: pedir lugar de subida, webhook, listar, eliminar |
 | **4c** | `audits/reports/`: plantilla docx, generar, listar, descargar |
 | **4d** | `health/ready` con Nextcloud |

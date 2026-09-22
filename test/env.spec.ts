@@ -3,7 +3,15 @@ import { loadEnv } from '../src/platform/config/index.js'
 
 const DB_URL = 'postgresql://u:p@localhost:5432/db'
 const ISSUER = 'https://auth.ejemplo.com/application/o/audit/'
-const BASE = { DATABASE_URL: DB_URL, AUTHENTIK_ISSUER: ISSUER, AUTHENTIK_CLIENT_ID: 'cid' }
+const BASE = {
+  DATABASE_URL: DB_URL,
+  AUTHENTIK_ISSUER: ISSUER,
+  AUTHENTIK_CLIENT_ID: 'cid',
+  NEXTCLOUD_BASE_URL: 'https://nextcloud.ejemplo.com',
+  NEXTCLOUD_SERVICE_USER: 'audit-core',
+  NEXTCLOUD_SERVICE_PASSWORD: 'p',
+  NEXTCLOUD_WEBHOOK_SECRET: 's',
+}
 
 describe('loadEnv', () => {
   it('aplica los valores por defecto', () => {
@@ -19,6 +27,10 @@ describe('loadEnv', () => {
       CORS_ORIGINS: [],
       THROTTLE_TTL_MS: 60_000,
       THROTTLE_LIMIT: 100,
+      NEXTCLOUD_BASE_URL: 'https://nextcloud.ejemplo.com',
+      NEXTCLOUD_SERVICE_USER: 'audit-core',
+      NEXTCLOUD_SERVICE_PASSWORD: 'p',
+      NEXTCLOUD_WEBHOOK_SECRET: 's',
     })
   })
 
@@ -68,6 +80,19 @@ describe('loadEnv', () => {
       expect(loadEnv({ ...BASE, AUTHENTIK_JWKS_URI: 'https://otro.com/jwks/' }).AUTHENTIK_JWKS_URI).toBe(
         'https://otro.com/jwks/',
       )
+    })
+  })
+
+  describe('Nextcloud', () => {
+    it('la URL base, la cuenta de servicio y el secreto del webhook son obligatorios', () => {
+      expect(() => loadEnv({ ...BASE, NEXTCLOUD_BASE_URL: undefined })).toThrow(/NEXTCLOUD_BASE_URL/)
+      expect(() => loadEnv({ ...BASE, NEXTCLOUD_SERVICE_USER: '' })).toThrow(/NEXTCLOUD_SERVICE_USER/)
+      expect(() => loadEnv({ ...BASE, NEXTCLOUD_SERVICE_PASSWORD: '' })).toThrow(/NEXTCLOUD_SERVICE_PASSWORD/)
+      expect(() => loadEnv({ ...BASE, NEXTCLOUD_WEBHOOK_SECRET: '' })).toThrow(/NEXTCLOUD_WEBHOOK_SECRET/)
+    })
+
+    it('la URL base debe ser una URL', () => {
+      expect(() => loadEnv({ ...BASE, NEXTCLOUD_BASE_URL: 'no-es-una-url' })).toThrow(/NEXTCLOUD_BASE_URL/)
     })
   })
 })

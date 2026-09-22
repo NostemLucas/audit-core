@@ -44,7 +44,7 @@ export async function createTestApp(
     builder = builder.overrideProvider(LOG_DESTINATION).useValue({ write: (line: string) => sink(JSON.parse(line)) })
   const moduleRef = await builder.compile()
 
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false })
+  const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false, rawBody: true })
   configureApp(app, env)
   await app.init()
   return app

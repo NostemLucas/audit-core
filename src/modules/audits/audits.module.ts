@@ -11,6 +11,12 @@ import { EvaluationsController } from './evaluation/evaluations.controller.js'
 import { SetExpectedLevelUseCase } from './evaluation/use-cases/set-expected-level.use-case.js'
 import { AssignEvaluationsUseCase } from './evaluation/use-cases/assign-evaluations.use-case.js'
 import { ListEvaluationsUseCase } from './evaluation/use-cases/list-evaluations.use-case.js'
+import { EvidenceController } from './evidence/evidence.controller.js'
+import { NextcloudWebhookController } from './evidence/nextcloud-webhook.controller.js'
+import { DeleteEvidenceUseCase } from './evidence/use-cases/delete-evidence.use-case.js'
+import { ListEvidenceUseCase } from './evidence/use-cases/list-evidence.use-case.js'
+import { RegisterEvidenceUseCase } from './evidence/use-cases/register-evidence.use-case.js'
+import { RequestEvidenceUploadUseCase } from './evidence/use-cases/request-evidence-upload.use-case.js'
 import { HistoryController } from './history/history.controller.js'
 import { GetEvaluationHistoryUseCase } from './history/use-cases/get-evaluation-history.use-case.js'
 import { ListAuditHistoryUseCase } from './history/use-cases/list-audit-history.use-case.js'
@@ -47,6 +53,8 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     EvaluationsController,
     ResultsController,
     HistoryController,
+    EvidenceController,
+    NextcloudWebhookController,
   ],
   providers: [
     AuditHistoryRecorder,
@@ -78,6 +86,10 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     ListGapsUseCase,
     ListAuditHistoryUseCase,
     GetEvaluationHistoryUseCase,
+    ListEvidenceUseCase,
+    RequestEvidenceUploadUseCase,
+    DeleteEvidenceUseCase,
+    RegisterEvidenceUseCase,
   ],
 })
 export class AuditsModule {}

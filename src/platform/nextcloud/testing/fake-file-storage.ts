@@ -28,4 +28,12 @@ export class FakeFileStorage implements FileStoragePort {
   }
 
   async ping(): Promise<void> {}
+
+  /** Para el `beforeEach` de los tests de integración: `resetDb` vacía la BD, esto vacía lo que se recuerda aquí. */
+  reset(): void {
+    this.sequence = 0
+    this.uploadTargets.length = 0
+    this.uploaded.length = 0
+    this.readShares.length = 0
+  }
 }

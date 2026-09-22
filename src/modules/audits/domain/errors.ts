@@ -106,8 +106,11 @@ export const AuditErrors = defineErrors({
     message: 'Ese archivo ya está registrado como evidencia',
     onUnique: 'evidences_storageFileId_key',
   },
-  /** No se adjunta ni se elimina evidencia de una evaluación cerrada (aprobada) o de una ronda anterior. */
+  /** Misma ventana que editar el contenido (`editable`: IN_PROGRESS o RETURNED, docs/06 §3): no se adjunta ni se
+   * elimina evidencia de un criterio sin arrancar, enviado a revisión o aprobado. */
   EVIDENCE_LOCKED: { http: 409, message: 'La evidencia de esta evaluación no admite cambios en su estado actual' },
+  /** La ruta del archivo (del webhook de Nextcloud) no tiene la forma `.../Evidencias/{evaluationId}/...` (docs/07 §1.2). */
+  EVIDENCE_PATH_INVALID: { http: 422, message: 'La ruta del archivo no corresponde a ningún criterio' },
 
   // ── Informes ───────────────────────────────────────────────────────────────
   REPORT_NOT_FOUND: { http: 404, message: 'Informe no encontrado' },

@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { DB, type Db } from '../../../src/platform/db/index.js'
+import { FakeFileStorage, type FileStoragePort } from '../../../src/platform/nextcloud/index.js'
 import { createTestIssuer } from '../../support/identity.js'
 import { createTestApp } from './app.js'
 import { resetDb } from './db.js'
@@ -19,18 +20,21 @@ export type TestRole = keyof typeof GROUPS
  * Arranque común de los tests HTTP contra Postgres real: la app completa, un emisor de tokens de prueba y la BD
  * vaciada antes de cada test. Llamar UNA vez en el nivel superior del archivo.
  */
-export function useTestApi() {
+export function useTestApi<S extends FileStoragePort = FakeFileStorage>(options: { fileStorage?: S } = {}) {
   let app: NestExpressApplication
   let db: Db
   let issuer: Awaited<ReturnType<typeof createTestIssuer>>
+  const fileStorage = (options.fileStorage ?? new FakeFileStorage()) as S
 
   beforeAll(async () => {
     issuer = await createTestIssuer()
-    app = await createTestApp({ jwtKeys: issuer.keys })
+    app = await createTestApp({ jwtKeys: issuer.keys, fileStorage })
     db = app.get<Db>(DB)
   })
   afterAll(() => app.close())
   beforeEach(() => resetDb(db))
+  // `resetDb` vacía la BD; el `FakeFileStorage` por defecto recuerda entre tests por su cuenta (docs/07 §3).
+  beforeEach(() => (fileStorage as unknown as { reset?: () => void }).reset?.())
 
   // `db` existe recién tras `beforeAll`; el proxy deja usarlo directamente en los tests (`t.db.organization…`).
   const lazyDb = new Proxy({} as Db, { get: (_target, key) => Reflect.get(db, key) })
@@ -38,6 +42,8 @@ export function useTestApi() {
   return {
     app: () => app,
     db: lazyDb,
+    /** El almacenamiento de archivos (`FakeFileStorage` por defecto: sin red real en los tests). */
+    storage: fileStorage,
     /** Una petición HTTP a la app. */
     api: () => request(app.getHttpServer()),
     /**
