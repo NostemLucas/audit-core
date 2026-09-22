@@ -1,10 +1,10 @@
-import ExcelJS from 'exceljs'
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { useTestApi } from './support/api.js'
 import { type SeedNode, seedControls } from './support/templates.js'
 
 const T = '/api/v1/templates'
-const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const YAML_MIME = 'application/yaml'
 const UNKNOWN_ID = '0199c0de-0000-7000-8000-000000000001'
 
 const t = useTestApi()
@@ -144,17 +144,8 @@ describe('archivar', () => {
     await api().get(`${T}/${id}/export`).set('authorization', auth).expect(200)
   })
 })
-
-// ── Excel ────────────────────────────────────────────────────────────────────────────────────────────────────
-async function workbook(sheets: Record<string, Array<Array<ExcelJS.CellValue>>>): Promise<Buffer> {
-  const w = new ExcelJS.Workbook()
-  for (const [name, rows] of Object.entries(sheets)) {
-    const sheet = w.addWorksheet(name)
-    rows.forEach((row) => sheet.addRow(row))
-  }
-  return Buffer.from(await w.xlsx.writeBuffer())
-}
-const CONTROLS_HEADER = ['Nivel', 'Referencia', 'Título', 'Descripción']
+// ── YAML ─────────────────────────────────────────────────────────────────────────────────────────────────────
+const yamlFile = (doc: Record<string, unknown>): Buffer => Buffer.from(stringifyYaml(doc), 'utf8')
 
 async function upload(
   file: Buffer | undefined,
@@ -165,7 +156,7 @@ async function upload(
     .post(`${T}/import`)
     .set('authorization', await as(role))
   for (const [key, value] of Object.entries(fields)) req = req.field(key, value)
-  if (file) req = req.attach('file', file, { filename: 'plantilla.xlsx', contentType: XLSX })
+  if (file) req = req.attach('file', file, { filename: 'plantilla.yaml', contentType: YAML_MIME })
   return req
 }
 async function download(id: string, role: 'manager' | 'auditor' = 'manager') {
@@ -206,20 +197,28 @@ const shape = async (templateId: string) =>
   }))
 
 describe('importar', () => {
-  const ISO = [
-    CONTROLS_HEADER,
-    [1, 'A.5', 'Controles organizacionales', 'Descripción del tema'],
-    [2, 'A.5.1', 'Políticas para la seguridad de la información', undefined],
-    [2, 'A.5.2', '¿Están definidos los roles y responsabilidades?', undefined],
-    [1, 'A.6', 'Controles de personas', undefined],
-    [2, 'A.6.1', 'Selección', undefined],
-    [3, undefined, 'Verificación de antecedentes', undefined],
-  ]
+  const ISO = {
+    controls: [
+      {
+        reference: 'A.5',
+        title: 'Controles organizacionales',
+        description: 'Descripción del tema',
+        controls: [
+          { reference: 'A.5.1', title: 'Políticas para la seguridad de la información' },
+          { reference: 'A.5.2', title: '¿Están definidos los roles y responsabilidades?' },
+        ],
+      },
+      {
+        reference: 'A.6',
+        title: 'Controles de personas',
+        controls: [{ reference: 'A.6.1', title: 'Selección', controls: [{ title: 'Verificación de antecedentes' }] }],
+      },
+    ],
+  }
 
-  it('crea una plantilla NUEVA en borrador con el árbol del archivo (padres por nivel, orden de las filas)', async () => {
-    const res = await upload(await workbook({ Controles: ISO }), { name: 'ISO/IEC 27001:2022' })
+  it('crea una plantilla NUEVA en borrador con el árbol del archivo (la anidación es la jerarquía, orden de lectura)', async () => {
+    const res = await upload(yamlFile(ISO), { name: 'ISO/IEC 27001:2022' })
     expect(res.status).toBe(201)
-    expect(res.body.data.warnings).toEqual([])
     expect(res.body.data.template).toMatchObject({
       name: 'ISO/IEC 27001:2022',
       status: 'DRAFT',
@@ -267,76 +266,46 @@ describe('importar', () => {
     expect(row.createdById).toBe(user.id)
   })
 
-  it('el nombre viene del campo o de la hoja "Plantilla"; si vienen los dos gana el campo; si no viene ninguno: 422', async () => {
-    const sheets = {
-      Plantilla: [
-        ['Campo', 'Valor'],
-        ['Nombre', 'Del archivo'],
-      ],
-      Controles: [CONTROLS_HEADER, [1, undefined, 'D', undefined], [2, undefined, 'h', undefined]],
-    }
-    const file = await workbook(sheets)
-    expect((await upload(file)).body.data.template.name).toBe('Del archivo')
-    expect((await upload(file, { name: 'Del formulario' })).body.data.template.name).toBe('Del formulario')
+  it('el nombre viene del campo o de la clave "name" del YAML; si vienen los dos gana el campo; si no viene ninguno: 422', async () => {
+    const withName = { name: 'Del archivo', controls: [{ title: 'D', controls: [{ title: 'h' }] }] }
+    expect((await upload(yamlFile(withName))).body.data.template.name).toBe('Del archivo')
+    expect((await upload(yamlFile(withName), { name: 'Del formulario' })).body.data.template.name).toBe(
+      'Del formulario',
+    )
 
-    const anonymous = await upload(await workbook({ Controles: sheets.Controles }))
+    const anonymous = await upload(yamlFile({ controls: withName.controls }))
     expect(anonymous.status).toBe(422)
     expect(anonymous.body.error.code).toBe('TEMPLATE_IMPORT_INVALID')
     expect(anonymous.body.error.details.errors[0].message).toMatch(/nombre/)
   })
 
-  it('archivo del formato anterior (Standards + Código padre + guía): se importa y avisa de lo que ignoró', async () => {
-    const file = await workbook({
-      Standards: [
-        ['ID (Sistema)', 'Código', 'Título', 'Descripción', 'Código Padre', 'ID Padre', 'Guía Auditor'],
-        ['u1', 'A.5.1', 'Hijo', '', 'A.5', 'u2', 'guía que ya no existe'],
-        ['u2', 'A.5', 'Dominio', 'texto', '-', '', ''],
-      ],
-    })
-    const res = await upload(file, { name: 'Antigua' })
-    expect(res.status).toBe(201)
-    expect(res.body.data.warnings.join(' ')).toMatch(/guía del auditor/)
-    expect(await shape(res.body.data.template.id)).toEqual([
-      { reference: 'A.5', title: 'Dominio', description: 'texto', position: 0, depth: 0, isLeaf: false },
-      { reference: 'A.5.1', title: 'Hijo', description: null, position: 0, depth: 1, isLeaf: true },
-    ])
-  })
-
-  it('errores del archivo: 422 con la fila de cada uno, y NO se crea nada', async () => {
-    const file = await workbook({
-      Controles: [
-        CONTROLS_HEADER,
-        [1, 'A', 'ok', undefined],
-        [3, 'B', 'salta', undefined],
-        [2, 'C', '', undefined],
-        ['x', 'D', 'raro', undefined],
-      ],
-    })
-    const res = await upload(file, { name: 'Con errores' })
+  it('errores del archivo: 422 con la posición de cada uno (orden de lectura), y NO se crea nada', async () => {
+    const res = await upload(
+      yamlFile({
+        controls: [{ title: 'ok' }, { title: '', controls: [{ title: 'nieto ok' }] }, { title: '' }],
+      }),
+      { name: 'Con errores' },
+    )
     expect(res.status).toBe(422)
     expect(res.body.error.code).toBe('TEMPLATE_IMPORT_INVALID')
-    expect(res.body.error.details.errors.map((e: { row: number }) => e.row)).toEqual([3, 4, 5])
-    expect(res.body.error.details.totalErrors).toBe(3)
+    expect(res.body.error.details.errors.map((e: { row: number }) => e.row)).toEqual([2, 4])
+    expect(res.body.error.details.totalErrors).toBe(2)
     expect(await db.template.count()).toBe(0)
     expect(await db.control.count()).toBe(0)
   })
 
   it('con muchos errores se informan los primeros 20 y el total', async () => {
-    const rows = [
-      CONTROLS_HEADER,
-      ...Array.from({ length: 30 }, (_v, i) => [1, `r${i}`, undefined, undefined] as ExcelJS.CellValue[]),
-    ]
-    const res = await upload(await workbook({ Controles: rows }), { name: 'Muchos' })
+    const controls = Array.from({ length: 30 }, () => ({ title: '' }))
+    const res = await upload(yamlFile({ controls }), { name: 'Muchos' })
     expect(res.body.error.details.errors).toHaveLength(20)
     expect(res.body.error.details.totalErrors).toBe(30)
   })
 
   it('nombre repetido (sin distinguir mayúsculas): 409 y no queda ningún control huérfano', async () => {
     await createTemplate('Existente')
-    const res = await upload(
-      await workbook({ Controles: [CONTROLS_HEADER, [1, undefined, 'D', undefined], [2, undefined, 'h', undefined]] }),
-      { name: 'existente' },
-    )
+    const res = await upload(yamlFile({ controls: [{ title: 'D', controls: [{ title: 'h' }] }] }), {
+      name: 'existente',
+    })
     expect(res.status).toBe(409)
     expect(res.body.error.code).toBe('TEMPLATE_NAME_TAKEN')
     expect(await db.template.count()).toBe(1)
@@ -345,11 +314,10 @@ describe('importar', () => {
 
   it.each([
     ['sin archivo', undefined],
-    ['un archivo que no es Excel', Buffer.from('nombre,nivel\nx,1')],
-    ['un libro sin columna Título', undefined],
-  ])('%s: 422 TEMPLATE_IMPORT_INVALID', async (caso, file) => {
-    const buffer = caso === 'un libro sin columna Título' ? await workbook({ x: [['Nivel'], [1]] }) : file
-    const res = await upload(buffer, { name: 'X' })
+    ['un archivo que no es YAML', Buffer.from('controls: [x: y: z\n', 'utf8')],
+    ['un archivo sin ningún control', Buffer.from('name: X\n', 'utf8')],
+  ])('%s: 422 TEMPLATE_IMPORT_INVALID', async (_caso, file) => {
+    const res = await upload(file, { name: 'X' })
     expect(res.status).toBe(422)
     expect(res.body.error.code).toBe('TEMPLATE_IMPORT_INVALID')
     expect(await db.template.count()).toBe(0)
@@ -370,35 +338,33 @@ describe('importar', () => {
     expect(await db.template.count()).toBe(0)
   })
 
-  it('un archivo en el tope de 5000 filas se importa completo (la inserción cabe en los límites de parámetros de Postgres)', async () => {
-    const rows: ExcelJS.CellValue[][] = [CONTROLS_HEADER]
-    for (let d = 0; d < 50; d++) {
-      rows.push([1, `D${d}`, `Dominio ${d}`, undefined])
-      for (let c = 0; c < 99; c++) rows.push([2, `D${d}.${c}`, `Criterio ${d}.${c}`, 'descripción'])
-    }
-    expect(rows.length - 1).toBe(5000)
-    const res = await upload(await workbook({ Controles: rows }), { name: 'En el tope' })
+  it('un archivo en el tope de 5000 controles se importa completo (la inserción cabe en los límites de parámetros de Postgres)', async () => {
+    const domains = Array.from({ length: 50 }, (_v, d) => ({
+      title: `Dominio ${d}`,
+      controls: Array.from({ length: 99 }, (_w, c) => ({ title: `Criterio ${d}.${c}`, description: 'descripción' })),
+    }))
+    const total = domains.reduce((sum, d) => sum + 1 + d.controls.length, 0)
+    expect(total).toBe(5000)
+    const res = await upload(yamlFile({ controls: domains }), { name: 'En el tope' })
     expect(res.status).toBe(201)
     expect(res.body.data.template.controlCount).toBe(5000)
     expect(await db.control.count({ where: { parentId: null } })).toBe(50)
-    const over = await upload(await workbook({ Controles: [...rows, [2, 'x', 'una más', undefined]] }), {
-      name: 'Pasado',
-    })
+
+    const over = await upload(yamlFile({ controls: [...domains, { title: 'una más' }] }), { name: 'Pasado' })
     expect(over.status).toBe(422)
     expect(over.body.error.details.errors[0].message).toMatch(/máximo de 5000/)
   })
 
   it('un auditor no importa (403 antes de leer el archivo); sin token 401', async () => {
-    const file = await workbook({ Controles: [CONTROLS_HEADER, [1, undefined, 'D', undefined]] })
+    const file = yamlFile({ controls: [{ title: 'D' }] })
     expect((await upload(file, { name: 'X' }, 'auditor')).status).toBe(403)
-    expect((await api().post(`${T}/import`).attach('file', file, 'x.xlsx')).status).toBe(401)
+    expect((await api().post(`${T}/import`).attach('file', file, 'x.yaml')).status).toBe(401)
     expect(await db.template.count()).toBe(0)
   })
 
   /**
    * Atomicidad: si el guardado de los controles falla DESPUÉS de crear la plantilla, no debe quedar la plantilla. El fallo
-   * se provoca con un disparador temporal de la BD (cualquier error de la BD sirve; un carácter inválido no llega a la BD
-   * porque Excel lo elimina).
+   * se provoca con un disparador temporal de la BD (cualquier error de la BD sirve).
    */
   it('si falla el guardado de los controles, no queda la plantilla a medias (transacción)', async () => {
     await db.$executeRawUnsafe(`
@@ -408,9 +374,7 @@ describe('importar', () => {
       `CREATE TRIGGER test_fail_control BEFORE INSERT ON "controls" FOR EACH ROW EXECUTE FUNCTION test_fail_control()`,
     )
     try {
-      const file = await workbook({
-        Controles: [CONTROLS_HEADER, [1, undefined, 'Dominio', undefined], [2, undefined, 'BOOM', undefined]],
-      })
+      const file = yamlFile({ controls: [{ title: 'Dominio', controls: [{ title: 'BOOM' }] }] })
       const res = await upload(file, { name: 'Se rompe' })
       expect(res.status).toBe(500)
       expect(res.body.error.code).toBe('INTERNAL')
@@ -423,16 +387,14 @@ describe('importar', () => {
   })
 
   it('una plantilla importada con dominios sin hijos entra como borrador y NO se publica hasta agruparla', async () => {
-    const res = await upload(await workbook({ Controles: [CONTROLS_HEADER, [1, undefined, 'Solo', undefined]] }), {
-      name: 'Plana',
-    })
+    const res = await upload(yamlFile({ controls: [{ title: 'Solo' }] }), { name: 'Plana' })
     expect(res.status).toBe(201)
     expect((await post(`${T}/${res.body.data.template.id}/publish`)).body.error.code).toBe('TEMPLATE_INVALID_STRUCTURE')
   })
 })
 
 describe('exportar', () => {
-  it('devuelve un .xlsx con el árbol en orden de lectura y los niveles; sin el envoltorio { data }', async () => {
+  it('devuelve un .yaml con el árbol anidado; sin el envoltorio { data }', async () => {
     const id = await templateWith(
       [
         {
@@ -447,23 +409,37 @@ describe('exportar', () => {
     )
     const res = await download(id)
     expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toBe(XLSX)
+    expect(res.headers['content-type']).toBe(YAML_MIME)
     expect(res.headers['content-disposition']).toMatch(
-      /^attachment; filename="ISO_IEC 27001_2022\.xlsx"; filename\*=UTF-8''ISO%2FIEC%2027001%3A2022\.xlsx$/,
+      /^attachment; filename="ISO_IEC 27001_2022\.yaml"; filename\*=UTF-8''ISO%2FIEC%2027001%3A2022\.yaml$/,
     )
 
-    const w = new ExcelJS.Workbook()
-    await w.xlsx.load(res.body as ExcelJS.Buffer)
-    const rows = w.getWorksheet('Controles')!.getSheetValues().slice(2) as Array<Array<ExcelJS.CellValue>>
-    expect(rows.map((r) => [r[1], r[2] || null, r[3]])).toEqual([
-      [1, 'D1', 'Dominio'],
-      [2, null, 'Objetivo'],
-      [3, 'D1.1', 'Criterio'],
-      [2, null, 'Directo'],
-      [1, null, 'Otro'],
-      [2, null, 'h'],
-    ])
-    expect(w.getWorksheet('Plantilla')!.getRow(2).getCell(2).value).toBe('ISO/IEC 27001:2022')
+    const doc = parseYaml((res.body as Buffer).toString('utf8'))
+    expect(doc).toEqual({
+      name: 'ISO/IEC 27001:2022',
+      controls: [
+        {
+          reference: 'D1',
+          title: 'Dominio',
+          description: 'desc',
+          controls: [
+            {
+              reference: null,
+              title: 'Objetivo',
+              description: null,
+              controls: [{ reference: 'D1.1', title: 'Criterio', description: null }],
+            },
+            { reference: null, title: 'Directo', description: null },
+          ],
+        },
+        {
+          reference: null,
+          title: 'Otro',
+          description: null,
+          controls: [{ reference: null, title: 'h', description: null }],
+        },
+      ],
+    })
   })
 
   it('cualquier nombre de plantilla produce un encabezado seguro (sin comillas, saltos de línea ni caracteres de control)', async () => {
@@ -518,7 +494,6 @@ describe('exportar', () => {
     const exported = await download(original)
     const res = await upload(exported.body as Buffer, { name: 'Copia' })
     expect(res.status).toBe(201)
-    expect(res.body.data.warnings).toEqual([])
     expect(await shape(res.body.data.template.id)).toEqual(await shape(original))
   })
 })

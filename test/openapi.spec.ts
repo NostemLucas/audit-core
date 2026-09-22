@@ -74,7 +74,7 @@ describe('OpenAPI de la aplicación', () => {
     expect(data.levels.items.properties.value).toMatchObject({ type: 'number' })
   })
 
-  it('la importación es multipart con un archivo binario y la exportación produce un .xlsx', () => {
+  it('la importación es multipart con un archivo binario y la exportación produce un .yaml', () => {
     const importBody = (doc.paths['/api/v1/templates/import']?.post as Operation).requestBody
     expect(importBody.content['multipart/form-data'].schema.properties.file).toMatchObject({
       type: 'string',
@@ -87,9 +87,7 @@ describe('OpenAPI de la aplicación', () => {
       format: 'binary',
     })
     const exported = (doc.paths['/api/v1/templates/{id}/export']?.get as Operation).responses!['200']!
-    expect(Object.keys(exported.content!)).toEqual([
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    ])
+    expect(Object.keys(exported.content!)).toEqual(['application/yaml'])
   })
 
   it('ninguna respuesta de éxito documentada trae un esquema vacío o sin representar', () => {

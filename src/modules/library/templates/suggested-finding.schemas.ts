@@ -43,7 +43,7 @@ export const ImportMatrixBody = z.object({
       type: 'string',
       format: 'binary',
       description:
-        'Matriz de Excel (.xlsx) descargada del sistema y completada. Obligatorio: sin él la respuesta es 422.',
+        'Matriz YAML (.yaml/.yml) descargada del sistema y completada. Obligatorio: sin él la respuesta es 422.',
     })
     .optional(),
 })

@@ -19,7 +19,7 @@ export const TemplateView = z.object({
 
 /**
  * Importar (multipart). `file` se documenta aquí para que el OpenAPI lo muestre como archivo, pero NO se valida aquí: multer
- * lo entrega aparte (`@UploadedFile()`), no en el cuerpo. El nombre puede venir en el formulario o en la hoja "Plantilla".
+ * lo entrega aparte (`@UploadedFile()`), no en el cuerpo. El nombre puede venir en el formulario o en la clave "name" del YAML.
  */
 export const ImportTemplateBody = z.object({
   file: z
@@ -27,18 +27,14 @@ export const ImportTemplateBody = z.object({
     .meta({
       type: 'string',
       format: 'binary',
-      description: 'Libro de Excel (.xlsx). Obligatorio: sin él la respuesta es 422.',
+      description: 'Archivo YAML (.yaml/.yml). Obligatorio: sin él la respuesta es 422.',
     })
     .optional(),
   name: Name.optional(),
 })
 export type ImportTemplateBodyT = z.infer<typeof ImportTemplateBody>
 
-export const ImportTemplateResult = z.object({
-  template: TemplateView,
-  /** Lo que se ignoró o se interpretó del formato anterior; no impide la importación. */
-  warnings: z.array(z.string()),
-})
+export const ImportTemplateResult = z.object({ template: TemplateView })
 
 export const CreateTemplate = z.object({ name: Name })
 export type CreateTemplateT = z.infer<typeof CreateTemplate>

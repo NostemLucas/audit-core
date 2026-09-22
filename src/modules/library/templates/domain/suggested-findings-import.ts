@@ -111,7 +111,7 @@ export function planSuggestedImport(
 
     const id = raw.controlId?.toLowerCase()
     if (!id) {
-      issues.push({ row: raw.row, message: 'Falta el ID del control (columna "ID": no la borres ni la modifiques)' })
+      issues.push({ row: raw.row, message: 'Falta el ID del control (no lo borres ni lo modifiques)' })
       continue
     }
     if (!UUID.test(id) || !leafIds.has(id)) {

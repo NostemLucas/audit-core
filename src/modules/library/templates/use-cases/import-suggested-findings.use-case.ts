@@ -5,7 +5,7 @@ import { LibraryErrors } from '../../errors.js'
 import { ControlTree } from '../domain/control-tree.js'
 import { matchLevelColumns, planSuggestedImport } from '../domain/suggested-findings-import.js'
 import { importError } from '../import-error.js'
-import { type MatrixContent, readMatrixWorkbook } from '../infrastructure/matrix-excel.js'
+import { type MatrixContent, readMatrixYaml } from '../infrastructure/matrix-yaml.js'
 import { loadControls, loadTemplate } from '../template.queries.js'
 
 @Injectable()
@@ -13,14 +13,14 @@ export class ImportSuggestedFindingsUseCase {
   constructor(@InjectTx() private readonly tx: Tx) {}
 
   /**
-   * Carga la matriz de una escala desde un Excel. Solo AGREGA o CAMBIA sugerencias: una celda vacía no borra nada (borrar es
+   * Carga la matriz de una escala desde un YAML. Solo AGREGA o CAMBIA sugerencias: una celda vacía no borra nada (borrar es
    * explícito). Todo o nada: si el archivo tiene errores no se guarda ninguna celda. Se permite en cualquier estado de la
    * plantilla, como escribir una sugerencia suelta. Leer el archivo no necesita la transacción.
    */
   async execute(input: { templateId: string; scaleId: string; file: Buffer | undefined }) {
     if (!input.file || input.file.length === 0)
       throw importError([{ row: 0, message: 'Falta el archivo (campo "file")' }])
-    return this.apply(input.templateId, input.scaleId, await readMatrixWorkbook(input.file))
+    return this.apply(input.templateId, input.scaleId, readMatrixYaml(input.file))
   }
 
   /**

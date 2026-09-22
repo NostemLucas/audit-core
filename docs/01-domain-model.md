@@ -166,14 +166,14 @@ auditoría. Añade una dimensión a `evaluations` y a los pesos. Si se necesita,
 
 ## 3a. Plantillas: importar, exportar y clonar
 
-- **Excel**: se conserva, con un formato nuevo (`library/templates/domain/control-import.ts` es la
-  única lógica; `infrastructure/excel-*.ts` solo lee y escribe el libro):
-  - Hoja `Controles` con `Nivel`, `Referencia`, `Título`, `Descripción`, en orden de lectura; el padre de una fila es la fila
-    anterior de nivel menor (no depende de ninguna referencia). Hoja `Plantilla` (`Campo`/`Valor`) con `Nombre`.
-  - Se siguen aceptando los archivos del proyecto anterior (`Standards`, `Código`, `Código padre`) resolviendo el padre solo dentro
-    del archivo; la columna "Guía auditor" se ignora con un aviso. Los avisos no impiden importar.
-  - Importar **crea una plantilla nueva** en borrador (todo o nada); los errores se devuelven todos juntos con su fila
-    (`TEMPLATE_IMPORT_INVALID`, primeros 20 y el total). Exportar → importar reproduce el árbol tal cual.
+- **YAML** (no Excel: `library/templates/domain/control-import.ts` es la única lógica, sobre un árbol ya parseado;
+  `infrastructure/template-yaml.ts` solo lee y escribe el archivo):
+  - `name` (opcional: puede venir del formulario) y `controls`, una lista de `{ reference, title, description, controls }`
+    anidada — la anidación del YAML ES la jerarquía, no hace falta ninguna columna "nivel" (a diferencia del formato anterior en
+    Excel, que este proyecto no conserva: no hay archivos antiguos que migrar porque el import/export es nuevo).
+  - Importar **crea una plantilla nueva** en borrador (todo o nada); los errores se devuelven todos juntos con la posición de cada
+    control en el orden de lectura (`TEMPLATE_IMPORT_INVALID`, primeros 20 y el total). Exportar → importar reproduce el árbol tal
+    cual.
   - Tope de 5 MB y 5000 filas.
 - **Clonar** (`POST /templates/:id/clone`, con un `name` nuevo): copia el árbol (orden incluido) y los hallazgos sugeridos de una
   plantilla en **cualquier estado** a otra NUEVA en borrador; el origen no cambia (no se archiva: una publicada sigue en uso por
@@ -201,20 +201,23 @@ Qué se cambia:
   (`SCALE_LEVEL_IN_USE` / `SCALE_IN_USE`, `details.reason = SUGGESTED_FINDINGS`) en lugar de destruir texto redactado en cascada.
 - API: `GET /templates/:id/suggested-findings?scaleId=` (la matriz: una fila por hoja con su dominio y solo los textos que
   existen), `PUT` y `DELETE /templates/:id/controls/:controlId/suggested-findings/:levelId` (quitar es idempotente).
-- **Excel** (matriz por escala; `domain/suggested-findings-import.ts` es la única lógica y `infrastructure/matrix-excel.ts` solo
-  lee y escribe el libro): `GET …/suggested-findings/export?scaleId=` baja una hoja `Hallazgos` con una fila por hoja del árbol
-  (columnas `Dominio`, `Referencia`, `Control` y una por opción: `0 – No cumple`, `50 – Parcial`…) y una columna `ID` **oculta** que
-  identifica al control. `POST …/import?scaleId=` la vuelve a leer: las opciones se reconocen por el puntaje del encabezado (o,
-  si no, por la etiqueta), lo que no se reconoce se ignora con un aviso, y **solo agrega o cambia** (una celda vacía no borra:
-  borrar es explícito). Todo o nada, con los errores de todas las filas juntos. Como las referencias ya no son claves (`04` §4.1),
-  el formato antiguo por `código` + nivel no se puede reconocer: la matriz se baja del sistema.
+- **YAML** (matriz por escala; `domain/suggested-findings-import.ts` es la única lógica —sin cambios respecto a Excel: sigue
+  operando sobre "columnas" y "filas" genéricas— y `infrastructure/matrix-yaml.ts` solo lee y escribe el archivo): `GET
+  …/suggested-findings/export?scaleId=` baja `findings`, una entrada por hoja del árbol (`id`, `domain`, `reference`, `control`
+  de contexto, y `texts` con TODAS las opciones de la escala como claves, aunque estén vacías: `0 – No cumple`, `50 – Parcial`…,
+  para que el archivo muestre qué rellenar incluso sin ninguna sugerencia todavía). `POST …/import?scaleId=` la vuelve a leer:
+  cada clave de `texts` vista en el archivo es una "columna" (igual que antes); las opciones se reconocen por el puntaje de la
+  clave (o, si no, por su etiqueta), lo que no se reconoce se ignora con un aviso, y **solo agrega o cambia** (una clave vacía o
+  ausente no borra: borrar es explícito). Todo o nada, con los errores de todas las entradas juntos (posición en el archivo, no
+  fila de hoja de cálculo).
 
 ## 5. Qué se conserva del proyecto actual
 
 El análisis de brechas (con la fórmula de resultados rediseñada: `05` §6 y §11, sin pesos); reglas de transición de auditoría y evaluación (ahora como tabla tipada `defineLifecycle`, sin XState; ver `03`); clonado de plantillas; CASL con su test de
 cobertura de rutas; sincronización con Authentik (`protectLastAdmin`, reintentos por unique); provisioning y
 shares de Nextcloud (`READ_ONLY=1`, `UPLOAD_ONLY=7`, `EDIT=15`), webhooks y OnlyOffice; contenido de los seeds
-(ISO 27001, ASFI, COBIT 5, CMMI, binaria, cualitativa); informes docx; import/export Excel; Sentry y throttling.
+(ISO 27001, ASFI, COBIT 5, CMMI, binaria, cualitativa); informes docx; import/export de plantillas y hallazgos sugeridos (en
+YAML, no en Excel: `3a` y `4`); Sentry y throttling.
 
 **No se conserva:** `BaseRepository`, `@Transactional()` por monkey-patching, logger propio (2.6k líneas), i18n
 propio (2.4k), decoradores swagger propios y `swagger.cli`, `_shared/` como cajón de sastre,

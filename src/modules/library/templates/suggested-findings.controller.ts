@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiOkResponse, ApiProduces } from '@nestjs/swagger'
 import { Can } from '../../../platform/authz/index.js'
-import { attachment, Responds, XLSX_MIME } from '../../../platform/http/index.js'
+import { attachment, Responds, YAML_MIME } from '../../../platform/http/index.js'
 import { LIMITS } from '../../../shared/limits.js'
 import { ControlId } from './control.schemas.js'
 import { ExportSuggestedFindingsUseCase } from './use-cases/export-suggested-findings.use-case.js'
@@ -61,20 +61,20 @@ export class SuggestedFindingsController {
     return this.matrix.execute(templateId, query.scaleId)
   }
 
-  /** La matriz de una escala como Excel: se completa y se vuelve a subir con `POST …/import`. */
+  /** La matriz de una escala como YAML: se completa y se vuelve a subir con `POST …/import`. */
   @Get('suggested-findings/export')
   @Can('read', 'Template')
-  @ApiProduces(XLSX_MIME)
+  @ApiProduces(YAML_MIME)
   @ApiOkResponse({
-    description: 'La matriz como Excel',
-    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+    description: 'La matriz como YAML',
+    content: { [YAML_MIME]: { schema: { type: 'string', format: 'binary' } } },
   })
   async export(
     @Param('templateId', { schema: TemplateId }) templateId: string,
     @Query({ schema: MatrixQuery }) query: MatrixQueryT,
   ): Promise<StreamableFile> {
     const { buffer, name } = await this.exportMatrix.execute(templateId, query.scaleId)
-    return new StreamableFile(buffer, { type: XLSX_MIME, disposition: attachment(name, 'xlsx') })
+    return new StreamableFile(buffer, { type: YAML_MIME, disposition: attachment(name, 'yaml') })
   }
 
   /** Solo agrega o cambia sugerencias (una celda vacía no borra). Todo o nada. Multipart: `file`. */

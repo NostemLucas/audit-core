@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiOkResponse, ApiProduces } from '@nestjs/swagger'
 import { Can } from '../../../platform/authz/index.js'
-import { attachment, Responds, XLSX_MIME } from '../../../platform/http/index.js'
+import { attachment, Responds, YAML_MIME } from '../../../platform/http/index.js'
 import { LIMITS } from '../../../shared/limits.js'
 import { ArchiveTemplateUseCase } from './use-cases/archive-template.use-case.js'
 import { CloneTemplateUseCase } from './use-cases/clone-template.use-case.js'
@@ -117,7 +117,7 @@ export class TemplatesController {
     return this.archiveTemplate.execute(id)
   }
 
-  /** Crea una plantilla nueva (borrador) desde un Excel. Multipart: `file` y, opcionalmente, `name`. */
+  /** Crea una plantilla nueva (borrador) desde un YAML. Multipart: `file` y, opcionalmente, `name`. */
   @Post('import')
   @Can('create', 'Template')
   @Responds(ImportTemplateResult, { status: 201 })
@@ -133,13 +133,13 @@ export class TemplatesController {
 
   @Get(':id/export')
   @Can('read', 'Template')
-  @ApiProduces(XLSX_MIME)
+  @ApiProduces(YAML_MIME)
   @ApiOkResponse({
-    description: 'La plantilla como Excel',
-    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+    description: 'La plantilla como YAML',
+    content: { [YAML_MIME]: { schema: { type: 'string', format: 'binary' } } },
   })
   async export(@Param('id', { schema: TemplateId }) id: string): Promise<StreamableFile> {
     const { buffer, name } = await this.exportTemplate.execute(id)
-    return new StreamableFile(buffer, { type: XLSX_MIME, disposition: attachment(name, 'xlsx') })
+    return new StreamableFile(buffer, { type: YAML_MIME, disposition: attachment(name, 'yaml') })
   }
 }

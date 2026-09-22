@@ -138,7 +138,7 @@ La tabla de §4 preveía un repositorio (port + adaptador + mapper) para el agre
 las reglas de la plantilla (árbol, ciclo de vida, orden entre hermanos, análisis de la importación) son **funciones puras
 sobre datos planos** (`domain/`), y se prueban sin ninguna infraestructura; los casos de uso cargan filas con `Tx` y se las
 pasan. Un port con una sola implementación en Prisma habría sido ceremonia (y otra copia de la lista de campos). Lo que sí
-sale de `domain/` es lo que no es lógica: la lectura de Excel (`infrastructure/`). El criterio para `audits` se decide en su
+sale de `domain/` es lo que no es lógica: la lectura del YAML (`infrastructure/`). El criterio para `audits` se decide en su
 fase: allí las entidades sí tienen comportamiento propio.
 
 ### Estructura de un módulo Tier B (y por qué no tiene `domain/`)
