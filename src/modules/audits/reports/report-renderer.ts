@@ -48,13 +48,20 @@ export interface ReportData {
  * `docxtemplater` escribiría el texto "undefined", que en un informe real se leería como un error de la plantilla.
  * Cualquier fallo (plantilla corrupta, marcador que no encuentra su dato) se traduce a `REPORT_GENERATION_FAILED`;
  * nunca se sube ni se guarda un informe a medias.
+ *
+ * `chartPng`, si se da, REEMPLAZA los bytes del `word/media/chart1.png` de la plantilla (el marcador de imagen —
+ * posición, tamaño, relación — ya está fijo en la plantilla estática; solo cambia el contenido del PNG por auditoría).
+ * Así se evita cualquier módulo de imágenes de `docxtemplater` (de pago): el "marcador" de la imagen es, en los
+ * hechos, un nombre de archivo fijo dentro del zip.
  */
-export function renderReport(template: Buffer, data: ReportData): Buffer {
+export function renderReport(template: Buffer, data: ReportData, chartPng: Buffer | null = null): Buffer {
   try {
     const zip = new PizZip(template)
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => '—' })
     doc.render(data as unknown as Record<string, unknown>)
-    return doc.getZip().generate({ type: 'nodebuffer' })
+    const rendered = doc.getZip()
+    if (chartPng) rendered.file('word/media/chart1.png', chartPng)
+    return rendered.generate({ type: 'nodebuffer' })
   } catch (cause) {
     throw new DomainError(AuditErrors.REPORT_GENERATION_FAILED, {}, { cause })
   }

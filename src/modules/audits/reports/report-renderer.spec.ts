@@ -109,6 +109,21 @@ describe('renderReport', () => {
     expect(xml).toContain('Personas: esperado —, alcanzado —, brecha —')
   })
 
+  it('con `chartPng`: reemplaza los bytes de word/media/chart1.png por los del gráfico de ESTE informe', async () => {
+    const chartPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xde, 0xad, 0xbe, 0xef])
+    const buffer = renderReport(loadDefaultTemplate(), DATA, chartPng)
+    const { default: PizZip } = await import('pizzip')
+    const embedded = new PizZip(buffer).file('word/media/chart1.png')!.asUint8Array()
+    expect(Buffer.from(embedded)).toEqual(chartPng)
+  })
+
+  it('sin `chartPng` (por defecto): conserva la imagen de la plantilla (el marcador de imagen sigue siendo válido)', async () => {
+    const buffer = renderReport(loadDefaultTemplate(), DATA)
+    const { default: PizZip } = await import('pizzip')
+    const embedded = new PizZip(buffer).file('word/media/chart1.png')
+    expect(embedded).not.toBeNull()
+  })
+
   it('una plantilla que no es un zip válido: REPORT_GENERATION_FAILED, no la excepción cruda de la librería', () => {
     expect(() => renderReport(Buffer.from('no soy un docx'), DATA)).toThrow(
       expect.objectContaining({ code: 'REPORT_GENERATION_FAILED' }),

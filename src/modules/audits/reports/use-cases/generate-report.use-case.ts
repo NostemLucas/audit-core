@@ -13,6 +13,8 @@ import { SEVERITY_LABELS } from '../../messages.es.js'
 import { findEvaluations } from '../../evaluation/evaluation.queries.js'
 import { accessOf, loadAuditView } from '../../infrastructure/audit.queries.js'
 import { computeGapViews, countBySeverity, toScoredLeaves } from '../../results/results.queries.js'
+import { renderChartPng } from '../chart-renderer.js'
+import { buildDomainChartSvg } from '../domain-chart.js'
 import { loadReport } from '../reports.queries.js'
 import { renderReport } from '../report-renderer.js'
 import { loadDefaultTemplate } from '../report.template.js'
@@ -52,35 +54,42 @@ export class GenerateReportUseCase {
     )
     const gaps = computeGapViews(rows, template)
     const severityCounts = countBySeverity(gaps)
+    const domains = results.domains.map(({ domainId: _domainId, ...domain }, index) => ({
+      title: roots[index]!.title,
+      ...domain,
+    }))
+    const scaleMax = Math.max(...scale.levels.map((level) => level.value))
+    const chartPng = await renderChartPng(buildDomainChartSvg(domains, scaleMax))
 
     const title = input.title ?? audit.name
-    const buffer = renderReport(loadDefaultTemplate(), {
-      auditCode: audit.code,
-      auditName: audit.name,
-      organizationName: audit.organization.name,
-      generatedAt: this.clock.now().toISOString().slice(0, 10),
-      evaluated: results.overall.evaluated,
-      meets: results.overall.meets,
-      below: results.overall.below,
-      notApplicable: results.overall.notApplicable,
-      pending: results.overall.pending,
-      majorCount: severityCounts.MAJOR,
-      minorCount: severityCounts.MINOR,
-      observationCount: severityCounts.OBSERVATION,
-      domains: results.domains.map(({ domainId: _domainId, ...domain }, index) => ({
-        title: roots[index]!.title,
-        ...domain,
-      })),
-      gaps: gaps.map((gap) => ({
-        domain: gap.control.domain,
-        reference: gap.control.reference,
-        title: gap.control.title,
-        expectedLabel: gap.expectedLevel?.label ?? null,
-        achievedLabel: gap.achievedLevel?.label ?? null,
-        findings: gap.findings,
-        severity: gap.severity ? SEVERITY_LABELS[gap.severity] : null,
-      })),
-    })
+    const buffer = renderReport(
+      loadDefaultTemplate(),
+      {
+        auditCode: audit.code,
+        auditName: audit.name,
+        organizationName: audit.organization.name,
+        generatedAt: this.clock.now().toISOString().slice(0, 10),
+        evaluated: results.overall.evaluated,
+        meets: results.overall.meets,
+        below: results.overall.below,
+        notApplicable: results.overall.notApplicable,
+        pending: results.overall.pending,
+        majorCount: severityCounts.MAJOR,
+        minorCount: severityCounts.MINOR,
+        observationCount: severityCounts.OBSERVATION,
+        domains,
+        gaps: gaps.map((gap) => ({
+          domain: gap.control.domain,
+          reference: gap.control.reference,
+          title: gap.control.title,
+          expectedLabel: gap.expectedLevel?.label ?? null,
+          achievedLabel: gap.achievedLevel?.label ?? null,
+          findings: gap.findings,
+          severity: gap.severity ? SEVERITY_LABELS[gap.severity] : null,
+        })),
+      },
+      chartPng,
+    )
 
     const reportId = randomUUID()
     const uploaded = await this.storage.upload(reportPath(audit.code, reportId), buffer, DOCX_MIME)

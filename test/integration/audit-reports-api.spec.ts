@@ -1,4 +1,5 @@
 import PizZip from 'pizzip'
+import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 import '../../src/app-events.js'
 import { renderEventMessage } from '../../src/platform/events/index.js'
@@ -89,6 +90,37 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
     expect(xml).toContain('Cubre solo la mitad')
     expect(xml).toContain(gap.expectedLevel.label)
     expect(xml).toContain(gap.achievedLevel.label)
+  })
+
+  it('el gráfico embebido es un PNG real, del tamaño que declara la plantilla y con color (no el marcador en blanco)', async () => {
+    const ctx = await startedAudit(t)
+    const roles = await db.evaluation.findFirstOrThrow({ where: { auditId: ctx.auditId, control: { title: 'Roles' } } })
+    const parcial = ctx.lib.scale.levels.find((l) => l.label === 'Parcial')!
+    await api()
+      .patch(`${A}/${ctx.auditId}/evaluations/${roles.id}`)
+      .set('authorization', await as('auditor', 'ana'))
+      .send({ achievedLevelId: parcial.id, findings: 'x', severity: 'MINOR', version: roles.version })
+
+    const res = await generate(ctx)
+    expect(res.status).toBe(201)
+    const uploaded = storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
+    const zip = new PizZip(uploaded.content)
+    const chartBytes = zip.file('word/media/chart1.png')!.asUint8Array()
+
+    const meta = await sharp(chartBytes).metadata()
+    expect(meta.format).toBe('png')
+    expect(meta.width).toBe(720)
+    expect(meta.height).toBe(380)
+
+    // Roles quedó por debajo: su barra "alcanzado" debe ser roja (#dc2626). No basta con "algún píxel no blanco"
+    // (el texto también lo es): busca el color exacto de la barra, en cantidad, para distinguirlo del marcador o de
+    // un gráfico vacío (que solo tendría el texto "Sin dominios evaluados" en negro).
+    const { data, info } = await sharp(chartBytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    let redPixels = 0
+    for (let i = 0; i < data.length; i += info.channels) {
+      if (data[i] === 0xdc && data[i + 1] === 0x26 && data[i + 2] === 0x26) redPixels += 1
+    }
+    expect(redPixels).toBeGreaterThan(100)
   })
 
   it('el líder también genera; un auditor sin ser líder, otro GERENTE y el ADMIN no: 403', async () => {

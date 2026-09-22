@@ -136,6 +136,35 @@ las brechas sin clasificar, siempre el caso en madurez, no cuentan en ninguno de
 /gaps` no cambia de forma, el resumen es una decisión de presentación del documento, no un dato nuevo que el frontend
 necesite por API (puede sumarlo él mismo con lo que ya recibe).
 
+**Gráfico embebido: nivel esperado vs. alcanzado por dominio** (decidido 2026-09-22, revierte la exclusión original de
+esta sección). Una barra doble por dominio (gris = esperado, azul = alcanzado si cumple, rojo = alcanzado si queda por
+debajo), con los MISMOS promedios que `results.domains` (`GET /results`): corrige el fallo del proyecto anterior
+(`04`, "Fallo encontrado…") de usar el máximo de la escala como el objetivo de todos los dominios en vez del promedio
+real de cada uno.
+
+- **Sin ningún módulo de imágenes de pago de `docxtemplater`.** La plantilla estática (`build-report-template.mjs`)
+  ya trae, fijos, la relación (`word/_rels/document.xml.rels`), el `<w:drawing>` (posición, tamaño declarado en EMU)
+  y un PNG placeholder en `word/media/chart1.png`. Lo único que cambia por informe son los BYTES de ese archivo:
+  `renderReport(template, data, chartPng)` los reemplaza dentro del zip ya renderizado por `docxtemplater`
+  (`rendered.file('word/media/chart1.png', chartPng)`), sin tocar el XML del documento en absoluto. El "marcador" de
+  la imagen es, en los hechos, un nombre de archivo fijo dentro del zip — no un `{campo}` de texto.
+- **Dibujo del gráfico: SVG a mano, sin ninguna librería de gráficos.** `domain-chart.ts` (función PURA, sin `sharp`
+  ni ningún I/O, totalmente unit-testeable) arma el SVG como texto; `chart-renderer.ts` es la ÚNICA pieza que conoce
+  `sharp`, y solo para rasterizar ese SVG a PNG. Se evitó a propósito cualquier librería de canvas nativo
+  (`node-canvas`, `chartjs-node-canvas`): son dependencias con binarios nativos por plataforma, justo la clase de
+  complejidad que el proyecto anterior aisló en "un servicio de canvas aparte, ~200 líneas" — aquí no hace falta:
+  `sharp` (Apache-2.0, binarios precompilados, cero dependencias nativas adicionales, ya usado por media internet)
+  rasteriza el SVG directamente.
+- **Se descartó `docxtemplater-image-module-free`** (el módulo gratuito más conocido para insertar imágenes con
+  `docxtemplater`): depende de `xmldom@^0.1.27`, una versión antigua con vulnerabilidades conocidas, sin
+  actualizaciones desde 2022. El reemplazo de bytes de archivo (arriba) resuelve lo mismo sin esa dependencia.
+- **Tamaño de lienzo FIJO** (`CHART_WIDTH`/`CHART_HEIGHT` en `domain-chart.ts`, hoy 720×380 px): el `<wp:extent>` del
+  `.docx` es estático, así que el PNG debe tener siempre las mismas dimensiones o Word lo estira y deforma. Con
+  muchos dominios las filas se angostan (hasta un mínimo legible); no hay paginación del gráfico.
+- **Verificado abriendo el documento de verdad**, no solo generándolo: `soffice --headless --convert-to pdf` sobre un
+  informe con datos reales confirma que LibreOffice (y por transitividad, Word) acepta el XML de la imagen y la
+  muestra correctamente — la misma disciplina que ya encontró el bug de `docxtemplater` con notación de punto (`4c`).
+
 ## 3. El puerto (`FileStoragePort`)
 
 Una sola interfaz en `platform/nextcloud/` (no en `audits/domain/`: lo usan tanto `evidence/` como `reports/`, y no hay
@@ -171,9 +200,6 @@ la de la BD): no bloquea el arranque, informa `checks.nextcloud: 'up' | 'down'` 
 
 ## 5. Qué se deja fuera de esta fase (deliberado, se documenta para no reabrir la discusión sin motivo)
 
-- **Gráficas embebidas en el docx** (el proyecto anterior las generaba con un servicio de canvas aparte, ~200 líneas).
-  El frontend ya tiene `GET /results` con todo lo necesario para pintar sus propios gráficos; incrustarlos en el
-  documento es trabajo real pero separable, y no bloquea tener un informe utilizable.
 - **PDF.** El `.docx` ya se edita en OnlyOffice, que también exporta a PDF con un clic; no se duplica esa conversión
   en el backend salvo que alguien la necesite programáticamente (un endpoint, no una reescritura del generador).
 - **Borrar el archivo en Nextcloud al borrar la fila `Evidence`/`Report`.** El soft-delete de `Evidence` ya cubre la
