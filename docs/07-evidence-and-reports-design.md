@@ -110,7 +110,7 @@ notación de punto**:
 {auditCode} {auditName} {organizationName} {generatedAt}
 {evaluated} {meets} {below} {notApplicable} {pending}
 {#domains} {title} {averageExpected} {averageAchieved} {gap} {/domains}
-{#gaps} {domain} {reference} {title} {expectedLabel} {achievedLabel} {findings} {/gaps}
+{#gaps} {severity} {domain} {reference} {title} {expectedLabel} {achievedLabel} {findings} {/gaps}
 ```
 
 **Se probó, no se asumió, y se encontró un error real: `docxtemplater` (sin módulos de pago) no entra a un objeto
@@ -169,8 +169,6 @@ la de la BD): no bloquea el arranque, informa `checks.nextcloud: 'up' | 'down'` 
   documento es trabajo real pero separable, y no bloquea tener un informe utilizable.
 - **PDF.** El `.docx` ya se edita en OnlyOffice, que también exporta a PDF con un clic; no se duplica esa conversión
   en el backend salvo que alguien la necesite programáticamente (un endpoint, no una reescritura del generador).
-  Clasificación de hallazgos (mayor/menor/observación, `05` pendiente): sigue sin decidirse; el informe hoy lista
-  brechas sin clasificar.
 - **Borrar el archivo en Nextcloud al borrar la fila `Evidence`/`Report`.** El soft-delete de `Evidence` ya cubre la
   trazabilidad; sincronizar el borrado físico es una tarea de reconciliación (un job periódico, no una llamada en el
   caso de uso) que se añade si el espacio en disco lo justifica.

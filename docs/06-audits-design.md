@@ -89,10 +89,17 @@ NOT_STARTED ─▶ IN_PROGRESS ─▶ COMPLETED ─▶ APPROVED
 - **Devolver** y **reabrir uno aprobado** exigen comentario. **Aprobar** puede llevarlo.
 - **Para enviar a revisión** (`COMPLETE`): nivel alcanzado (o «no aplica» con **motivo**) y, además:
   - **Hallazgo escrito** si el nivel alcanzado es inferior al esperado (`EVALUATION_INCOMPLETE`).
+  - **Gravedad** (`severity`: `MAJOR`/`MINOR`/`OBSERVATION`) si el nivel alcanzado es inferior al esperado **y la escala es
+    `CONFORMITY`** (`requiresSeverity`, `domain/evaluation-completion.ts`): en conformidad una mayor puede bloquear una
+    certificación, así que tiene una consecuencia real; en `MATURITY` nunca es obligatoria (un perfil de madurez no se
+    "clasifica" así). El campo está disponible en las dos dimensiones — puede anotarse aunque no se exija, y se limpia junto
+    con el nivel alcanzado al marcar «no aplica» — pero solo se exige para completar en conformidad y por debajo de lo
+    esperado.
   - **Evidencia** si el nivel alcanzado es **superior al mínimo de la escala**: para decir que algo cumple hay que demostrarlo. El
     nivel mínimo («no cumple», «inexistente») **no exige evidencia**: ahí el hallazgo *es* la ausencia («se pidió y no existe»).
     «No aplica» exige motivo, no evidencia. La regla **no es configurable** (siempre se aplica). Borde: en una escala que
     empieza en 1 (sin cero), el nivel 1 cuenta como el mínimo.
+  - Orden de las faltantes: hallazgo → gravedad → evidencia.
 - La **guía** (`guidance`) es un solo texto del líder por criterio: el contexto para el auditor y, a la vez, el porqué del nivel
   esperado. Sustituye a `expectedLevelReason`.
 - Reasignar un criterio (líder) solo mientras no esté `COMPLETED` ni `APPROVED`.
@@ -103,6 +110,9 @@ NOT_STARTED ─▶ IN_PROGRESS ─▶ COMPLETED ─▶ APPROVED
   comprueba **antes** que las precondiciones de contenido.
 - **«No aplica» y nivel alcanzado son excluyentes**: marcar «no aplica» borra el nivel; poner un nivel con «no aplica»
   activo es `EVALUATION_IS_NOT_APPLICABLE` (hay que desmarcarlo de forma explícita, `isNotApplicable: false`).
+- **Al aprobar**, el líder puede marcar `requiresFollowUp` (booleano, por defecto `false`): fuerza que ese criterio se
+  vuelva a evaluar desde cero en el próximo seguimiento, aunque haya cumplido o no aplicara — es una anotación del líder
+  ("esto pasó esta vez, pero hay que revisarlo de nuevo"), no un resultado. Efecto en `carriesOver` (`9`).
 
 ## 4. Historia de las revisiones
 
@@ -141,6 +151,8 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3d** (hecho) | Flujo del criterio (iniciar al primer edit, editar, completar, aprobar, devolver, reabrir) con su historia |
 | **3e** (hecho) | `scoring.ts` (conteos, distribución por opción, promedios esperado/alcanzado por dominio, brecha; **sin nota global**, `05` §6) y lecturas: `GET results`, `GET gaps`, `GET history` (de la auditoría) y `GET evaluations/:id/history` (de un criterio) |
 | **3f** (hecho) | Seguimientos como auditoría normal con enlace a la anterior (§9) |
+| **3g** (hecho) | Bloqueo optimista (`version`) en `PATCH /audits/:id` y `PATCH .../evaluations/:id` (§10) |
+| **3h** (hecho) | Gravedad del hallazgo (`severity`, obligatoria solo en conformidad por debajo de lo esperado) y seguimiento forzado por el líder (`requiresFollowUp`, §3 y §9) |
 
 La **evidencia** (subir archivos, Nextcloud) y los **informes** son la Fase 4. La regla de evidencia de §3 se aplica contando los
 registros de evidencia; hasta la Fase 4 no hay forma real de crearlos (las pruebas los insertan directamente).
@@ -189,9 +201,11 @@ historial— funciona igual. Decidido con el usuario, 2026-09-21.
   mandan): es la misma medición, así que siguen valiendo aunque la plantilla se haya archivado o la escala desactivado después.
   La organización sí debe seguir activa. Puede haber varios seguimientos de la misma anterior.
 - **`carryOver`** (por defecto `true`; solo con `previousAuditId`):
-  - **`true`**: cada criterio que allí **cumplió** (alcanzado ≥ esperado) o **no aplicaba** nace **`APPROVED`** con el resultado
-    copiado (nivel, hallazgo, notas, «no aplica» y su motivo) y `carriedFromId` apuntando al criterio de la anterior. El resto
-    nace `NOT_STARTED`, limpio.
+  - **`true`**: cada criterio que allí **cumplió** (alcanzado ≥ esperado) o **no aplicaba**, Y que el líder **no** marcó
+    `requiresFollowUp` al aprobarlo, nace **`APPROVED`** con el resultado copiado (nivel, hallazgo, gravedad, notas, «no
+    aplica» y su motivo) y `carriedFromId` apuntando al criterio de la anterior. El resto nace `NOT_STARTED`, limpio —
+    incluye tanto lo que quedó por debajo como lo que cumplió pero el líder pidió revisar de nuevo (`carriesOver()`,
+    `domain/follow-up.ts`: `requiresFollowUp` gana sobre cualquier otro resultado).
   - **`false`**: se evalúa todo de nuevo; la anterior queda como referencia.
 - **Nivel esperado y guía**: todos los criterios los heredan de la anterior (el líder no parte de cero en madurez).
 - **Sin estado nuevo:** trasladado = `APPROVED` + `carriedFromId`. Por eso **cerrar** funciona solo (ya está aprobado) y **iniciar
