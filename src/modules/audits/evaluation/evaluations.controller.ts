@@ -23,6 +23,7 @@ import { ApproveEvaluationUseCase } from './use-cases/approve-evaluation.use-cas
 import { AssignEvaluationsUseCase } from './use-cases/assign-evaluations.use-case.js'
 import { CompleteEvaluationUseCase } from './use-cases/complete-evaluation.use-case.js'
 import { GetEvaluationUseCase } from './use-cases/get-evaluation.use-case.js'
+import { GetPreviousEvaluationUseCase } from './use-cases/get-previous-evaluation.use-case.js'
 import { ListEvaluationsUseCase } from './use-cases/list-evaluations.use-case.js'
 import { ReopenEvaluationUseCase } from './use-cases/reopen-evaluation.use-case.js'
 import { ReturnEvaluationUseCase } from './use-cases/return-evaluation.use-case.js'
@@ -35,6 +36,7 @@ export class EvaluationsController {
   constructor(
     private readonly listUseCase: ListEvaluationsUseCase,
     private readonly getUseCase: GetEvaluationUseCase,
+    private readonly getPreviousUseCase: GetPreviousEvaluationUseCase,
     private readonly assignUseCase: AssignEvaluationsUseCase,
     private readonly setExpectedLevelUseCase: SetExpectedLevelUseCase,
     private readonly updateUseCase: UpdateEvaluationUseCase,
@@ -64,6 +66,19 @@ export class EvaluationsController {
     @Param('evaluationId', { schema: EvaluationId }) evaluationId: string,
   ) {
     return this.getUseCase.execute(actor, auditId, evaluationId)
+  }
+
+  /** Cómo quedó este mismo control en la auditoría anterior (solo tiene sentido en un seguimiento). `data: null` si no
+   *  es un seguimiento, o si el control es nuevo y no existía en la anterior. */
+  @Get('evaluations/:evaluationId/previous')
+  @Can('read', 'Evaluation')
+  @Responds(EvaluationView.nullable())
+  findPrevious(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('auditId', { schema: AuditId }) auditId: string,
+    @Param('evaluationId', { schema: EvaluationId }) evaluationId: string,
+  ) {
+    return this.getPreviousUseCase.execute(actor, auditId, evaluationId)
   }
 
   /** El líder asigna criterios a un auditor (o los deja sin asignar). Devuelve los que cambiaron. */

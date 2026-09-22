@@ -70,6 +70,7 @@ describe('permisos y rutas', () => {
         'POST /audits/:id/archive → update Audit',
         'PUT /audits/:auditId/expected-levels → update Evaluation',
         'GET /audits/:auditId/evaluations/:evaluationId → read Evaluation',
+        'GET /audits/:auditId/evaluations/:evaluationId/previous → read Evaluation',
         'PATCH /audits/:auditId/evaluations/:evaluationId → update Evaluation',
         'POST /audits/:auditId/evaluations/:evaluationId/complete → update Evaluation',
         'POST /audits/:auditId/evaluations/:evaluationId/approve → update Evaluation',

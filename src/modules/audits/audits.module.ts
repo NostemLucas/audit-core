@@ -4,6 +4,7 @@ import { OrganizationsModule } from '../organizations/index.js'
 import { ApproveEvaluationUseCase } from './evaluation/use-cases/approve-evaluation.use-case.js'
 import { CompleteEvaluationUseCase } from './evaluation/use-cases/complete-evaluation.use-case.js'
 import { GetEvaluationUseCase } from './evaluation/use-cases/get-evaluation.use-case.js'
+import { GetPreviousEvaluationUseCase } from './evaluation/use-cases/get-previous-evaluation.use-case.js'
 import { ReopenEvaluationUseCase } from './evaluation/use-cases/reopen-evaluation.use-case.js'
 import { ReturnEvaluationUseCase } from './evaluation/use-cases/return-evaluation.use-case.js'
 import { UpdateEvaluationUseCase } from './evaluation/use-cases/update-evaluation.use-case.js'
@@ -79,6 +80,7 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     AssignEvaluationsUseCase,
     SetExpectedLevelUseCase,
     GetEvaluationUseCase,
+    GetPreviousEvaluationUseCase,
     UpdateEvaluationUseCase,
     CompleteEvaluationUseCase,
     ApproveEvaluationUseCase,

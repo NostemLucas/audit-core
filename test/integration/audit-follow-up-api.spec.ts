@@ -334,6 +334,65 @@ describe('crear un seguimiento (docs/06 §9)', () => {
   })
 })
 
+describe('GET .../evaluations/:evaluationId/previous (cómo quedó en la auditoría anterior)', () => {
+  const previousOf = (auditId: string, evaluationId: string, role: TestRole = 'manager', who?: string) =>
+    get(`${A}/${auditId}/evaluations/${evaluationId}/previous`, role, who)
+
+  it('un criterio trasladado: el mismo resultado que ya tenía (buscado por control, no por carriedFromId)', async () => {
+    const prev = await closedAudit()
+    const followUpId = (await followUp(prev)).body.data.id as string
+    const carried = await evalOf(followUpId, 'Políticas')
+    const res = await previousOf(followUpId, carried.id)
+    expect(res.status).toBe(200)
+    expect(res.body.data).toMatchObject({
+      status: 'APPROVED',
+      achievedLevel: { label: 'Cumple' },
+      notes: 'Revisado con TI',
+    })
+  })
+
+  it('un criterio re-evaluado desde cero (quedó por debajo, sin carriedFromId): también trae lo anterior', async () => {
+    const prev = await closedAudit()
+    const followUpId = (await followUp(prev)).body.data.id as string
+    const fresh = await evalOf(followUpId, 'Roles')
+    expect(fresh.carriedFromId).toBeNull() // por debajo: no se traslada
+    const res = await previousOf(followUpId, fresh.id)
+    expect(res.status).toBe(200)
+    expect(res.body.data).toMatchObject({
+      status: 'APPROVED',
+      achievedLevel: { label: 'Parcial' },
+      findings: 'Cubre la mitad',
+    })
+  })
+
+  it('una auditoría que NO es un seguimiento: null (no 404, es un estado normal)', async () => {
+    const ctx = await startedAudit(t, 'CONFORMITY', '-normal')
+    const id = await evalOf(ctx.auditId, 'Roles')
+    const res = await previousOf(ctx.auditId, id.id)
+    expect(res.status).toBe(200)
+    expect(res.body.data).toBeNull()
+  })
+
+  it('lo ve cualquiera que vea el SEGUIMIENTO, aunque no tenga acceso a la auditoría anterior', async () => {
+    const prev = await closedAudit({}, '-ajeno')
+    const followUpId = (await followUp(prev)).body.data.id as string
+    const carried = await evalOf(followUpId, 'Políticas')
+    const outsider = await t.userId('auditor', 'ajeno-previo')
+    await post(`${A}/${followUpId}/members`, { userId: outsider, role: 'MEMBER' })
+    const res = await previousOf(followUpId, carried.id, 'auditor', 'ajeno-previo')
+    expect(res.status).toBe(200)
+    expect(res.body.data).toMatchObject({ achievedLevel: { label: 'Cumple' } })
+    // el mismo actor NO puede leer la auditoría anterior directamente
+    expect((await get(`${A}/${prev.auditId}`, 'auditor', 'ajeno-previo')).status).toBe(403)
+  })
+
+  it('un evaluationId inexistente: 404 EVALUATION_NOT_FOUND', async () => {
+    const prev = await closedAudit({}, '-404')
+    const followUpId = (await followUp(prev)).body.data.id as string
+    expect((await previousOf(followUpId, UNKNOWN_ID)).body.error.code).toBe('EVALUATION_NOT_FOUND')
+  })
+})
+
 describe('el seguimiento en marcha', () => {
   /** Un seguimiento (con lo del ejemplo trasladado) con equipo armado, listo para iniciarse. */
   async function readyFollowUp() {

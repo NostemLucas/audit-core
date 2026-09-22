@@ -153,6 +153,8 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3f** (hecho) | Seguimientos como auditoría normal con enlace a la anterior (§9) |
 | **3g** (hecho) | Bloqueo optimista (`version`) en `PATCH /audits/:id` y `PATCH .../evaluations/:id` (§10) |
 | **3h** (hecho) | Gravedad del hallazgo (`severity`, obligatoria solo en conformidad por debajo de lo esperado) y seguimiento forzado por el líder (`requiresFollowUp`, §3 y §9) |
+| **3i** (hecho) | Conteo de hallazgos por gravedad en el informe (docs/07 §2) |
+| **3j** (hecho) | `GET .../evaluations/:evaluationId/previous`: resultado anterior de un criterio en un seguimiento (§9) |
 
 La **evidencia** (subir archivos, Nextcloud) y los **informes** son la Fase 4. La regla de evidencia de §3 se aplica contando los
 registros de evidencia; hasta la Fase 4 no hay forma real de crearlos (las pruebas los insertan directamente).
@@ -165,6 +167,7 @@ registros de evidencia; hasta la Fase 4 no hay forma real de crearlos (las prueb
 | `GET /audits/:id/gaps` | Criterios evaluados por debajo de lo esperado, del más lejano al menos (a igual brecha, orden de lectura) |
 | `GET /audits/:id/history` | Historial paginado, lo más reciente primero, con el texto redactado al leer |
 | `GET /audits/:id/evaluations/:evaluationId/history` | Historia de un criterio en orden cronológico, con el contenido del evento (la copia de lo enviado) |
+| `GET /audits/:id/evaluations/:evaluationId/previous` | Cómo quedó ESE control en la auditoría anterior (`fase-3j`, solo en un seguimiento; `null` si no aplica) — ver `9` |
 
 Los ven todos los que ven la auditoría. Un evento que ya no existe o cuyo contenido no cumple el formato actual **no rompe** la
 lectura: se muestra su tipo (§4).
@@ -219,3 +222,9 @@ historial— funciona igual. Decidido con el usuario, 2026-09-21.
   que no se puede saber cuáles siguen valiendo). Si el cliente pide A y B, se crea con `carryOver: false` (o sin nada que
   trasladar) y el alcance se indica o edita como en cualquier borrador.
 - **En un seguimiento de un seguimiento**, `previousAuditId` es la anterior **inmediata**.
+- **Ver el resultado anterior de un criterio** (`GET .../evaluations/:evaluationId/previous`, `fase-3j`): busca por
+  `(previousAuditId, controlId)`, no por `carriedFromId` — funciona igual para lo trasladado que para lo re-evaluado
+  desde cero (lo que quedó por debajo no tiene `carriedFromId`, pero el auditor igual quiere ver qué pasó antes).
+  `null` si la auditoría no es un seguimiento. El acceso se valida contra ESTA auditoría (igual que `previousAudit` en
+  `AuditView`): quien ve el seguimiento ve el resultado anterior de sus criterios, aunque no tenga acceso a la
+  auditoría anterior en sí.
