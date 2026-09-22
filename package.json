@@ -61,6 +61,8 @@
     "test:watch": "vitest",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",
+    "preseed": "tsc -p tsconfig.seed.json",
+    "seed": "node dist-seed/prisma/seeds/seed.js",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:all": "vitest run && vitest run -c vitest.integration.config.ts",
     "postinstall": "prisma generate",

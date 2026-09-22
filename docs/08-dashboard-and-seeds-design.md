@@ -36,7 +36,11 @@ sus conteos aquí abriría una pregunta de alcance que nadie pidió resolver. Qu
 ## 2. Seeds
 
 Los seeds son datos de EJEMPLO, no fixtures de test (esos ya existen en `test/integration/support/`). Un script
-idempotente (`prisma/seeds/`, corrido con `tsx`, no parte del build) que:
+(`prisma/seeds/seed.ts`) que llama a los MISMOS casos de uso que expone la API (`CreateOrganizationUseCase`,
+`CreateScaleUseCase`, `CreateTemplateUseCase`, `CreateControlUseCase`, `PublishTemplateUseCase`,
+`SetSuggestedFindingUseCase`), dentro de un `SeedModule` propio — NO el `AppModule` completo, que arrastra
+`AuthGuard`/`AbilitiesGuard` sin que este script los use — y de `ContextRunner` (`platform/context`, pensado para
+"un job, un seed, un comando"; hasta este script nunca se había probado fuera de una petición HTTP real):
 
 1. Organizaciones de ejemplo (2–3).
 2. Usuarios: los seeds NO crean usuarios (`01` §0 y `identity`: la única fuente es el primer login vía Authentik,
@@ -44,17 +48,31 @@ idempotente (`prisma/seeds/`, corrido con `tsx`, no parte del build) que:
    `authentikId` inventado, imposible de loguear de verdad. En su lugar, el seed deja la biblioteca y las
    organizaciones listas; el PRIMER usuario que entra por Authentik con rol GERENTE puede crear auditorías de una vez.
 3. Biblioteca: dos escalas (una `CONFORMITY` tipo ISO 27001, una `MATURITY` tipo COBIT 5) y dos plantillas publicadas
-   (un recorte real de ISO 27001 — los mismos dominios que usan los tests de integración — y uno de COBIT 5), cada una
-   con `suggested_findings` en un par de criterios, para que la biblioteca no se vea vacía.
+   (un recorte real de ISO 27001 y uno de COBIT 5), cada una con al menos un `suggested_finding`, para que la
+   biblioteca no se vea vacía.
 4. **Sin auditoría de ejemplo por defecto**: crearla exige un manager real (un `User` que solo existe tras loguearse).
    Se documenta como un paso manual opcional después del primer login, no un seed.
 
-`npm run seed` (nuevo script). Vuelve a ejecutarse sin duplicar (`upsert` por nombre único, ya garantizado por los
-índices de fase 2).
+**Idempotente por construcción**, no por un `upsert` explícito: cada creación pasa por el MISMO `_NAME_TAKEN` que
+usaría cualquier usuario repitiendo el nombre; el script lo atrapa y sigue («ya existe, no es un fallo»). Volver a
+correrlo no duplica nada, aunque tampoco repara una corrida que quedó a medias en un paso intermedio (aceptable para
+datos de ejemplo, no para una migración).
+
+**`npm run seed` compila y corre con Node normal (`tsc -p tsconfig.seed.json && node dist-seed/...`), NO con un
+ejecutor de TypeScript al vuelo (`tsx`, `ts-node`).** Se probó con `tsx` primero y falló de un modo que no tenía nada
+que ver con la lógica del script: `nestjs-cls` (que `@Transactional()`/`@InjectTx()` usan por debajo) es un paquete
+CJS que en tiempo de arranque hace `require('@nestjs/core')`, un paquete `"type": "module"` (ESM puro); `tsx`
+resuelve ese `require` con su propio *shim* de interoperabilidad, que crea una instancia de `@nestjs/core` DISTINTA
+de la que ve el resto del programa por `import` normal — mismas clases por nombre, pero un `HttpAdapterHost` (y
+luego un `ModuleRef`, y luego más) que Nest no reconoce como el mismo token, y el arranque falla sin pista de que la
+causa es esa (confirmado sustituyendo, uno por uno, cada dependencia por la versión resuelta con `require()`: el
+error se corría a la siguiente clase de `@nestjs/core` en vez de desaparecer). Compilando con `tsc` y ejecutando con
+`node` —lo mismo que hace `npm run build` + `node dist/main.js` en producción— todo el programa usa una sola
+instancia de cada paquete y el problema no aparece. `tsx` no quedó como dependencia del proyecto.
 
 ## 3. Cómo se construye
 
 | Paso | Contenido |
 |---|---|
 | **5a** (hecho) | `dashboard/`: summary, my-work |
-| **5b** | `prisma/seeds/`: organizaciones + biblioteca de ejemplo |
+| **5b** (hecho) | `prisma/seeds/`: organizaciones + biblioteca de ejemplo |
