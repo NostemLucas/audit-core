@@ -63,6 +63,13 @@ describe('permisos globales por rol', () => {
     expect(can(['AUDITOR'], 'delete', 'Evaluation')).toBe(false)
   })
 
+  it('AUDITOR también genera informes (puede ser líder, docs/07 §2), pero no los administra', () => {
+    expect(can(['AUDITOR'], 'create', 'Report')).toBe(true)
+    expect(can(['AUDITOR'], 'read', 'Report')).toBe(true)
+    expect(can(['AUDITOR'], 'update', 'Report')).toBe(false)
+    expect(can(['AUDITOR'], 'delete', 'Report')).toBe(false)
+  })
+
   it('AUDITOR no puede administrar la biblioteca, las organizaciones ni las auditorías', () => {
     for (const action of ['create', 'update', 'delete'] as const) {
       expect(can(['AUDITOR'], action, 'Template')).toBe(false)

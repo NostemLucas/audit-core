@@ -104,6 +104,8 @@ export const AuditEvents = defineEvents({
   }),
   EvaluationReturned: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),
   EvaluationReopened: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),
+  // Informes (docs/07 §2). El sujeto es la auditoría: un informe no tiene su propia historia aparte.
+  ReportGenerated: z.object({ ...audit, reportId: z.uuid(), title: z.string() }),
 })
 
 export const AUDIT_EVENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AuditEvents))

@@ -20,6 +20,10 @@ import { RequestEvidenceUploadUseCase } from './evidence/use-cases/request-evide
 import { HistoryController } from './history/history.controller.js'
 import { GetEvaluationHistoryUseCase } from './history/use-cases/get-evaluation-history.use-case.js'
 import { ListAuditHistoryUseCase } from './history/use-cases/list-audit-history.use-case.js'
+import { ReportsController } from './reports/reports.controller.js'
+import { GenerateReportUseCase } from './reports/use-cases/generate-report.use-case.js'
+import { GetReportUseCase } from './reports/use-cases/get-report.use-case.js'
+import { ListReportsUseCase } from './reports/use-cases/list-reports.use-case.js'
 import { ResultsController } from './results/results.controller.js'
 import { GetAuditResultsUseCase } from './results/use-cases/get-audit-results.use-case.js'
 import { ListGapsUseCase } from './results/use-cases/list-gaps.use-case.js'
@@ -55,6 +59,7 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     HistoryController,
     EvidenceController,
     NextcloudWebhookController,
+    ReportsController,
   ],
   providers: [
     AuditHistoryRecorder,
@@ -90,6 +95,9 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     RequestEvidenceUploadUseCase,
     DeleteEvidenceUseCase,
     RegisterEvidenceUseCase,
+    GenerateReportUseCase,
+    ListReportsUseCase,
+    GetReportUseCase,
   ],
 })
 export class AuditsModule {}

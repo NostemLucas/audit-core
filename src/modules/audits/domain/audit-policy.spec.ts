@@ -59,6 +59,23 @@ describe('tabla de docs/06 §1', () => {
   })
 })
 
+describe('generar un informe', () => {
+  it('el manager y el líder sí; un auditor del equipo, otro GERENTE, el ADMIN y un ajeno no', () => {
+    expect(canOnAudit('report', OWNER, access('owner'))).toBe(true)
+    expect(canOnAudit('report', LEAD, access('lead'))).toBe(true)
+    expect(canOnAudit('report', MEMBER, access('member'))).toBe(false)
+    expect(canOnAudit('report', OTHER_MANAGER, access('other'))).toBe(false)
+    expect(canOnAudit('report', ADMIN, access('admin'))).toBe(false)
+    expect(canOnAudit('report', OUTSIDER, access('outsider'))).toBe(false)
+  })
+
+  it('assertOnAudit lanza AUDIT_ACCESS_DENIED con MANAGER_OR_LEAD', () => {
+    expect(() => assertOnAudit('report', MEMBER, access('member'))).toThrow(
+      expect.objectContaining({ details: { required: 'MANAGER_OR_LEAD' } }),
+    )
+  })
+})
+
 describe('evaluar', () => {
   it('solo el auditor asignado a ese criterio', () => {
     expect(canEvaluate(MEMBER, access('member'), 'member')).toBe(true)

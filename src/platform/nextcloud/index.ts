@@ -1,8 +1,8 @@
 export { NextcloudModule } from './nextcloud.module.js'
 export { FILE_STORAGE } from './file-storage.port.js'
 export type { FileStoragePort } from './file-storage.port.js'
-export { evaluationIdFromEvidencePath, evidenceFolder } from './storage-paths.js'
+export { evaluationIdFromEvidencePath, evidenceFolder, reportPath } from './storage-paths.js'
 export { verifyWebhookSignature } from './webhook-signature.js'
 export { FakeFileStorage } from './testing/fake-file-storage.js'
-// `reportPath`, `signWebhook` y los tipos `ReadShare`/`UploadedFile`/`UploadTarget` se exportan cuando 4c (informes) y
-// las pruebas del webhook los consuman (docs/07 §6) — hasta entonces `knip` los marcaría como exportados sin uso.
+// `signWebhook` y los tipos `ReadShare`/`UploadedTarget` se piden directo de su archivo (solo los usan pruebas) —
+// re-exportarlos aquí sin que nada los consuma DESDE el índice, `knip` los marcaría sin uso (docs/07 §6).

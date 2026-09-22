@@ -86,33 +86,54 @@ buffer, mimeType)`) y se edita después en OnlyOffice como cualquier otro docume
 para eso: es exactamente la delegación que `01 §0` pide.
 
 `POST /audits/:auditId/reports` — el **manager** o el **líder** (mismo criterio que revisar: quien responde por el
-contenido). Exige la auditoría con **algún resultado que informar** (al menos un criterio evaluado; `AUDIT_NOT_EVALUABLE`
-reutilizado si ni siquiera está en curso — un borrador no tiene nada que informar). El caso de uso:
-1. Junta los datos con lo que YA existe (`GetAuditResultsUseCase`, `ListGapsUseCase`, el árbol de la plantilla): **no
-   se inventa un cálculo paralelo para el informe** — es la misma fuente que `GET /results` y `GET /gaps`.
-2. Rellena la plantilla (`assets/reports/compliance-report.docx`, un `.docx` mínimo con los marcadores de abajo,
-   sin diseño institucional propio: cada organización sustituye este archivo por el suyo, mismos marcadores).
-3. Sube el resultado a `/Auditorias/{code}/Informes/{timestamp}-{título-slug}.docx` y crea `Report` (`type`, `title`,
-   `storageFileId`).
+contenido; política contextual nueva, `audit-policy.ts` acción `report`). Sin otra precondición: se puede informar en
+cualquier estado, también un borrador con todo pendiente — es una foto de lo que hay, no una certificación. El caso de uso:
+1. Junta los datos con los MISMOS cálculos que `GET /results` y `GET /gaps` (`scoring.ts`, `results.queries.ts`): **no
+   se inventa una fuente paralela para el informe**.
+2. Rellena la plantilla por defecto (`reports/assets/compliance-report.docx`, generada por
+   `scripts/build-report-template.mjs`; un `.docx` mínimo con los marcadores de abajo, sin diseño institucional propio:
+   cada organización sustituye este archivo por el suyo, mismos marcadores).
+3. Sube el resultado a `/Auditorias/{code}/Informes/{reportId}.docx` (el id se genera antes de subir, para que la ruta
+   sea determinística desde el principio) y crea `Report` (`type`, `title`, `storageFileId`).
 4. **Solo se persiste si la subida tuvo éxito** (`01`: se deja de imitar el `FAILED` + `errorMessage` del proyecto
    anterior — un intento fallido no deja rastro; si Nextcloud no responde, `502 UPSTREAM_UNAVAILABLE` y el cliente
    reintenta el `POST`, sin estado a medias que limpiar).
 
-**Marcadores de la plantilla** (sintaxis de `docxtemplater`, `{campo}` y `{#lista}...{/lista}`):
+**Todos los `ReportType` comparten hoy la misma plantilla y los mismos datos** (conteos y brechas): el campo distingue
+la intención del informe, no todavía su contenido. Una plantilla distinta por tipo es una extensión futura, no
+necesaria mientras nadie la pida.
+
+**Marcadores de la plantilla** (sintaxis de `docxtemplater`, `{campo}` y `{#lista}...{/lista}`), **TODOS planos, sin
+notación de punto**:
 
 ```
 {auditCode} {auditName} {organizationName} {generatedAt}
-{overall.evaluated} {overall.meets} {overall.below} {overall.notApplicable} {overall.pending}
+{evaluated} {meets} {below} {notApplicable} {pending}
 {#domains} {title} {averageExpected} {averageAchieved} {gap} {/domains}
-{#gaps} {control.reference} {control.title} {control.domain} {expectedLevel.label} {achievedLevel.label} {findings} {/gaps}
+{#gaps} {domain} {reference} {title} {expectedLabel} {achievedLabel} {findings} {/gaps}
 ```
 
+**Se probó, no se asumió, y se encontró un error real: `docxtemplater` (sin módulos de pago) no entra a un objeto
+anidado.** `{overall.evaluated}` no significa "el campo `evaluated` de `overall`": busca la clave literal
+`"overall.evaluated"`, no la encuentra, y por defecto escribe el texto **`undefined`** en el documento — sin lanzar
+ningún error. La primera versión de esta plantilla usaba esa notación (`overall.evaluated`, `control.title`,
+`expectedLevel.label`…) y el primer test de integración que revisó el CONTENIDO del `.docx` (no solo que se generó)
+lo encontró. Corrección: `ReportData` es plano (`evaluated`, `meets`… al nivel superior; cada `gaps[]` con `domain`,
+`reference`, `title`, `expectedLabel`, `achievedLabel` en vez de objetos anidados) — el caso de uso aplana los datos
+al construirlos, la plantilla nunca anida. También se configuró `nullGetter: () => '—'`: sin él, un valor `null`
+(un promedio sin nada evaluado) se escribe igual como el texto `undefined`, que en un informe real se leería como
+un fallo de la plantilla.
+
 `GET /audits/:auditId/reports` (lista, con la URL de descarga: un share de solo-lectura que el caso de uso pide al
-mismo puerto) y `GET .../reports/:id` los ve quien ve la auditoría.
+mismo puerto) y `GET .../reports/:id` los ve quien ve la auditoría. La lista de brechas es la MISMA función
+(`results/results.queries.ts`, `computeGapViews`) que usa `GET /gaps`: no hay dos sitios que decidan qué es una
+brecha.
 
 ## 3. El puerto (`FileStoragePort`)
 
-Una sola interfaz en `audits/domain/` (o `platform/nextcloud/`, ver nota); un adaptador real HTTP y, en los tests, uno
+Una sola interfaz en `platform/nextcloud/` (no en `audits/domain/`: lo usan tanto `evidence/` como `reports/`, y no hay
+agregado propio que la posea — es infraestructura de E/S, corrección sobre `02` §6, que la listaba junto a los
+repositorios de agregado). Un adaptador real HTTP y, en los tests, uno
 en memoria (no se necesita un Nextcloud vivo para probar CADA pieza de nuestro lado: firma del webhook, idempotencia,
 permisos, contrato de la plantilla — todo eso se prueba sin red. El adaptador HTTP en sí se prueba con un `fetch`
 simulado, comprobando que construye las peticiones WebDAV/OCS correctas: no hay forma honesta de probar contra un
@@ -175,7 +196,6 @@ la de la BD): no bloquea el arranque, informa `checks.nextcloud: 'up' | 'down'` 
 
 | Paso | Contenido |
 |---|---|
-| **4a** (hecho) | `platform/nextcloud/` (puerto, adaptador HTTP, firma del webhook), env vars, `storageFolderId` fuera del esquema |
+| **4a** (hecho) | `platform/nextcloud/` (puerto, adaptador HTTP, firma del webhook), env vars, `storageFolderId` fuera del esquema, `health/ready` con Nextcloud |
 | **4b** (hecho) | `audits/evidence/`: pedir lugar de subida, webhook, listar, eliminar |
-| **4c** | `audits/reports/`: plantilla docx, generar, listar, descargar |
-| **4d** | `health/ready` con Nextcloud |
+| **4c** (hecho) | `audits/reports/`: plantilla docx, generar, listar, descargar |

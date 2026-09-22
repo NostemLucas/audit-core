@@ -24,9 +24,10 @@ export interface AuditAccess {
 
 /**
  * `read`: ver. `manage`: editar, alcance, equipo, iniciar, cerrar, archivar (el manager). `lead`: asignar criterios, nivel
- * esperado y guía, y revisar (el líder).
+ * esperado y guía, y revisar (el líder). `report`: generar un informe (el manager o el líder: quien responde por el
+ * contenido, docs/07 §2).
  */
-export type AuditAction = 'read' | 'manage' | 'lead'
+export type AuditAction = 'read' | 'manage' | 'lead' | 'report'
 
 export function canOnAudit(action: AuditAction, actor: Actor, access: AuditAccess): boolean {
   switch (action) {
@@ -37,6 +38,8 @@ export function canOnAudit(action: AuditAction, actor: Actor, access: AuditAcces
         access.managerId === actor.id ||
         access.memberRole !== null
       )
+    case 'report':
+      return access.managerId === actor.id || access.memberRole === AuditRole.LEAD
     case 'manage':
       return access.managerId === actor.id
     case 'lead':
@@ -75,7 +78,7 @@ export function assertCanTransfer(actor: Actor): void {
   if (!canTransfer(actor)) throw new DomainError(AuditErrors.AUDIT_ACCESS_DENIED, { required: 'ADMIN' })
 }
 
-const REQUIRED = { read: 'MEMBER', manage: 'MANAGER', lead: 'LEAD' } as const
+const REQUIRED = { read: 'MEMBER', manage: 'MANAGER', lead: 'LEAD', report: 'MANAGER_OR_LEAD' } as const
 
 export function assertOnAudit(action: AuditAction, actor: Actor, access: AuditAccess): void {
   if (!canOnAudit(action, actor, access))

@@ -1,4 +1,5 @@
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 /**
  * `Content-Disposition` seguro para cualquier nombre: un respaldo ASCII sin comillas, barras ni caracteres de control

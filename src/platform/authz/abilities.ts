@@ -53,9 +53,12 @@ const GRANTS: Readonly<Record<Role, readonly Grant[]>> = {
   ],
 
   AUDITOR: [
-    { actions: ['read'], subjects: ['Audit', 'AuditMember', 'Report', 'Template', 'Scale', 'Dashboard'] },
+    { actions: ['read'], subjects: ['Audit', 'AuditMember', 'Template', 'Scale', 'Dashboard'] },
     { actions: ['create', 'read', 'update'], subjects: ['Evaluation', 'Evidence'] },
     { actions: ['delete'], subjects: ['Evidence'] },
+    // Un auditor puede ser LÍDER de una auditoría, y el líder también genera informes (docs/07 §2); la política
+    // contextual (`audit-policy.ts`, acción `report`) exige además que sea el manager o el líder de ESA auditoría.
+    { actions: ['create', 'read'], subjects: ['Report'] },
   ],
 }
 
