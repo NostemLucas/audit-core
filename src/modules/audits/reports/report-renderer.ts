@@ -33,6 +33,8 @@ export interface ReportData {
     readonly expectedLabel: string | null
     readonly achievedLabel: string | null
     readonly findings: string | null
+    /** Ya traducida (docs/06 §3): `null` cuando no se clasificó (siempre el caso en capacidad, opcional en conformidad). */
+    readonly severity: string | null
   }>
 }
 

@@ -25,7 +25,7 @@ const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     ${paragraph('{/domains}')}
     ${paragraph('Criterios por debajo de lo esperado', 'Heading1')}
     ${paragraph('{#gaps}')}
-    ${paragraph('{domain} / {reference} {title}: esperado {expectedLabel}, alcanzado {achievedLabel}. {findings}')}
+    ${paragraph('[{severity}] {domain} / {reference} {title}: esperado {expectedLabel}, alcanzado {achievedLabel}. {findings}')}
     ${paragraph('{/gaps}')}
     <w:sectPr/>
   </w:body>

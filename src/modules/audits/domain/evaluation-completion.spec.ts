@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { missingForCompletion, requiresEvidence, requiresFindings } from './evaluation-completion.js'
+import { missingForCompletion, requiresEvidence, requiresFindings, requiresSeverity } from './evaluation-completion.js'
 
 const level = (value: number) => ({ value })
 const MIN = level(0)
@@ -28,62 +28,97 @@ describe('requiresEvidence', () => {
   })
 })
 
+describe('requiresSeverity', () => {
+  it('en CONFORMITY, exactamente cuando hace falta hallazgo (por debajo del esperado)', () => {
+    expect(requiresSeverity(MID, MIN, 'CONFORMITY')).toBe(true)
+    expect(requiresSeverity(MID, MID, 'CONFORMITY')).toBe(false)
+    expect(requiresSeverity(MID, MAX, 'CONFORMITY')).toBe(false)
+  })
+
+  it('en MATURITY, nunca — aunque esté por debajo del esperado', () => {
+    expect(requiresSeverity(MID, MIN, 'MATURITY')).toBe(false)
+  })
+})
+
 describe('missingForCompletion', () => {
   const input = (over: Partial<Parameters<typeof missingForCompletion>[0]> = {}) => ({
     achievedLevelId: 'lv-max',
     isNotApplicable: false,
     notApplicableReason: null,
     findings: null,
+    severity: null,
     ...over,
   })
   const levels = (achieved: typeof MIN | null, expected = MID) => ({ expected, achieved, minimum: MIN })
 
   it('cumple en el mínimo, sin hallazgo ni evidencia: nada falta', () => {
-    expect(missingForCompletion(input({ achievedLevelId: 'lv-0' }), levels(MIN, MIN), 0)).toEqual([])
+    expect(missingForCompletion(input({ achievedLevelId: 'lv-0' }), levels(MIN, MIN), 0, 'CONFORMITY')).toEqual([])
   })
 
   it('sin nivel alcanzado y sin N/A: falta ACHIEVED_LEVEL_OR_NOT_APPLICABLE (y nada más, aunque falten otras cosas)', () => {
-    expect(missingForCompletion(input({ achievedLevelId: null }), levels(null), 0)).toEqual([
+    expect(missingForCompletion(input({ achievedLevelId: null }), levels(null), 0, 'CONFORMITY')).toEqual([
       'ACHIEVED_LEVEL_OR_NOT_APPLICABLE',
     ])
   })
 
-  it('por debajo del esperado sin hallazgo: falta FINDINGS', () => {
-    expect(missingForCompletion(input(), levels(MIN), 0)).toEqual(['FINDINGS'])
+  it('por debajo del esperado sin hallazgo, en CONFORMITY: faltan FINDINGS y SEVERITY, en ese orden', () => {
+    expect(missingForCompletion(input(), levels(MIN), 0, 'CONFORMITY')).toEqual(['FINDINGS', 'SEVERITY'])
   })
 
-  it('por debajo del esperado CON hallazgo: no falta nada (estar por debajo no exige evidencia si además es el mínimo)', () => {
-    expect(missingForCompletion(input({ findings: 'no existe' }), levels(MIN), 0)).toEqual([])
+  it('por debajo del esperado sin hallazgo, en MATURITY: falta solo FINDINGS (la gravedad nunca es obligatoria)', () => {
+    expect(missingForCompletion(input(), levels(MIN), 0, 'MATURITY')).toEqual(['FINDINGS'])
+  })
+
+  it('por debajo del esperado CON hallazgo pero sin gravedad, en CONFORMITY: falta SEVERITY', () => {
+    expect(missingForCompletion(input({ findings: 'no existe' }), levels(MIN), 0, 'CONFORMITY')).toEqual(['SEVERITY'])
+  })
+
+  it('por debajo del esperado con hallazgo Y gravedad, en CONFORMITY: no falta nada (el mínimo no exige evidencia)', () => {
+    expect(
+      missingForCompletion(input({ findings: 'no existe', severity: 'MINOR' }), levels(MIN), 0, 'CONFORMITY'),
+    ).toEqual([])
   })
 
   it('por encima del mínimo sin evidencia: falta EVIDENCE', () => {
-    expect(missingForCompletion(input(), levels(MID, MID), 0)).toEqual(['EVIDENCE'])
+    expect(missingForCompletion(input(), levels(MID, MID), 0, 'CONFORMITY')).toEqual(['EVIDENCE'])
   })
 
-  it('por encima del mínimo, por debajo del esperado, sin hallazgo ni evidencia: faltan los dos, en orden', () => {
-    expect(missingForCompletion(input(), levels(MID, MAX), 0)).toEqual(['FINDINGS', 'EVIDENCE'])
+  it('por encima del mínimo, por debajo del esperado, en CONFORMITY: faltan hallazgo, gravedad y evidencia, en orden', () => {
+    expect(missingForCompletion(input(), levels(MID, MAX), 0, 'CONFORMITY')).toEqual([
+      'FINDINGS',
+      'SEVERITY',
+      'EVIDENCE',
+    ])
   })
 
   it('por encima del mínimo con evidencia: no falta nada', () => {
-    expect(missingForCompletion(input(), levels(MID, MID), 1)).toEqual([])
+    expect(missingForCompletion(input(), levels(MID, MID), 1, 'CONFORMITY')).toEqual([])
   })
 
-  it('N/A con motivo: nada falta, aunque no haya nivel ni evidencia', () => {
+  it('N/A con motivo: nada falta, aunque no haya nivel, hallazgo, gravedad ni evidencia', () => {
     expect(
-      missingForCompletion(input({ isNotApplicable: true, notApplicableReason: 'no aplica' }), levels(null), 0),
+      missingForCompletion(
+        input({ isNotApplicable: true, notApplicableReason: 'no aplica' }),
+        levels(null),
+        0,
+        'CONFORMITY',
+      ),
     ).toEqual([])
   })
 
   it('N/A sin motivo: falta NOT_APPLICABLE_REASON, y nada más', () => {
-    expect(missingForCompletion(input({ isNotApplicable: true }), levels(null), 0)).toEqual(['NOT_APPLICABLE_REASON'])
+    expect(missingForCompletion(input({ isNotApplicable: true }), levels(null), 0, 'CONFORMITY')).toEqual([
+      'NOT_APPLICABLE_REASON',
+    ])
   })
 
-  it('N/A gana sobre cualquier otra falta: no exige nivel, hallazgo ni evidencia', () => {
+  it('N/A gana sobre cualquier otra falta: no exige nivel, hallazgo, gravedad ni evidencia', () => {
     expect(
       missingForCompletion(
-        { achievedLevelId: null, isNotApplicable: true, notApplicableReason: 'x', findings: null },
+        { achievedLevelId: null, isNotApplicable: true, notApplicableReason: 'x', findings: null, severity: null },
         levels(null, MAX),
         0,
+        'CONFORMITY',
       ),
     ).toEqual([])
   })

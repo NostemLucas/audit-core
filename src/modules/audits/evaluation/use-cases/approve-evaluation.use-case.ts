@@ -27,13 +27,15 @@ export class ApproveEvaluationUseCase {
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
     const to = evaluationLifecycle.next(evaluation.status, 'APPROVE')
 
-    await this.tx.evaluation.update({ where: { id: evaluationId }, data: { status: to } })
+    const requiresFollowUp = input.requiresFollowUp ?? false
+    await this.tx.evaluation.update({ where: { id: evaluationId }, data: { status: to, requiresFollowUp } })
     const template = await this.library.getTemplate(audit.templateId)
     await this.events.publish(AuditEvents.EvaluationApproved, {
       auditId,
       evaluationId,
       controlTitle: template.tree.pathTo(evaluation.controlId).at(-1)!.title,
       comments: input.comments ?? null,
+      requiresFollowUp,
     })
     return toEvaluationViews([await loadEvaluation(this.tx, auditId, evaluationId)], template)[0]!
   }

@@ -1,5 +1,5 @@
 import { defineMessages } from '../../platform/events/index.js'
-import type { AuditRole } from '../../shared/enums.js'
+import type { AuditRole, EvaluationSeverity } from '../../shared/enums.js'
 import { type AuditField, AuditEvents } from './domain/events.js'
 
 const FIELD_LABELS: Record<AuditField, string> = {
@@ -12,6 +12,13 @@ const FIELD_LABELS: Record<AuditField, string> = {
 }
 
 const ROLE_LABELS: Record<AuditRole, string> = { LEAD: 'líder', MEMBER: 'auditor' }
+
+/** Etiqueta en español de la gravedad de un hallazgo (docs/06 §3). La usa también el informe (`audits/reports`). */
+export const SEVERITY_LABELS: Record<EvaluationSeverity, string> = {
+  MAJOR: 'No conformidad mayor',
+  MINOR: 'No conformidad menor',
+  OBSERVATION: 'Observación',
+}
 
 /** Texto de cada evento de la auditoría. Sin él no compila (el mapa es exhaustivo). */
 export const auditMessages = defineMessages(AuditEvents, {
@@ -40,7 +47,8 @@ export const auditMessages = defineMessages(AuditEvents, {
   AuditArchived: () => 'Archivó la auditoría',
   EvaluationStarted: (p) => `Comenzó a trabajar en «${p.controlTitle}»`,
   EvaluationCompleted: (p) => `Envió «${p.controlTitle}» a revisión`,
-  EvaluationApproved: (p) => (p.comments ? `Aprobó «${p.controlTitle}»: ${p.comments}` : `Aprobó «${p.controlTitle}»`),
+  EvaluationApproved: (p) =>
+    `Aprobó «${p.controlTitle}»${p.comments ? `: ${p.comments}` : ''}${p.requiresFollowUp ? ' (requiere seguimiento)' : ''}`,
   EvaluationReturned: (p) => `Devolvió «${p.controlTitle}»: ${p.comments}`,
   ReportGenerated: (p) => `Generó el informe "${p.title}"`,
   EvaluationReopened: (p) => `Reabrió «${p.controlTitle}» (estaba aprobado): ${p.comments}`,

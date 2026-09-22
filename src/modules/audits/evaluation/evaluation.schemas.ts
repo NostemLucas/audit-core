@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DecimalNumber } from '../../../platform/http/index.js'
-import { EvaluationStatus } from '../../../shared/enums.js'
+import { EvaluationSeverity, EvaluationStatus } from '../../../shared/enums.js'
 import { LIMITS } from '../../../shared/limits.js'
 import { optionalText } from '../../../shared/schemas.js'
 
@@ -18,10 +18,14 @@ export const EvaluationView = z.object({
   achievedLevel: z.object({ id: z.uuid(), value: DecimalNumber, label: z.string() }).nullable(),
   findings: z.string().nullable(),
   notes: z.string().nullable(),
+  /** Gravedad del hallazgo (docs/06 §3). Solo obligatoria si la escala es de conformidad; en capacidad, libre. */
+  severity: z.enum(EvaluationSeverity).nullable(),
   isNotApplicable: z.boolean(),
   notApplicableReason: z.string().nullable(),
   /** Cuántas evidencias tiene adjuntas (la Fase 4 trae el detalle; aquí solo el conteo, para saber si puede enviarse). */
   evidenceCount: z.int(),
+  /** El líder lo marca al aprobar (docs/06 §3, §9): aunque cumpla, debe evaluarse de nuevo en el próximo seguimiento. */
+  requiresFollowUp: z.boolean(),
   /** Seguimiento: el criterio de la auditoría anterior del que viene este resultado (trasladado, no evaluado aquí). Su historia se pide con el endpoint del criterio, en esa auditoría. */
   carriedFromId: z.uuid().nullable(),
   /** Para editar el contenido: se envía la versión que se leyó (docs/06 §10). */
@@ -64,6 +68,7 @@ export const UpdateEvaluationContent = z
     achievedLevelId: z.uuid().nullable().optional(),
     findings: optionalText().nullable().optional(),
     notes: optionalText().nullable().optional(),
+    severity: z.enum(EvaluationSeverity).nullable().optional(),
     isNotApplicable: z.boolean().optional(),
     notApplicableReason: optionalText().nullable().optional(),
     /** La versión que se leyó (`EvaluationView.version`): si otra escritura la cambió, 409 `VERSION_CONFLICT`. */
@@ -77,8 +82,14 @@ export const UpdateEvaluationContent = z
   })
 export type UpdateEvaluationContentT = z.infer<typeof UpdateEvaluationContent>
 
-/** Aprobar: el comentario es opcional. Devolver y reabrir: obligatorio (docs/06 §3). */
-export const ApproveEvaluation = z.object({ comments: optionalText().optional() })
+/**
+ * Aprobar: el comentario es opcional. Devolver y reabrir: obligatorio (docs/06 §3). `requiresFollowUp` (por defecto
+ * `false`): el líder pide que este criterio se evalúe de nuevo en el próximo seguimiento, aunque haya cumplido.
+ */
+export const ApproveEvaluation = z.object({
+  comments: optionalText().optional(),
+  requiresFollowUp: z.boolean().optional(),
+})
 export type ApproveEvaluationT = z.infer<typeof ApproveEvaluation>
 
 export const ReturnEvaluation = z.object({ comments: z.string().trim().min(1).max(LIMITS.text) })

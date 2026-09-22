@@ -260,7 +260,12 @@ describe('GET /audits/:id/evaluations/:evaluationId/history', () => {
     await api()
       .patch(url)
       .set('authorization', ana)
-      .send({ achievedLevelId: levelId(ctx, 'No cumple'), findings: 'No existe', version: before.version })
+      .send({
+        achievedLevelId: levelId(ctx, 'No cumple'),
+        findings: 'No existe',
+        severity: 'MAJOR',
+        version: before.version,
+      })
     await api().post(`${url}/complete`).set('authorization', ana)
     await api().post(`${url}/return`).set('authorization', lider).send({ comments: 'Detalla qué se pidió' })
 

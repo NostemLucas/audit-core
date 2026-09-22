@@ -9,6 +9,7 @@ import { LibraryReader } from '../../../library/index.js'
 import { type Actor, assertOnAudit } from '../../domain/audit-policy.js'
 import { AuditEvents } from '../../domain/events.js'
 import { computeResults } from '../../domain/scoring.js'
+import { SEVERITY_LABELS } from '../../messages.es.js'
 import { findEvaluations } from '../../evaluation/evaluation.queries.js'
 import { accessOf, loadAuditView } from '../../infrastructure/audit.queries.js'
 import { computeGapViews, toScoredLeaves } from '../../results/results.queries.js'
@@ -73,6 +74,7 @@ export class GenerateReportUseCase {
         expectedLabel: gap.expectedLevel?.label ?? null,
         achievedLabel: gap.achievedLevel?.label ?? null,
         findings: gap.findings,
+        severity: gap.severity ? SEVERITY_LABELS[gap.severity] : null,
       })),
     })
 

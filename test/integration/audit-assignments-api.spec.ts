@@ -73,11 +73,13 @@ describe('ver los criterios', () => {
       guidance: null,
       achievedLevel: null,
       findings: null,
+      severity: null,
       notes: null,
       isNotApplicable: false,
       notApplicableReason: null,
       evidenceCount: 0,
       carriedFromId: null,
+      requiresFollowUp: false,
       version: 0,
     })
     expect(res.body.data[2].control.reference).toBeNull()

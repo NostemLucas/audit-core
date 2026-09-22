@@ -64,6 +64,14 @@ enum EvaluationStatus {
   APPROVED
 }
 
+/// Gravedad del hallazgo (docs/06 §3). Disponible en las dos dimensiones de escala; solo OBLIGATORIA en CONFORMITY,
+/// donde tiene una consecuencia real (una mayor puede bloquear una certificación). En MATURITY es una anotación libre.
+enum EvaluationSeverity {
+  MAJOR
+  MINOR
+  OBSERVATION
+}
+
 enum ReportType {
   COMPLIANCE
   EXECUTIVE_SUMMARY
@@ -354,12 +362,19 @@ model Evaluation {
 
   status EvaluationStatus @default(NOT_STARTED)
 
-  achievedLevelId String? @db.Uuid
+  achievedLevelId String?             @db.Uuid
   findings        String?
   notes           String?
+  /// Lo pone el auditor asignado, al enviar a revisión (docs/06 §3). Obligatoria si hace falta hallazgo (`findings`)
+  /// Y la escala es CONFORMITY; en MATURITY es libre, nunca obligatoria.
+  severity        EvaluationSeverity?
 
   isNotApplicable     Boolean @default(false)
   notApplicableReason String?
+
+  /// Lo pone el líder al aprobar (docs/06 §3, §9): aunque este criterio cumpla, debe volver a evaluarse en el próximo
+  /// seguimiento en vez de trasladarse automáticamente. No bloquea nada por sí solo; solo importa al crear un seguimiento.
+  requiresFollowUp Boolean @default(false)
 
   /// Seguimiento: el criterio de la auditoría anterior del que viene este resultado, TRASLADADO sin volver a evaluarlo (nace
   /// `APPROVED`). Nulo si se evalúa en esta auditoría. Reabrirlo lo borra: ya se está evaluando aquí (docs/06 §9).

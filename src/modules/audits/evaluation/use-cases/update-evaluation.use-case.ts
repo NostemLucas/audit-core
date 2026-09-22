@@ -60,7 +60,8 @@ export class UpdateEvaluationUseCase {
         ...(input.achievedLevelId !== undefined && { achievedLevelId: input.achievedLevelId }),
         ...(input.findings !== undefined && { findings: input.findings }),
         ...(input.notes !== undefined && { notes: input.notes }),
-        ...(input.isNotApplicable === true && { isNotApplicable: true, achievedLevelId: null }),
+        ...(input.severity !== undefined && { severity: input.severity }),
+        ...(input.isNotApplicable === true && { isNotApplicable: true, achievedLevelId: null, severity: null }),
         ...(input.isNotApplicable === false && { isNotApplicable: false, notApplicableReason: null }),
         ...(input.notApplicableReason !== undefined &&
           input.isNotApplicable !== false && { notApplicableReason: input.notApplicableReason }),

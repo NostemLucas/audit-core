@@ -20,6 +20,9 @@ CREATE TYPE "AuditRole" AS ENUM ('LEAD', 'MEMBER');
 CREATE TYPE "EvaluationStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'RETURNED', 'APPROVED');
 
 -- CreateEnum
+CREATE TYPE "EvaluationSeverity" AS ENUM ('MAJOR', 'MINOR', 'OBSERVATION');
+
+-- CreateEnum
 CREATE TYPE "ReportType" AS ENUM ('COMPLIANCE', 'EXECUTIVE_SUMMARY', 'FINDINGS', 'GAP_ANALYSIS', 'OTHER');
 
 -- CreateTable
@@ -176,8 +179,10 @@ CREATE TABLE "evaluations" (
     "achievedLevelId" UUID,
     "findings" TEXT,
     "notes" TEXT,
+    "severity" "EvaluationSeverity",
     "isNotApplicable" BOOLEAN NOT NULL DEFAULT false,
     "notApplicableReason" TEXT,
+    "requiresFollowUp" BOOLEAN NOT NULL DEFAULT false,
     "carriedFromId" UUID,
     "version" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

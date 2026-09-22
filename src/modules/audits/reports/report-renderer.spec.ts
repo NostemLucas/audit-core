@@ -22,6 +22,7 @@ const DATA: ReportData = {
       expectedLabel: 'Cumple',
       achievedLabel: 'Parcial',
       findings: 'Cubre la mitad',
+      severity: 'No conformidad menor',
     },
   ],
 }
@@ -42,6 +43,7 @@ describe('renderReport', () => {
     expect(xml).toContain('Organización: ACME')
     expect(xml).toContain('Generado: 2026-09-22')
     expect(xml).toContain('Evaluados: 4 · Cumplen: 2 · Por debajo: 1 · No aplica: 1 · Pendientes: 0')
+    expect(xml).toContain('[No conformidad menor] Organizacionales / A.5.2 Roles')
   })
 
   it('el bucle de dominios repite una fila por dominio, con sus propios valores', async () => {
@@ -71,14 +73,17 @@ describe('renderReport', () => {
           expectedLabel: 'Cumple',
           achievedLabel: 'No cumple',
           findings: 'No existe',
+          severity: null, // capacidad: nunca se clasifica, y no debe salir como "undefined"
         },
       ],
     })
     const { default: PizZip } = await import('pizzip')
     const xml = new PizZip(buffer).file('word/document.xml')!.asText()
-    assertFullySubstituted(xml) // ni siquiera con `reference: null` (se rellena con "—", no "undefined")
-    expect(xml).toContain('Organizacionales / A.5.2 Roles: esperado Cumple, alcanzado Parcial. Cubre la mitad')
-    expect(xml).toContain('Personas / — Antecedentes: esperado Cumple, alcanzado No cumple. No existe')
+    assertFullySubstituted(xml) // ni siquiera con `reference: null` o `severity: null` (se rellenan con "—")
+    expect(xml).toContain(
+      '[No conformidad menor] Organizacionales / A.5.2 Roles: esperado Cumple, alcanzado Parcial. Cubre la mitad',
+    )
+    expect(xml).toContain('[—] Personas / — Antecedentes: esperado Cumple, alcanzado No cumple. No existe')
   })
 
   it('sin dominios ni brechas, los bucles quedan vacíos: nada de "undefined" ni de marcadores sueltos', async () => {

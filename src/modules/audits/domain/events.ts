@@ -1,7 +1,7 @@
 import { z } from 'zod'
 // Import directo del archivo puro: el `index` de platform/events arrastra el bus (Nest) y `domain/` no puede importar Nest.
 import { defineEvents } from '../../../platform/events/define-events.js'
-import { AuditRole } from '../../../shared/enums.js'
+import { AuditRole, EvaluationSeverity } from '../../../shared/enums.js'
 
 /**
  * Eventos de la auditoría: lo que se guarda en `audit_events`. Cada payload lleva `auditId`; además, y solo si aplica:
@@ -93,6 +93,7 @@ export const AuditEvents = defineEvents({
     isNotApplicable: z.boolean(),
     notApplicableReason: z.string().nullable(),
     findings: z.string().nullable(),
+    severity: z.enum(EvaluationSeverity).nullable(),
     notes: z.string().nullable(),
     evidence: z.array(z.object({ id: z.uuid(), title: z.string() })),
   }),
@@ -101,6 +102,8 @@ export const AuditEvents = defineEvents({
     evaluationId: z.uuid(),
     controlTitle: z.string(),
     comments: z.string().nullable(),
+    /** El líder lo pide al aprobar (docs/06 §3, §9): este criterio no se traslada solo en el próximo seguimiento. */
+    requiresFollowUp: z.boolean(),
   }),
   EvaluationReturned: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),
   EvaluationReopened: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),

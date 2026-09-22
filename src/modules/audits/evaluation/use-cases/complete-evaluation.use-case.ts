@@ -39,6 +39,7 @@ export class CompleteEvaluationUseCase {
         minimum: scale.levels[0]!,
       },
       evaluation._count.evidences,
+      scale.dimension,
     )
     if (missing.length > 0) throw new DomainError(AuditErrors.EVALUATION_INCOMPLETE, { missing })
 
@@ -57,6 +58,7 @@ export class CompleteEvaluationUseCase {
       isNotApplicable: evaluation.isNotApplicable,
       notApplicableReason: evaluation.notApplicableReason,
       findings: evaluation.findings,
+      severity: evaluation.severity,
       notes: evaluation.notes,
       evidence,
     })

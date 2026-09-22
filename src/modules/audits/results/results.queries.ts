@@ -1,4 +1,5 @@
 import type { TemplateForAudit } from '../../library/index.js'
+import type { EvaluationSeverity } from '../../../shared/enums.js'
 import type { ScoredLeaf } from '../domain/scoring.js'
 import { leafGap } from '../domain/scoring.js'
 import { toEvaluationViews } from '../evaluation/evaluation.queries.js'
@@ -11,6 +12,7 @@ interface ResultRow {
   isNotApplicable: boolean
   carriedFromId: string | null
   findings: string | null
+  severity: EvaluationSeverity | null
   expectedLevel: { label: string; value: { toNumber(): number } } | null
   achievedLevel: { id: string; label: string; value: { toNumber(): number } } | null
   _count: { evidences: number }

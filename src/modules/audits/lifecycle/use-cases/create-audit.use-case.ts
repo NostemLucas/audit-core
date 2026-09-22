@@ -130,6 +130,7 @@ export class CreateAuditUseCase {
           isNotApplicable: before.isNotApplicable,
           expected: before.expectedLevel?.value.toNumber() ?? null,
           achieved: before.achievedLevel?.value.toNumber() ?? null,
+          requiresFollowUp: before.requiresFollowUp,
         })
       if (!traslada) return base
       return {
@@ -137,6 +138,7 @@ export class CreateAuditUseCase {
         status: 'APPROVED' as const,
         achievedLevelId: before.achievedLevelId,
         findings: before.findings,
+        severity: before.severity,
         notes: before.notes,
         isNotApplicable: before.isNotApplicable,
         notApplicableReason: before.notApplicableReason,

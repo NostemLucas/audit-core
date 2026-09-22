@@ -7,6 +7,7 @@
 export {
   AuditRole,
   AuditStatus,
+  EvaluationSeverity,
   EvaluationStatus,
   ReportType,
   Role,

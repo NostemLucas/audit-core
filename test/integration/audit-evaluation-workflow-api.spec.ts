@@ -157,10 +157,10 @@ describe('editar el contenido (solo el auditor asignado)', () => {
     expect((await patch(ctx, id, { achievedLevelId: 'x' })).status).toBe(400)
   })
 
-  it('"no aplica": exige motivo, borra el nivel alcanzado, y es excluyente con él (se desmarca de forma explícita)', async () => {
+  it('"no aplica": exige motivo, borra el nivel alcanzado y la gravedad, y es excluyente con él (se desmarca de forma explícita)', async () => {
     const ctx = await inProgress()
     const id = await evaluationOf(ctx, 'Roles')
-    await patch(ctx, id, { achievedLevelId: level(ctx, 'Cumple') })
+    await patch(ctx, id, { achievedLevelId: level(ctx, 'Parcial'), severity: 'MINOR' })
 
     const noReason = await patch(ctx, id, { isNotApplicable: true })
     expect(noReason.status).toBe(422)
@@ -178,6 +178,7 @@ describe('editar el contenido (solo el auditor asignado)', () => {
       isNotApplicable: true,
       notApplicableReason: 'El sistema no existe',
       achievedLevel: null,
+      severity: null, // ya no hay nivel alcanzado al que asignarle una gravedad
     })
 
     const conflict = await patch(ctx, id, { achievedLevelId: level(ctx, 'Cumple') })
@@ -235,26 +236,38 @@ describe('enviar a revisión: qué se exige (docs/06 §3)', () => {
     expect(await statusOf(id)).toBe('IN_PROGRESS')
   })
 
-  it('por encima del mínimo y por debajo de lo esperado: hace falta hallazgo Y evidencia, en ese orden', async () => {
+  it('por encima del mínimo y por debajo de lo esperado: hace falta hallazgo, gravedad Y evidencia, en ese orden', async () => {
     const ctx = await inProgress()
     const id = await evaluationOf(ctx, 'Roles')
     await patch(ctx, id, { achievedLevelId: level(ctx, 'Parcial') }) // esperado Cumple, mínimo No cumple
-    expect((await complete(ctx, id)).body.error.details.missing).toEqual(['FINDINGS', 'EVIDENCE'])
+    expect((await complete(ctx, id)).body.error.details.missing).toEqual(['FINDINGS', 'SEVERITY', 'EVIDENCE'])
     await patch(ctx, id, { findings: 'Cubre solo la mitad' })
+    expect((await complete(ctx, id)).body.error.details.missing).toEqual(['SEVERITY', 'EVIDENCE'])
+    await patch(ctx, id, { severity: 'MINOR' })
     expect((await complete(ctx, id)).body.error.details.missing).toEqual(['EVIDENCE'])
     await evidence(id)
     expect((await complete(ctx, id)).status).toBe(200)
   })
 
-  it('en el nivel MÍNIMO no se exige evidencia (el hallazgo ES la ausencia), pero sí el hallazgo', async () => {
+  it('en el nivel MÍNIMO no se exige evidencia (el hallazgo ES la ausencia), pero sí el hallazgo y la gravedad', async () => {
     const ctx = await inProgress()
     const id = await evaluationOf(ctx, 'Roles')
     await patch(ctx, id, { achievedLevelId: level(ctx, 'No cumple') })
-    expect((await complete(ctx, id)).body.error.details.missing).toEqual(['FINDINGS'])
-    await patch(ctx, id, { findings: 'Se pidió la política y no existe' })
+    expect((await complete(ctx, id)).body.error.details.missing).toEqual(['FINDINGS', 'SEVERITY'])
+    await patch(ctx, id, { findings: 'Se pidió la política y no existe', severity: 'MAJOR' })
     const res = await complete(ctx, id)
     expect(res.status).toBe(200)
     expect(res.body.data.evidenceCount).toBe(0)
+    expect(res.body.data.severity).toBe('MAJOR')
+  })
+
+  it('en MATURITY la gravedad nunca es obligatoria, aunque esté por debajo de lo esperado', async () => {
+    const ctx = await inProgress('MATURITY', '-sev')
+    const id = await evaluationOf(ctx, 'Roles') // esperado: Parcial
+    await patch(ctx, id, { achievedLevelId: level(ctx, 'No cumple'), findings: 'Aún no arranca' })
+    const res = await complete(ctx, id)
+    expect(res.status).toBe(200)
+    expect(res.body.data.severity).toBeNull()
   })
 
   it('"no aplica" con motivo se envía sin nivel, hallazgo ni evidencia', async () => {
@@ -316,7 +329,7 @@ describe('enviar a revisión: qué se exige (docs/06 §3)', () => {
   it('atomicidad: si falla el historial, el criterio no queda enviado', async () => {
     const ctx = await inProgress()
     const id = await evaluationOf(ctx, 'Roles')
-    await patch(ctx, id, { achievedLevelId: level(ctx, 'No cumple'), findings: 'x' })
+    await patch(ctx, id, { achievedLevelId: level(ctx, 'No cumple'), findings: 'x', severity: 'MINOR' })
     await db.$executeRawUnsafe(`
       CREATE FUNCTION test_fail_event() RETURNS trigger AS $$
       BEGIN IF NEW."type" = 'EvaluationCompleted' THEN RAISE EXCEPTION 'fallo simulado'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql`)
@@ -337,7 +350,7 @@ describe('revisar (solo el líder)', () => {
   /** Un criterio ya enviado a revisión, en el nivel mínimo (no exige evidencia). */
   async function sent(ctx: Ctx, title = 'Roles', findings = 'v1') {
     const id = await evaluationOf(ctx, title)
-    await patch(ctx, id, { achievedLevelId: level(ctx, 'No cumple'), findings })
+    await patch(ctx, id, { achievedLevelId: level(ctx, 'No cumple'), findings, severity: 'MAJOR' })
     expect((await complete(ctx, id)).status).toBe(200)
     return id
   }

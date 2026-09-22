@@ -24,11 +24,19 @@ const post = async (path: string, body: object, role: TestRole = 'manager', who?
     .set('authorization', await as(role, who))
     .send(body)
 
-type Result = { achieved?: string; expected?: string; na?: boolean; notes?: string; findings?: string }
+type Result = {
+  achieved?: string
+  expected?: string
+  na?: boolean
+  notes?: string
+  findings?: string
+  severity?: 'MAJOR' | 'MINOR' | 'OBSERVATION'
+}
 
 /**
  * Una auditoría CERRADA con resultados reales (CONFORMITY): Políticas cumple, Roles queda por debajo, Antecedentes no aplica,
- * Contratos cumple. Alcance: ERP y CRM. Directo en la BD: aquí se prueba el seguimiento, no el flujo de cierre.
+ * Contratos cumple (con una observación anotada, aunque cumplir no la exigía). Alcance: ERP y CRM. Directo en la BD: aquí se
+ * prueba el seguimiento, no el flujo de cierre.
  */
 async function closedAudit(
   overrides: Record<string, Result> = {},
@@ -40,7 +48,7 @@ async function closedAudit(
     Políticas: { achieved: 'Cumple', notes: 'Revisado con TI' },
     Roles: { achieved: 'Parcial', findings: 'Cubre la mitad' },
     Antecedentes: { na: true },
-    Contratos: { achieved: 'Cumple' },
+    Contratos: { achieved: 'Cumple', severity: 'OBSERVATION' },
     ...overrides,
   }
   for (const [title, r] of Object.entries(results)) {
@@ -53,6 +61,7 @@ async function closedAudit(
         ...(r.na && { isNotApplicable: true, notApplicableReason: 'No hay contratos' }),
         ...(r.notes && { notes: r.notes }),
         ...(r.findings && { findings: r.findings }),
+        ...(r.severity && { severity: r.severity }),
       },
     })
   }
@@ -100,11 +109,13 @@ describe('crear un seguimiento (docs/06 §9)', () => {
         achievedLevelId: before.achievedLevelId,
         notes: before.notes,
         findings: before.findings,
+        severity: before.severity,
         isNotApplicable: before.isNotApplicable,
         notApplicableReason: before.notApplicableReason,
       })
     }
     expect((await evalOf(view.id, 'Políticas')).notes).toBe('Revisado con TI')
+    expect((await evalOf(view.id, 'Contratos')).severity).toBe('OBSERVATION')
     expect(await evalOf(view.id, 'Antecedentes')).toMatchObject({
       isNotApplicable: true,
       notApplicableReason: 'No hay contratos',
@@ -118,6 +129,65 @@ describe('crear un seguimiento (docs/06 §9)', () => {
       findings: null,
       assignedUserId: null,
       expectedLevelId: levelId(prev, 'Cumple'),
+    })
+  })
+
+  it('con requiresFollowUp el líder fuerza una nueva evaluación en el seguimiento, aunque el criterio haya cumplido', async () => {
+    const ctx = await startedAudit(t)
+    const ana = await as('auditor', 'ana')
+    const lider = await as('auditor', 'lider')
+    const manager = await as('manager')
+    const rows = await db.evaluation.findMany({ where: { auditId: ctx.auditId }, include: { control: true } })
+    for (const row of rows) {
+      await db.evidence.create({
+        data: {
+          evaluationId: row.id,
+          title: 'Acta',
+          fileName: 'acta.pdf',
+          mimeType: 'application/pdf',
+          size: 1024n,
+          storageFileId: `nc-${row.id}`,
+        },
+      })
+      const patched = await api()
+        .patch(`${A}/${ctx.auditId}/evaluations/${row.id}`)
+        .set('authorization', ana)
+        .send({ achievedLevelId: levelId(ctx, 'Cumple'), version: row.version })
+      expect(patched.status).toBe(200)
+      expect(
+        (await api().post(`${A}/${ctx.auditId}/evaluations/${row.id}/complete`).set('authorization', ana)).status,
+      ).toBe(200)
+    }
+    const forced = rows.find((r) => r.control.title === 'Políticas')!
+    expect(
+      (
+        await api()
+          .post(`${A}/${ctx.auditId}/evaluations/${forced.id}/approve`)
+          .set('authorization', lider)
+          .send({ requiresFollowUp: true })
+      ).status,
+    ).toBe(200)
+    for (const row of rows) {
+      if (row.id === forced.id) continue
+      expect(
+        (await api().post(`${A}/${ctx.auditId}/evaluations/${row.id}/approve`).set('authorization', lider).send({}))
+          .status,
+      ).toBe(200)
+    }
+    expect((await api().post(`${A}/${ctx.auditId}/close`).set('authorization', manager)).status).toBe(200)
+
+    const res = await followUp(ctx)
+    expect(res.status).toBe(201)
+    // marcado con requiresFollowUp: se evalúa de nuevo pese a haber cumplido
+    expect(await evalOf(res.body.data.id, 'Políticas')).toMatchObject({
+      status: 'NOT_STARTED',
+      carriedFromId: null,
+      achievedLevelId: null,
+    })
+    // el resto cumplió sin exigir seguimiento: se traslada como siempre
+    expect(await evalOf(res.body.data.id, 'Roles')).toMatchObject({
+      status: 'APPROVED',
+      carriedFromId: expect.any(String),
     })
   })
 
@@ -328,7 +398,12 @@ describe('el seguimiento en marcha', () => {
     await api()
       .patch(url)
       .set('authorization', anaToken)
-      .send({ achievedLevelId: levelId(prev, 'No cumple'), findings: 'Sigue sin cerrarse', version: current.version })
+      .send({
+        achievedLevelId: levelId(prev, 'No cumple'),
+        findings: 'Sigue sin cerrarse',
+        severity: 'MAJOR',
+        version: current.version,
+      })
     expect((await api().post(`${url}/complete`).set('authorization', anaToken)).status).toBe(200)
     expect((await api().post(`${url}/approve`).set('authorization', lider).send({})).status).toBe(200)
     const closed = await post(`${A}/${id}/close`, {})
