@@ -162,6 +162,22 @@ lectura: se muestra su tipo (§4).
 Sin pesos ni puntajes guardados (`05` §6, §11); una sola escala por auditoría; «no aplica» es una marca de la evaluación con
 motivo, no una opción de la escala; el nivel esperado es **por criterio**.
 
+## 10. Bloqueo optimista
+
+Editar datos de la auditoría (`PATCH /audits/:id`) y editar el contenido de un criterio (`PATCH /audits/:id/evaluations/:id`)
+son los dos sitios donde dos personas pueden pisarse: dos ediciones a la vez, o una edición sobre algo que alguien ya cambió.
+Sin bloqueos de fila (decisión de fase-2i): en su lugar, la columna `version` de `audits` y `evaluations`.
+
+- **El cliente manda la versión que leyó** (`version` en el cuerpo, obligatorio en ambos PATCH). La escritura va con
+  `WHERE id = ? AND version = ?`; si no tocó ninguna fila, alguien la cambió entre medias → `409 VERSION_CONFLICT` (con
+  `details.expected`, la versión que se mandó). El cliente relee y decide si reintenta.
+- **Toda escritura sube la versión**, la haga o no un PATCH: una asignación, un cambio de nivel esperado, aprobar, transferir,
+  etc. Así "la fila cambió desde que la leíste" significa lo mismo sin importar qué caso de uso la tocó. Lo hace una extensión
+  de Prisma (`platform/db/extensions.ts`, `versionExtension`), automática por columna, igual que los sellos de auditoría: no
+  hay que acordarse de subirla a mano en cada `update`.
+- **El primer edit de un criterio (arranca + guarda contenido) es una sola escritura**, así que sube la versión una sola vez.
+- No se guarda ninguna otra cosa por esto: es un contador, no una instantánea.
+
 ## 9. Seguimientos
 
 **Un seguimiento es una auditoría normal con un enlace a la anterior.** No hay entidad ni estado propios, ni se crean filas solo

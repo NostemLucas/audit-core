@@ -25,6 +25,8 @@ export const AuditView = z.object({
   plannedStart: CalendarDate.nullable(),
   plannedEnd: CalendarDate.nullable(),
   closedAt: Instant.nullable(),
+  /** Para editar: se envía la versión que se leyó; si cambió entre tanto, 409 `VERSION_CONFLICT` (docs/06 §10). */
+  version: z.int(),
   /** Seguimiento: la auditoría anterior que toma de referencia (docs/06 §9). */
   previousAudit: z.object({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
   organization: z.object({ id: z.uuid(), name: z.string() }),
@@ -96,7 +98,10 @@ export const UpdateAudit = z
     plannedEnd: Day.nullable(),
   })
   .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: 'Indica al menos un campo a modificar' })
+  .extend({ /** La versión que se leyó (`AuditView.version`). */ version: z.int().min(0) })
+  .refine((body) => Object.keys(body).some((key) => key !== 'version'), {
+    message: 'Indica al menos un campo a modificar',
+  })
 export type UpdateAuditT = z.infer<typeof UpdateAudit>
 
 export const ListAuditsQuery = z.object({

@@ -379,11 +379,12 @@ describe('listar', () => {
 })
 
 describe('editar', () => {
+  /** La versión se toma de la BD salvo que el test la indique (para probar el conflicto). */
   const patch = async (id: string, body: Record<string, unknown>, role: TestRole = 'manager', who?: string) =>
     api()
       .patch(`${A}/${id}`)
       .set('authorization', await as(role, who))
-      .send(body)
+      .send({ version: (await db.audit.findUnique({ where: { id } }))?.version ?? 0, ...body })
 
   it('cambia datos, deja la plantilla/organización/escala intactas aunque se envíen, y registra SOLO lo que cambió', async () => {
     const id = await idOf(auditBody(lib, { plannedStart: '2026-10-01', introduction: 'vieja' }))

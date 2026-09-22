@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
-import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
+import { InjectTx, Transactional, type Tx, versionConflict } from '../../../../platform/db/index.js'
 import { DomainError } from '../../../../platform/errors/index.js'
 import { EventBus } from '../../../../platform/events/index.js'
 import { assertAuditEditable } from '../../domain/audit.lifecycle.js'
 import { type Actor, assertOnAudit } from '../../domain/audit-policy.js'
 import { AuditErrors } from '../../domain/errors.js'
-import { AuditEvents, type AuditField } from '../../domain/events.js'
+import { AUDIT_FIELDS, AuditEvents, type AuditField } from '../../domain/events.js'
 import { accessOf, loadAudit, loadAuditView } from '../../infrastructure/audit.queries.js'
 import { withAccess } from '../audit.presenter.js'
 import type { UpdateAuditT } from '../audit.schemas.js'
@@ -44,13 +44,12 @@ export class UpdateAuditUseCase {
       plannedStart: day(audit.plannedStart),
       plannedEnd: day(audit.plannedEnd),
     }
-    const changed = (Object.keys(input) as AuditField[]).filter(
-      (field) => input[field] !== undefined && input[field] !== current[field],
-    )
+    const changed = AUDIT_FIELDS.filter((field) => input[field] !== undefined && input[field] !== current[field])
 
     if (changed.length > 0) {
-      await this.tx.audit.update({
-        where: { id },
+      // Con la versión que el cliente leyó: si otra escritura la cambió, no toca ninguna fila (docs/06 §10).
+      const { count } = await this.tx.audit.updateMany({
+        where: { id, version: input.version },
         data: {
           ...(input.name !== undefined && { name: input.name }),
           ...(input.introduction !== undefined && { introduction: input.introduction }),
@@ -62,6 +61,7 @@ export class UpdateAuditUseCase {
           ...(input.plannedEnd !== undefined && { plannedEnd: input.plannedEnd ? new Date(input.plannedEnd) : null }),
         },
       })
+      if (count === 0) throw versionConflict('Audit', id, input.version)
       await this.events.publish(AuditEvents.AuditUpdated, { auditId: id, changed })
     }
     return withAccess(await loadAuditView(this.tx, id), actor, access)

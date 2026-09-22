@@ -24,6 +24,8 @@ export const EvaluationView = z.object({
   evidenceCount: z.int(),
   /** Seguimiento: el criterio de la auditoría anterior del que viene este resultado (trasladado, no evaluado aquí). Su historia se pide con el endpoint del criterio, en esa auditoría. */
   carriedFromId: z.uuid().nullable(),
+  /** Para editar el contenido: se envía la versión que se leyó (docs/06 §10). */
+  version: z.int(),
 })
 
 export const ListEvaluationsQuery = z.object({
@@ -64,8 +66,12 @@ export const UpdateEvaluationContent = z
     notes: optionalText().nullable().optional(),
     isNotApplicable: z.boolean().optional(),
     notApplicableReason: optionalText().nullable().optional(),
+    /** La versión que se leyó (`EvaluationView.version`): si otra escritura la cambió, 409 `VERSION_CONFLICT`. */
+    version: z.int().min(0),
   })
-  .refine((body) => Object.keys(body).length > 0, { message: 'Indica al menos un campo a modificar' })
+  .refine((body) => Object.keys(body).some((key) => key !== 'version'), {
+    message: 'Indica al menos un campo a modificar',
+  })
   .refine((body) => !(body.isNotApplicable === true && body.achievedLevelId), {
     message: 'No se puede marcar "no aplica" y fijar un nivel alcanzado a la vez',
   })

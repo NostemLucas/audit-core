@@ -5,6 +5,7 @@ import type { Db } from './create-db.js'
 export { DB, DbModule } from './db.module.js'
 export { createDb } from './create-db.js'
 export type { Db } from './create-db.js'
+export { versionConflict } from './version-conflict.js'
 
 /**
  * Cómo escribe un caso de uso en la BD:

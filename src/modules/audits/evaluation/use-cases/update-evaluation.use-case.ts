@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { InjectTx, Transactional, type Tx } from '../../../../platform/db/index.js'
+import { InjectTx, Transactional, type Tx, versionConflict } from '../../../../platform/db/index.js'
 import { DomainError } from '../../../../platform/errors/index.js'
 import { EventBus } from '../../../../platform/events/index.js'
 import { LibraryReader } from '../../../library/index.js'
@@ -32,17 +32,8 @@ export class UpdateEvaluationUseCase {
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
     assertCanEvaluate(actor, await accessOf(this.tx, actor, audit), evaluation.assignedUserId)
 
-    if (evaluationLifecycle.can(evaluation.status, 'START')) {
-      await this.tx.evaluation.update({
-        where: { id: evaluationId },
-        data: { status: evaluationLifecycle.next(evaluation.status, 'START') },
-      })
-      await this.events.publish(AuditEvents.EvaluationStarted, {
-        auditId,
-        evaluationId,
-        controlTitle: await this.controlTitle(audit.templateId, evaluation.controlId),
-      })
-    } else if (!evaluationLifecycle.has(evaluation.status, 'editable')) {
+    const starting = evaluationLifecycle.can(evaluation.status, 'START')
+    if (!starting && !evaluationLifecycle.has(evaluation.status, 'editable')) {
       throw new DomainError(AuditErrors.EVALUATION_NOT_EDITABLE, { evaluationId, status: evaluation.status })
     }
 
@@ -61,9 +52,11 @@ export class UpdateEvaluationUseCase {
       if (!reason) throw new DomainError(AuditErrors.NOT_APPLICABLE_REASON_REQUIRED, { evaluationId })
     }
 
-    await this.tx.evaluation.update({
-      where: { id: evaluationId },
+    // UNA sola escritura (arrancar el criterio + el contenido), con la versión que el cliente leyó (docs/06 §10).
+    const { count } = await this.tx.evaluation.updateMany({
+      where: { id: evaluationId, version: input.version },
       data: {
+        ...(starting && { status: evaluationLifecycle.next(evaluation.status, 'START') }),
         ...(input.achievedLevelId !== undefined && { achievedLevelId: input.achievedLevelId }),
         ...(input.findings !== undefined && { findings: input.findings }),
         ...(input.notes !== undefined && { notes: input.notes }),
@@ -73,6 +66,14 @@ export class UpdateEvaluationUseCase {
           input.isNotApplicable !== false && { notApplicableReason: input.notApplicableReason }),
       },
     })
+    if (count === 0) throw versionConflict('Evaluation', evaluationId, input.version)
+    if (starting) {
+      await this.events.publish(AuditEvents.EvaluationStarted, {
+        auditId,
+        evaluationId,
+        controlTitle: await this.controlTitle(audit.templateId, evaluation.controlId),
+      })
+    }
 
     const template = await this.library.getTemplate(audit.templateId)
     return toEvaluationViews([await loadEvaluation(this.tx, auditId, evaluationId)], template)[0]!

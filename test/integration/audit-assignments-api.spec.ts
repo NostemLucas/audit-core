@@ -78,6 +78,7 @@ describe('ver los criterios', () => {
       notApplicableReason: null,
       evidenceCount: 0,
       carriedFromId: null,
+      version: 0,
     })
     expect(res.body.data[2].control.reference).toBeNull()
   })

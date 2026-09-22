@@ -62,6 +62,47 @@ export function stampsExtension(getUserId: () => string | undefined) {
   })
 }
 
+/** Modelos con columna `version` (bloqueo optimista), deducidos del schema igual que los sellos. */
+const VERSIONED_MODELS: ReadonlySet<string> = new Set(
+  Object.values(Prisma.ModelName).filter((model) => {
+    const fields = (Prisma as unknown as Record<string, Record<string, string> | undefined>)[`${model}ScalarFieldEnum`]
+    return fields !== undefined && 'version' in fields
+  }),
+)
+
+const bumpVersion = (data: Data): Data => ('version' in data ? data : { ...data, version: { increment: 1 } })
+
+/**
+ * Bloqueo optimista, mitad automática: TODA escritura de una fila con `version` la incrementa, así "la fila cambió desde que
+ * la leíste" significa lo mismo sin importar qué caso de uso la tocó. La otra mitad (rechazar una edición con una versión
+ * vieja) la hace cada caso de uso que lo necesita con `where: { id, version }` (`VERSION_CONFLICT`).
+ */
+export const versionExtension = Prisma.defineExtension({
+  name: 'version',
+  query: {
+    $allModels: {
+      async $allOperations({ model, operation, args, query }) {
+        if (!VERSIONED_MODELS.has(model)) return query(args)
+        const a = args as { data?: Data; update?: Data }
+        // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- solo las actualizaciones incrementan la versión
+        switch (operation) {
+          case 'update':
+          case 'updateMany':
+          case 'updateManyAndReturn':
+            a.data = bumpVersion(a.data as Data)
+            break
+          case 'upsert':
+            a.update = bumpVersion(a.update as Data)
+            break
+          default:
+            break
+        }
+        return query(a as typeof args)
+      },
+    },
+  },
+})
+
 /** Convierte los errores de la BD en errores del catálogo, sabiendo qué operación los provocó. */
 export const errorTranslationExtension = Prisma.defineExtension({
   name: 'error-translation',

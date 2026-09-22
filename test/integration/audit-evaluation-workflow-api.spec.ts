@@ -20,11 +20,12 @@ const level = (ctx: Ctx, label: string) => ctx.lib.scale.levels.find((l) => l.la
 const evaluationOf = async (ctx: Ctx, title: string) =>
   (await db.evaluation.findFirstOrThrow({ where: { auditId: ctx.auditId, control: { title } } })).id
 const url = (ctx: Ctx, evaluationId: string, action = '') => `${A}/${ctx.auditId}/evaluations/${evaluationId}${action}`
+/** La versión se toma de la BD salvo que el test la indique (para probar el conflicto, docs/06 §10). */
 const patch = async (ctx: Ctx, id: string, body: Record<string, unknown>, role: TestRole = 'auditor', who = 'ana') =>
   api()
     .patch(url(ctx, id))
     .set('authorization', await as(role, who))
-    .send(body)
+    .send({ version: (await db.evaluation.findUnique({ where: { id } }))?.version ?? 0, ...body })
 const complete = async (ctx: Ctx, id: string, role: TestRole = 'auditor', who = 'ana') =>
   api()
     .post(url(ctx, id, '/complete'))

@@ -256,10 +256,11 @@ describe('GET /audits/:id/evaluations/:evaluationId/history', () => {
     const url = `${A}/${ctx.auditId}/evaluations/${id}`
     const ana = await as('auditor', 'ana')
     const lider = await as('auditor', 'lider')
+    const before = await db.evaluation.findUniqueOrThrow({ where: { id } })
     await api()
       .patch(url)
       .set('authorization', ana)
-      .send({ achievedLevelId: levelId(ctx, 'No cumple'), findings: 'No existe' })
+      .send({ achievedLevelId: levelId(ctx, 'No cumple'), findings: 'No existe', version: before.version })
     await api().post(`${url}/complete`).set('authorization', ana)
     await api().post(`${url}/return`).set('authorization', lider).send({ comments: 'Detalla qué se pidió' })
 

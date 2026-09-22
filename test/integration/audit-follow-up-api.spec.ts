@@ -323,11 +323,12 @@ describe('el seguimiento en marcha', () => {
       .send({ evaluationIds: [roles.id], userId: ana })
     await post(`${A}/${id}/start`, {})
     const url = `${A}/${id}/evaluations/${roles.id}`
-    // en el nivel mínimo no hace falta evidencia, solo hallazgo
+    // en el nivel mínimo no hace falta evidencia, solo hallazgo (la versión se relee: asignarlo ya la incrementó)
+    const current = await db.evaluation.findUniqueOrThrow({ where: { id: roles.id } })
     await api()
       .patch(url)
       .set('authorization', anaToken)
-      .send({ achievedLevelId: levelId(prev, 'No cumple'), findings: 'Sigue sin cerrarse' })
+      .send({ achievedLevelId: levelId(prev, 'No cumple'), findings: 'Sigue sin cerrarse', version: current.version })
     expect((await api().post(`${url}/complete`).set('authorization', anaToken)).status).toBe(200)
     expect((await api().post(`${url}/approve`).set('authorization', lider).send({})).status).toBe(200)
     const closed = await post(`${A}/${id}/close`, {})
@@ -356,11 +357,16 @@ describe('el seguimiento en marcha', () => {
 
     // sin asignar nadie lo edita; al asignarlo, el auditor lo puede trabajar
     const anaToken = await as('auditor', 'ana')
-    expect((await api().patch(url).set('authorization', anaToken).send({ notes: 'x' })).status).toBe(403)
+    // versión cualquiera: el rechazo por no estar asignado ocurre antes de mirarla
+    expect((await api().patch(url).set('authorization', anaToken).send({ notes: 'x', version: 0 })).status).toBe(403)
     await api()
       .put(`${A}/${id}/assignments`)
       .set('authorization', lider)
       .send({ evaluationIds: [politicas.id], userId: ana })
-    expect((await api().patch(url).set('authorization', anaToken).send({ notes: 'Actualizado' })).status).toBe(200)
+    const current = await db.evaluation.findUniqueOrThrow({ where: { id: politicas.id } })
+    expect(
+      (await api().patch(url).set('authorization', anaToken).send({ notes: 'Actualizado', version: current.version }))
+        .status,
+    ).toBe(200)
   })
 })
