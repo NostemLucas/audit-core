@@ -1,7 +1,7 @@
 import type { Prisma } from '../../../generated/prisma/client.js'
 import { type Tx } from '../../../platform/db/index.js'
 import { DomainError } from '../../../platform/errors/index.js'
-import type { AuditRole } from '../../../shared/enums.js'
+import { Role, type AuditRole } from '../../../shared/enums.js'
 import { type Actor, type AuditAccess } from '../domain/audit-policy.js'
 import { AuditErrors } from '../domain/errors.js'
 
@@ -15,6 +15,16 @@ export const AUDIT_INCLUDE = {
   scopeItems: { select: { id: true, name: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   _count: { select: { evaluations: true } },
 } satisfies Prisma.AuditInclude
+
+/**
+ * Qué auditorías puede VER este actor (docs/06 §1): ADMIN y GERENTE todas; cualquier otro, solo donde es manager o
+ * miembro. Única fuente de esta parte de la política, tanto para el listado como para el dashboard (`05` Fase 5).
+ */
+export function visibleAuditsWhere(actor: Actor): Prisma.AuditWhereInput {
+  const seesAll = actor.roles.includes(Role.ADMIN) || actor.roles.includes(Role.GERENTE)
+  if (seesAll) return {}
+  return { OR: [{ managerId: actor.id }, { members: { some: { userId: actor.id } } }] }
+}
 
 export async function loadAudit(tx: Tx, id: string) {
   const audit = await tx.audit.findUnique({ where: { id } })

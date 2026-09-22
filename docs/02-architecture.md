@@ -19,7 +19,7 @@ src/
     config/ auth/ authz/ db/ errors/ events/ http/ logging/ storage/ health/
   shared/          tipos puros compartidos: enums.ts, labels.es.ts, limits.ts
   modules/
-    identity/  organizations/  library/  audits/  reporting/  dashboard/
+    identity/  organizations/  library/  audits/  dashboard/
 prisma/
   schema.prisma    ← fuente de la forma de los datos
   migrations/
@@ -34,11 +34,13 @@ platform, shared            → (nada del proyecto)
 identity, organizations,
 library                     → platform, shared
 audits                      → + identity, organizations, library   (solo por su index.ts)
-reporting                   → + audits
-dashboard                   → lectura de todo (Tier C)
+dashboard                   → + audits (lectura de todo, Tier C)
 ```
 
-`reporting` y `dashboard` no los importa nadie.
+**Corrección (fase 4c, `08` §1):** no hay `reporting` aparte del gráfico original — los informes son de UNA
+auditoría, reutilizan su política de permisos y viven en `audits/reports/`.
+
+`dashboard` no lo importa nadie.
 
 **Integridad referencial la garantiza la BD, no otro módulo.** "No se puede eliminar una organización con
 auditorías" o "una plantilla en uso" se resuelve con FK `onDelete: Restrict`; un único traductor de errores de
@@ -107,7 +109,7 @@ descubiertas al probar contra Postgres:
 |------|--------|---------|----------------------|
 | **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits`, `library/templates` | `domain/` + `application/` + `infrastructure/` + `presentation/` |
 | **B · CRUD** | Sin reglas más allá de validar y guardar | `identity`, `organizations`, `library/scales`, `audits/scope`, `audits/team`, `audits/evidence` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
-| **C · Lectura** | Agregaciones, listados, informes; nunca escribe | `dashboard`, `reporting`, listados de `audits` | *query services* con Prisma directo. Sin dominio |
+| **C · Lectura** | Agregaciones, listados, informes; nunca escribe | `dashboard`, `audits/reports`, listados de `audits` | *query services* con Prisma directo. Sin dominio |
 
 Reglas por tier:
 

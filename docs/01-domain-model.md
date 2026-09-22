@@ -237,7 +237,9 @@ Por qué este y no otro:
 - *Un `services/` plano por módulo* es lo que hay hoy y termina mezclando responsabilidades.
 
 Reglas:
-1. **Módulos Nest**: `identity`, `organizations`, `library`, `audits`, `reporting`, `dashboard`, `platform`.
+1. **Módulos Nest**: `identity`, `organizations`, `library`, `audits`, `dashboard`, `platform`. **Corrección (fase 4c,
+   `08` §1):** no hay un `reporting` aparte — los informes son de UNA auditoría y reutilizan su política de permisos,
+   así que viven en `audits/reports/`, no en un módulo propio.
    `audits` es **un** módulo con carpetas por funcionalidad (`lifecycle/`, `team/`, `evaluation/`,
    `evidence/`, `scope/`), no cinco módulos que se importan entre sí. Cada módulo expone solo su `index.ts`.
 2. **Capas dentro de un módulo** solo donde hay reglas ricas (`audits/evaluation`, `library/templates`):
@@ -303,5 +305,5 @@ Sin Redis ni colas mientras los informes sean síncronos.
    Postgres real).
 2. `identity` → `organizations` → `library` (scales, templates, controls, suggested_findings).
 3. `audits`: lifecycle, scope, team, evaluation (ciclos de vida + scoring).
-4. Evidencia y `reporting`.
+4. Evidencia e informes (`audits/evidence/`, `audits/reports/`).
 5. `dashboard` y seeds.

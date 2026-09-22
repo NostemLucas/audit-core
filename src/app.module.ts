@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import './app-errors.js' // registra el catálogo de errores completo (lo necesita el traductor de errores de la BD)
 import './app-events.js' // registra el catálogo de eventos completo
 import { AuditsModule } from './modules/audits/index.js'
+import { DashboardModule } from './modules/dashboard/index.js'
 import { IdentityModule } from './modules/identity/index.js'
 import { LibraryModule } from './modules/library/index.js'
 import { OrganizationsModule } from './modules/organizations/index.js'
@@ -33,6 +34,7 @@ import { NextcloudModule } from './platform/nextcloud/index.js'
     OrganizationsModule,
     LibraryModule,
     AuditsModule,
+    DashboardModule,
     ThrottlerModule.forRootAsync({
       imports: [], // EnvModule es global
       inject: [ENV],

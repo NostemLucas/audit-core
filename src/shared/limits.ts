@@ -21,4 +21,8 @@ export const LIMITS = {
   assignBatch: 1000,
   /** Textos largos sin formato: descripciones, hallazgos, notas. */
   text: 20_000,
+  /** Ítems por lista en `GET /dashboard/my-work` (docs/08 §1): un resumen, no un listado completo. */
+  dashboardItems: 10,
+  /** Días hacia adelante que cuentan como "vence pronto" en el dashboard (docs/08 §1). */
+  dashboardUpcomingDays: 14,
 } as const
