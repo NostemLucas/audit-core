@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { CLOCK, type Clock } from '../clock/index.js'
 import { ENV, type Env } from '../config/index.js'
 import { DomainError, PlatformErrors } from '../errors/index.js'
 import type { FileStoragePort, ReadShare, UploadedFile, UploadTarget } from './file-storage.port.js'
@@ -6,6 +7,10 @@ import type { FileStoragePort, ReadShare, UploadedFile, UploadTarget } from './f
 /**
  * Adaptador real, por WebDAV (subir, crear carpetas) y la API OCS de *Files sharing* (compartir). Mismos bitmask de
  * permisos que el proyecto anterior (docs/07 §1.1): `READ_ONLY = 1`, `UPLOAD_ONLY = 7`, `EDIT = 15`.
+ *
+ * Todo share lleva `expireDate` = HOY: nada vive para siempre. La API de Nextcloud solo vence por día (`YYYY-MM-DD`,
+ * confirmado contra su documentación — no hay minutos ni horas), así que el share sigue siendo válido el resto del
+ * día en que se pidió; como cada descarga/subida ya pide uno nuevo al vuelo, en la práctica la ventana es corta.
  *
  * No hay forma honesta de probar esto contra un Nextcloud real dentro de este repo: se prueba con un `fetch` simulado,
  * verificando que construye las peticiones correctas (`nextcloud-http.client.spec.ts`). Cualquier fallo de red o
@@ -16,7 +21,10 @@ const SHARE_TYPE_PUBLIC_LINK = 3
 
 @Injectable()
 export class NextcloudHttpClient implements FileStoragePort {
-  constructor(@Inject(ENV) private readonly env: Env) {}
+  constructor(
+    @Inject(ENV) private readonly env: Env,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
 
   async createUploadTarget(path: string): Promise<UploadTarget> {
     await this.ensureFolder(path)
@@ -62,6 +70,7 @@ export class NextcloudHttpClient implements FileStoragePort {
       path,
       shareType: String(SHARE_TYPE_PUBLIC_LINK),
       permissions: String(permissions),
+      expireDate: this.clock.now().toISOString().slice(0, 10),
     })
     const res = await this.request(
       `${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json`,

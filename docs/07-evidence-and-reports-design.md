@@ -21,7 +21,10 @@ lo enviado a revisión no cambia, tampoco su evidencia).
 El caso de uso llama al puerto (`FileStoragePort.createUploadTarget(path)`), que:
 1. Crea la carpeta si no existe (`MKCOL`, idempotente: un 405 "ya existe" no es error).
 2. Crea un share de solo-subida (`UPLOAD_ONLY = 7`, igual que el proyecto anterior: crea y lee lo propio, no borra ni ve
-   lo de otros — así un auditor no puede borrar la evidencia de otro con acceso al mismo share).
+   lo de otros — así un auditor no puede borrar la evidencia de otro con acceso al mismo share), con `expireDate` = HOY
+   (la API de Nextcloud solo vence por día, no por hora ni minuto): el share nunca queda vivo para siempre, y como se
+   pide uno nuevo cada vez que se llama a este endpoint, la ventana práctica es corta. Mismo mecanismo para el share de
+   solo lectura de los informes (§2).
 3. Devuelve la URL del share al cliente, que sube el archivo hablando directo con Nextcloud (WebDAV sobre esa URL). El
    backend no interviene en la subida en sí.
 

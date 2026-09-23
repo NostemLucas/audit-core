@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Clock } from '../clock/index.js'
 import { DomainError } from '../errors/index.js'
 import { testEnv } from '../../../test/support/env.js'
 import { NextcloudHttpClient } from './nextcloud-http.client.js'
 
 const env = testEnv()
-const client = new NextcloudHttpClient(env)
+const clock: Clock = { now: () => new Date('2026-03-05T10:00:00.000Z') }
+const client = new NextcloudHttpClient(env, clock)
 
 /** Una Response mínima, como la que devolvería `fetch`. */
 function fakeResponse(status: number, options: { json?: unknown; headers?: Record<string, string> } = {}): Response {
@@ -49,7 +51,9 @@ describe('createUploadTarget', () => {
     }
     const share = calls.find((c) => c.url.includes('/ocs/'))!
     expect(share.init.method).toBe('POST')
-    expect(new URLSearchParams(share.init.body as string).get('permissions')).toBe('7')
+    const params = new URLSearchParams(share.init.body as string)
+    expect(params.get('permissions')).toBe('7')
+    expect(params.get('expireDate')).toBe('2026-03-05') // vence HOY (docs/07 §1.1): nunca vive para siempre
   })
 
   it('un 405 o 409 al crear una carpeta (ya existe) no es error', async () => {
@@ -142,18 +146,21 @@ describe('upload', () => {
 })
 
 describe('createReadShare', () => {
-  it('comparte con permiso READ_ONLY (1), sin crear ninguna carpeta', async () => {
+  it('comparte con permiso READ_ONLY (1), sin crear ninguna carpeta, y vence HOY', async () => {
     let mkcolCalled = false
+    let body: string | undefined
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init: RequestInit) => {
         if (init.method === 'MKCOL') mkcolCalled = true
+        if (url.toString().includes('/ocs/')) body = init.body as string
         return fakeResponse(200, { json: OCS_SHARE_OK })
       }),
     )
     const share = await client.createReadShare('/Auditorias/AUD-1/Informes/rep-1.docx')
     expect(share.url).toBe('https://nextcloud.test/s/abc123')
     expect(mkcolCalled).toBe(false)
+    expect(new URLSearchParams(body).get('expireDate')).toBe('2026-03-05')
   })
 })
 
