@@ -1,8 +1,9 @@
 import { RequestMethod, VersioningType } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { ClsMiddleware } from 'nestjs-cls'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import type { Response } from 'express'
+import type { NextFunction, Request, Response } from 'express'
 import helmet from 'helmet'
 import type { Env } from './platform/config/index.js'
 import {
@@ -35,7 +36,11 @@ export function configureApp(app: NestExpressApplication, env: Env): void {
     }).use,
   )
   app.use(accessLog(logger.for('Http')))
-  app.use(helmet())
+  // El CSP por defecto de helmet bloquea los estilos/scripts inline que trae la UI de Swagger (queda en blanco);
+  // se relaja SOLO en /api/docs, no en el resto de la API.
+  app.use((req: Request, res: Response, next: NextFunction) =>
+    req.path.startsWith('/api/docs') ? next() : helmet()(req, res, next),
+  )
   app.enableCors({ origin: env.CORS_ORIGINS, credentials: true })
   app.setGlobalPrefix('api', {
     exclude: [
@@ -48,5 +53,10 @@ export function configureApp(app: NestExpressApplication, env: Env): void {
   app.useGlobalPipes(createValidationPipe())
   // El primero envuelve al segundo: la respuesta se serializa (esquema) y luego se envuelve ({ data, meta }).
   app.useGlobalInterceptors(new EnvelopeInterceptor(), new ApiSerializerInterceptor(app.get(Reflector)))
+  SwaggerModule.setup(
+    'api/docs',
+    app,
+    SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('Audit Core').setVersion('1').build()),
+  )
   app.enableShutdownHooks()
 }
