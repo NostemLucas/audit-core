@@ -107,21 +107,24 @@ descubiertas al probar contra Postgres:
 
 | Tier | Cuándo | Módulos | Estructura permitida |
 |------|--------|---------|----------------------|
-| **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits`, `library/templates` | `domain/` + `application/` + `infrastructure/` + `presentation/` |
+| **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits`, `library/templates` | `domain/` (puro) + `infrastructure/` (consultas y escrituras compartidas, Prisma directo) + `<corte>/use-cases/` por corte vertical. **Sin repositorio ni mapper** — ver más abajo por qué |
 | **B · CRUD** | Sin reglas más allá de validar y guardar | `identity`, `organizations`, `library/scales`, `audits/scope`, `audits/team`, `audits/evidence` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
 | **C · Lectura** | Agregaciones, listados, informes; nunca escribe | `dashboard`, `audits/reports`, listados de `audits` | *query services* con Prisma directo. Sin dominio |
 
 Reglas por tier:
 
 **Tier A**
-- `domain/` es TypeScript puro: entidades, ciclos de vida, `scoring`, `policy`, eventos, errores. No importa Nest ni
-  Prisma (salvo los enums vía `shared/enums.ts`). No hace I/O. De la plataforma solo usa `errors`, `state` y la
-  **definición** de eventos y mensajes (`events/define-events.ts`, `define-messages.ts`: declaraciones puras con Zod); el bus, que
-  usa Nest, no.
-- Los *ports* (interfaces) se declaran en `application/ports/`; los adaptadores viven en `infrastructure/`.
-- Solo hay port para: repositorios de agregados (`Audit`, `Evaluation`, `Template`), `FileStoragePort`, `Clock`.
-- Un único **mapper** por agregado (`toDomain` / `toPersistence`) en `infrastructure/`. Es el único punto de
-  traducción entre fila y dominio.
+- `domain/` es TypeScript puro: ciclos de vida (`defineLifecycle`), `scoring`, `policy`, eventos, errores. No importa
+  Nest ni Prisma (salvo los enums vía `shared/enums.ts`). No hace I/O. De la plataforma solo usa `errors`, `state` y la
+  **definición** de eventos y mensajes (`events/define-events.ts`, `define-messages.ts`: declaraciones puras con Zod);
+  el bus, que usa Nest, no.
+- **No hay repositorio, port, entidad de dominio con comportamiento propio, ni mapper `toDomain`/`toPersistence`.**
+  Los use-cases llaman a `Tx` (Prisma) directo, igual que Tier B. La diferencia con Tier B es que ANTES de escribir le
+  preguntan al `domain/` qué es válido (`lifecycle.next()`, `policy.assert()`, `scoring.ts`) — la regla vive en una
+  función pura sobre la fila, no en un método de una entidad.
+- Lo que se comparte entre los cortes verticales de un mismo módulo (consultas comunes, escrituras atómicas) vive en
+  `infrastructure/` — la única carpeta, junto con `platform/db` y `shared/enums.ts`, que puede importar el cliente de
+  Prisma generado (`dependency-cruiser` lo impone, §7).
 
 **Tier B** (estructura concreta más abajo)
 - Sin repositorio ni port: el use-case llama a Prisma directamente. Siempre hay use-case, aunque sea corto,
@@ -132,14 +135,18 @@ Reglas por tier:
 - Solo lectura. Puede unir tablas de varios módulos con Prisma/SQL (es el único tier con esa licencia).
 - No contiene reglas de negocio: si necesita una fórmula, llama a `scoring.ts` vía `audits/index.ts`.
 
-### Tier A sin repositorio: `library/templates` (desviación de la tabla anterior)
+### Por qué Tier A no tiene repositorio (decisión tomada, no pendiente)
 
-La tabla de §4 preveía un repositorio (port + adaptador + mapper) para el agregado `Template`. No se hizo, a propósito:
-las reglas de la plantilla (árbol, ciclo de vida, orden entre hermanos, análisis de la importación) son **funciones puras
-sobre datos planos** (`domain/`), y se prueban sin ninguna infraestructura; los casos de uso cargan filas con `Tx` y se las
-pasan. Un port con una sola implementación en Prisma habría sido ceremonia (y otra copia de la lista de campos). Lo que sí
-sale de `domain/` es lo que no es lógica: la lectura del YAML (`infrastructure/`). El criterio para `audits` se decide en su
-fase: allí las entidades sí tienen comportamiento propio.
+El diseño original de este documento preveía un repositorio (port + adaptador + mapper) por agregado —`Audit`,
+`Evaluation`, `Template`— y dejaba pendiente si `audits` lo necesitaría ("el criterio se decide en su fase", decía
+una versión anterior de este párrafo). Ya se construyeron los dos módulos Tier A y la respuesta fue la misma en
+ambos: no se hizo, a propósito. Las reglas de cada uno (árbol y ciclo de vida de la plantilla; ciclo de vida, scoring
+y política de la auditoría/evaluación) son **funciones puras sobre datos planos** (`domain/`), y se prueban sin
+ninguna infraestructura; los casos de uso cargan filas con `Tx` y se las pasan directo — no hay una entidad de
+dominio con los mismos campos que la fila que mantener sincronizada, ni un port con una sola implementación real
+(Prisma) que sería ceremonia. Lo que sí sale de `domain/` es lo que no es lógica pura: la lectura del YAML de una
+plantilla, y en `audits` las consultas compartidas entre cortes y las escrituras atómicas (p. ej. una transición de
+`Evaluation` con compare-and-swap sobre el estado) — eso va en `infrastructure/`.
 
 ### Estructura de un módulo Tier B (y por qué no tiene `domain/`)
 
@@ -157,9 +164,8 @@ carpeta con clases que repiten las columnas. La misma estructura para todos:
   <adaptador>/              SOLO si integra un sistema externo (p. ej. identity/authentik/); nunca suelto en la raíz
 ```
 
-- **Sin mapper.** El use case devuelve la fila y la vista de salida la recorta y da formato (`Instant` entrega las fechas
-  como ISO 8601). Un mapper fila → vista sería otra copia de la lista de campos. Los mappers son cosa del Tier A, donde la
-  entidad de dominio es distinta de la fila.
+- **Sin mapper — tampoco en Tier A (§4).** El use case devuelve la fila y la vista de salida la recorta y da formato
+  (`Instant` entrega las fechas como ISO 8601). Un mapper fila → vista sería otra copia de la lista de campos.
 - **Cuándo un módulo pasa a Tier A:** en cuanto aparece una regla que no es "validar y guardar": una invariante entre
   varias filas, un ciclo de vida o un cálculo. Hasta entonces, `.rules.ts` alcanza para una invariante aislada (p. ej.
   `library/scales`).
@@ -168,16 +174,22 @@ carpeta con clases que repiten las columnas. La misma estructura para todos:
 
 ```
 audits/
-  domain/                 ← compartido dentro del módulo, puro
+  domain/                 ← compartido dentro del módulo, puro, sin Prisma
     audit.lifecycle.ts   evaluation.lifecycle.ts   scoring.ts   audit-policy.ts
-    events.ts          errors.ts               storage-paths.ts
-  infrastructure/         ← PrismaAuditRepository, PrismaEvaluationRepository, mappers, StorageAdapter
-  lifecycle/  scope/  team/  evaluation/  evidence/     ← cortes verticales
+    events.ts          errors.ts               evaluation-completion.ts
+  infrastructure/         ← consultas y escrituras compartidas entre cortes, Prisma directo (p. ej.
+                             audit.queries.ts, evaluation-transitions.ts) — junto con platform/db y
+                             shared/enums.ts, la única carpeta que puede importar el cliente de Prisma generado
+  lifecycle/  scope/  team/  evaluation/  evidence/  reports/  results/  history/     ← cortes verticales
      <corte>.controller.ts
      <corte>.schemas.ts
+     <corte>.queries.ts      ← si el corte necesita consultas propias, no compartidas con otros cortes
      use-cases/<verbo>-<sustantivo>.use-case.ts
   audits.module.ts   index.ts
 ```
+
+(Las rutas de Nextcloud, `storage-paths.ts`, NO viven aquí: son `platform/nextcloud/`, infraestructura de plataforma,
+no de este módulo — `evidenceFolder`/`reportPath`/etc. se importan desde ahí.)
 
 Regla: **los cortes no se importan entre sí.** Lo que comparten está en `domain/` (puro) o `infrastructure/`. Esto
 sustituye al `_shared/` actual (7.1k líneas de todo mezclado): aquí `domain/` solo admite código puro y sin I/O.
@@ -186,17 +198,31 @@ sustituye al `_shared/` actual (7.1k líneas de todo mezclado): aquí `domain/` 
 
 Una operación = 1 use-case + 1 método de controller + sus esquemas (en el `.schemas.ts` del recurso).
 
+Tal como queda de verdad en un módulo Tier A (sin port ni entidad — §4): el use-case carga la fila con `Tx`, le
+pregunta a `domain/` qué es válido, y escribe con `Tx` de nuevo.
+
 ```ts
 @Injectable()
 export class ApproveEvaluationUseCase {
+  constructor(
+    @InjectTx() private readonly tx: Tx,
+    private readonly events: EventBus,
+    private readonly library: LibraryReader,
+  ) {}
+
   @Transactional()
-  async execute(actor: Actor, id: string, input: ApproveInput): Promise<EvaluationView> {
-    const evaluation = await this.evaluations.getOrFail(id)      // port (Tier A)
-    this.policy.assert(actor, membership, 'approve', evaluation)  // audit-policy.ts
-    evaluation.approve(actor, input.comments)                     // dominio: usa el ciclo de vida
-    await this.evaluations.save(evaluation)
-    await this.events.publish(new EvaluationApproved({ ... }))    // bus: escribe audit_events
-    return toView(evaluation)
+  async execute(actor: Actor, auditId: string, evaluationId: string, input: ApproveEvaluationT) {
+    const audit = await loadAudit(this.tx, auditId)                          // infrastructure/: consulta compartida
+    assertAuditEvaluable(audit.status)                                       // dominio: ciclo de vida de la auditoría
+    assertOnAudit('lead', actor, await accessOf(this.tx, actor, audit))      // dominio: política contextual
+    const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)  // infrastructure/: consulta compartida
+
+    // infrastructure/: escritura ATÓMICA — primero valida con evaluationLifecycle.next() (dominio), compare-and-swap
+    // sobre el estado leído; si otra transacción ya lo movió, pierde la carrera en vez de pisarla (docs/03 §5).
+    await transitionEvaluation(this.tx, evaluationId, evaluation.status, 'APPROVE', { requiresFollowUp })
+
+    await this.events.publish(AuditEvents.EvaluationApproved, { auditId, evaluationId, comments, requiresFollowUp })
+    return toEvaluationViews([await loadEvaluation(this.tx, auditId, evaluationId)], template)[0]
   }
 }
 ```
@@ -216,7 +242,7 @@ Convenciones fijas:
 | Quiero agregar… | Archivos | Detalle |
 |-----------------|----------|---------|
 | **Un campo a un recurso simple (Tier B)** | **2** | `schema.prisma` (+ migración generada) y el esquema base en `<recurso>.schemas.ts`. Los esquemas de crear/editar/respuesta se derivan. |
-| **Un campo a un agregado (Tier A)** | 4 | `schema.prisma`, `schemas.ts`, entidad de dominio y mapper. Es el costo de tener dominio; el mapper es el único punto de traducción. |
+| **Un campo a un agregado (Tier A)** | 2–3 | `schema.prisma` (+ migración) y el `.schemas.ts` del corte que lo expone — mismo costo base que Tier B, no hay mapper que mantener (§4). Si el campo entra en una regla de `domain/` (un ciclo de vida, `scoring.ts`), sumar esa función y su test. |
 | **Un endpoint** | 3 | use-case, método en el controller, esquemas. El permiso se declara en el decorador `@Can('accion', 'Sujeto')` del método. |
 | **Un permiso nuevo** | 1–2 | `abilities.ts`; si es contextual, `audit-policy.ts`. El test de rutas falla si un endpoint no declara permiso. |
 | **Un error** | 1 | `errors.ts` del módulo: `{ code, http, message }`. Filtro y OpenAPI lo toman del catálogo. |
