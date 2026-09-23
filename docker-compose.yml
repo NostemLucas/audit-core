@@ -1,0 +1,78 @@
+# Un solo compose para dev y para producción — la diferencia es el perfil, no el archivo (README § Ejecutar).
+#
+#   Dev:  docker compose up -d postgres        # el resto (npm run dev) corre en el host, con recarga en caliente
+#   Prod: docker compose --profile prod up -d --build
+#
+# `postgres` no lleva perfil: siempre disponible. `migrate` y `app` sí (`prod`): en dev el proceso corre en el host
+# apuntando a `localhost:5432` (el puerto publicado), no tiene sentido reconstruir la imagen en cada cambio.
+#
+# `DATABASE_URL` se redefine en `migrate`/`app` apuntando a `postgres` (el nombre del servicio, resoluble solo DENTRO
+# de la red de compose) en vez de tomar el de `.env`, que está pensado para `npm run dev` en el host (`localhost`).
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-audit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-audit}
+      POSTGRES_DB: ${POSTGRES_DB:-audit_core}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-audit} -d ${POSTGRES_DB:-audit_core}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Imagen efímera (todo o nada, no queda contenedor corriendo): aplica las migraciones y sale. `app` no arranca
+  # hasta que termine bien (`service_completed_successfully`), para no servir tráfico contra un esquema a medias.
+  migrate:
+    profiles: ['prod']
+    build:
+      context: .
+      target: build
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-audit}:${POSTGRES_PASSWORD:-audit}@postgres:5432/${POSTGRES_DB:-audit_core}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    profiles: ['prod']
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-audit}:${POSTGRES_PASSWORD:-audit}@postgres:5432/${POSTGRES_DB:-audit_core}
+      # Puerto FIJO dentro del contenedor: `PORT` en `.env` es el puerto PUBLICADO en el host (línea de abajo), no
+      # el interno — si se dejara pasar tal cual, la app escucharía en ese puerto pero la publicación de más abajo
+      # sigue mapeando al 3000 interno, y quedarían descoordinados.
+      PORT: 3000
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
