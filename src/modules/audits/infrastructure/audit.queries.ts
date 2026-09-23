@@ -51,6 +51,15 @@ export async function accessOf(tx: Tx, actor: Actor, audit: { id: string; manage
   return { managerId: audit.managerId, memberRole: await memberRoleOf(tx, audit.id, actor.id) }
 }
 
+/** Los usuarios de Nextcloud (username) de todo el equipo actual — para revocar/ajustar sus shares (docs/07 §1.5). */
+export async function teamUsernames(tx: Tx, auditId: string): Promise<readonly string[]> {
+  const members = await tx.auditMember.findMany({
+    where: { auditId },
+    select: { user: { select: { username: true } } },
+  })
+  return members.map((m) => m.user.username)
+}
+
 /** El acceso del actor a VARIAS auditorías con una sola consulta (para los listados). */
 export async function accessesOf(
   tx: Tx,

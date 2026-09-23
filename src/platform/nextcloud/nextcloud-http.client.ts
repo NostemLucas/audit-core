@@ -5,21 +5,31 @@ import { DomainError, PlatformErrors } from '../errors/index.js'
 import type { FileStoragePort, ReadShare, SharePermission, UploadedFile, UploadTarget } from './file-storage.port.js'
 
 /**
- * Adaptador real, por WebDAV (subir, crear carpetas) y la API OCS de *Files sharing* (compartir). Mismos bitmask de
- * permisos que el proyecto anterior (docs/07 §1.1): `READ_ONLY = 1`, `UPLOAD_ONLY = 7`, `EDIT = 15`.
+ * Adaptador real, por WebDAV (subir, crear carpetas) y la API OCS de *Files sharing* (compartir). Bitmask de
+ * permisos de Nextcloud: `READ=1`, `UPDATE=2`, `CREATE=4`, `DELETE=8`, `SHARE=16`. `READ_ONLY=1` y `UPLOAD_ONLY=7`
+ * (READ+UPDATE+CREATE) son los del proyecto anterior (docs/07 §1.1). `EDIT_NO_DELETE=3` (READ+UPDATE, SIN CREATE ni
+ * DELETE) es propio de acá — no `15` (RWCD, "editar" completo): el equipo puede abrir y modificar un informe en
+ * OnlyOffice (docs/07 §1.5), pero NUNCA borrarlo ni crear archivos nuevos ahí — la carpeta de informes solo la llena
+ * el backend (`upload()`, cuenta de servicio); un `MEMBER` con permiso de borrar podría eliminar el consolidado
+ * final sin que quede más rastro que el `Report` en la BD apuntando a un archivo que ya no existe.
  *
- * Todo share lleva `expireDate` = HOY: nada vive para siempre. La API de Nextcloud solo vence por día (`YYYY-MM-DD`,
- * confirmado contra su documentación — no hay minutos ni horas), así que el share sigue siendo válido el resto del
- * día en que se pidió; como cada descarga/subida ya pide uno nuevo al vuelo, en la práctica la ventana es corta.
+ * Todo share lleva `expireDate` = MAÑANA: nada vive para siempre. La API de Nextcloud solo vence por día
+ * (`YYYY-MM-DD`, confirmado contra su documentación — no hay minutos ni horas). MAÑANA y no HOY, a propósito: un
+ * servidor real rechaza una fecha de vencimiento que ya pasó ("Expiration date is in the past") — HOY puede leerse
+ * como "ya pasado" según la hora y la zona horaria del servidor de Nextcloud, que no controlamos desde acá. Como
+ * cada descarga/subida ya pide un share nuevo al vuelo, en la práctica la ventana de uso es corta de todos modos.
  *
  * No hay forma honesta de probar esto contra un Nextcloud real dentro de este repo: se prueba con un `fetch` simulado,
  * verificando que construye las peticiones correctas (`nextcloud-http.client.spec.ts`). Cualquier fallo de red o
  * respuesta inesperada se traduce a `UPSTREAM_UNAVAILABLE` (docs/03 regla 11): nunca se afirma éxito sin confirmarlo.
  */
-const PERMISSIONS = { READ_ONLY: 1, UPLOAD_ONLY: 7, EDIT: 15 } as const
+const PERMISSIONS = { READ_ONLY: 1, UPLOAD_ONLY: 7, EDIT_NO_DELETE: 3 } as const
 const SHARE_TYPE_PUBLIC_LINK = 3
 const SHARE_TYPE_USER = 0
-const PERMISSION_BITMASK: Record<SharePermission, number> = { READ_ONLY: PERMISSIONS.READ_ONLY, EDIT: PERMISSIONS.EDIT }
+const PERMISSION_BITMASK: Record<SharePermission, number> = {
+  READ_ONLY: PERMISSIONS.READ_ONLY,
+  EDIT_NO_DELETE: PERMISSIONS.EDIT_NO_DELETE,
+}
 
 @Injectable()
 export class NextcloudHttpClient implements FileStoragePort {
@@ -52,13 +62,31 @@ export class NextcloudHttpClient implements FileStoragePort {
     return { url: share.url }
   }
 
+  /**
+   * IDEMPOTENTE por diseño propio (no por interpretar un código de error de Nextcloud, que no se puede verificar sin
+   * un servidor real): antes de crear, lista lo que ya hay. Si el usuario YA tiene exactamente ese permiso sobre esa
+   * ruta, no hace nada — evita el 502 de "ya compartido" al reintentar tras una falla parcial (p. ej. si `grant()`
+   * comparte una de las dos carpetas y falla en la otra, un reintento no debe romperse en la que sí funcionó). Si lo
+   * tiene con OTRO permiso, lo reemplaza (borra y crea de nuevo — la API no tiene "actualizar permisos" por acá).
+   */
   async shareWithUser(path: string, username: string, permission: SharePermission): Promise<void> {
     await this.ensureFolder(path)
+    const bitmask = PERMISSION_BITMASK[permission]
+    const existing = (await this.listShares(path)).find(
+      (s) => s.shareType === SHARE_TYPE_USER && s.shareWith === username,
+    )
+    if (existing?.permissions === bitmask) return
+    if (existing) {
+      await this.request(
+        `${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares/${existing.id}?format=json`,
+        { method: 'DELETE' },
+      )
+    }
     const body = new URLSearchParams({
       path,
       shareType: String(SHARE_TYPE_USER),
       shareWith: username,
-      permissions: String(PERMISSION_BITMASK[permission]),
+      permissions: String(bitmask),
     })
     await this.request(`${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json`, {
       method: 'POST',
@@ -98,7 +126,11 @@ export class NextcloudHttpClient implements FileStoragePort {
       path,
       shareType: String(SHARE_TYPE_PUBLIC_LINK),
       permissions: String(permissions),
-      expireDate: this.clock.now().toISOString().slice(0, 10),
+      // MAÑANA, no hoy: un `expireDate` de hoy es, para Nextcloud, una fecha que ya pasó (o está por pasar en
+      // cualquier momento) — un servidor real la rechaza ("Expiration date is in the past"). No hay forma de acertar
+      // el huso horario exacto del servidor de Nextcloud desde acá (expireDate es solo fecha, sin hora ni zona), así
+      // que "mañana" en UTC es el margen simple y seguro: nunca queda en el pasado, sea cual sea esa zona.
+      expireDate: new Date(this.clock.now().getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     })
     const res = await this.request(
       `${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json`,
@@ -115,16 +147,24 @@ export class NextcloudHttpClient implements FileStoragePort {
     return { url }
   }
 
-  /** Los shares existentes sobre una ruta (para `unshareUser`: hay que borrar por id, la API no borra "por usuario"). */
-  private async listShares(path: string): Promise<Array<{ id: string; shareType: number; shareWith: string }>> {
+  /** Los shares existentes sobre una ruta (para `unshareUser`: hay que borrar por id, la API no borra "por usuario";
+   * y para que `shareWithUser` sea idempotente sin adivinar el formato de error de Nextcloud). */
+  private async listShares(
+    path: string,
+  ): Promise<Array<{ id: string; shareType: number; shareWith: string; permissions: number }>> {
     const res = await this.request(
       `${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json&path=${encodeURIComponent(path)}`,
       { method: 'GET' },
     )
     const json = (await res.json()) as {
-      ocs?: { data?: Array<{ id: string; share_type: number; share_with: string }> }
+      ocs?: { data?: Array<{ id: string; share_type: number; share_with: string; permissions: number }> }
     }
-    return (json.ocs?.data ?? []).map((d) => ({ id: d.id, shareType: d.share_type, shareWith: d.share_with }))
+    return (json.ocs?.data ?? []).map((d) => ({
+      id: d.id,
+      shareType: d.share_type,
+      shareWith: d.share_with,
+      permissions: d.permissions,
+    }))
   }
 
   private davUrl(path: string): string {

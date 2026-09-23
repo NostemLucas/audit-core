@@ -111,9 +111,21 @@ export const AuditEvents = defineEvents({
   ReportGenerated: z.object({ ...audit, reportId: z.uuid(), title: z.string() }),
   // Evidencia (docs/07 §1). El sujeto es el criterio (evaluationId), igual que su ciclo de vida.
   EvidenceRegistered: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), fileName: z.string() }),
-  /** También la dispara el webhook de Nextcloud cuando el archivo se borra ALLÁ (docs/07 §1.3): quien administra el
-   * storage es la fuente de verdad, no un botón de esta app. */
-  EvidenceDeleted: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), fileName: z.string() }),
+  /**
+   * También la dispara el webhook de Nextcloud cuando el archivo se borra ALLÁ (docs/07 §1.3): quien administra el
+   * storage es la fuente de verdad, no un botón de esta app. `wasLocked`: el criterio NO estaba en una ventana
+   * editable cuando se perdió el archivo (aprobado, o la auditoría ya no evaluable) — desde la app eso nunca pasa
+   * (el borrado exige la misma ventana editable que subir), pero el webhook, a propósito, no lo bloquea: el archivo
+   * ya no está en Nextcloud sin importar el estado del criterio. `true` marca un caso anómalo que vale la pena mirar
+   * (evidencia de algo ya aprobado que desapareció), no un cambio de trabajo normal.
+   */
+  EvidenceDeleted: z.object({
+    ...audit,
+    evaluationId: z.uuid(),
+    controlTitle: z.string(),
+    fileName: z.string(),
+    wasLocked: z.boolean(),
+  }),
 })
 
 export const AUDIT_EVENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AuditEvents))

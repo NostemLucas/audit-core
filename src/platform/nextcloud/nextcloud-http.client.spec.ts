@@ -53,7 +53,22 @@ describe('createUploadTarget', () => {
     expect(share.init.method).toBe('POST')
     const params = new URLSearchParams(share.init.body as string)
     expect(params.get('permissions')).toBe('7')
-    expect(params.get('expireDate')).toBe('2026-03-05') // vence HOY (docs/07 §1.1): nunca vive para siempre
+    expect(params.get('expireDate')).toBe('2026-03-06') // vence MAÑANA, nunca hoy (podría ya estar "en el pasado")
+  })
+
+  it('"mañana" cruza de mes/año correctamente (suma 24h reales, no solo el número de día)', async () => {
+    const nyeClock: Clock = { now: () => new Date('2026-12-31T15:00:00.000Z') }
+    const nyeClient = new NextcloudHttpClient(env, nyeClock)
+    let body: string | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (url.toString().includes('/ocs/')) body = init.body as string
+        return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+      }),
+    )
+    await nyeClient.createUploadTarget('/x')
+    expect(new URLSearchParams(body).get('expireDate')).toBe('2027-01-01')
   })
 
   it('un 405 o 409 al crear una carpeta (ya existe) no es error', async () => {
@@ -146,7 +161,7 @@ describe('upload', () => {
 })
 
 describe('createReadShare', () => {
-  it('comparte con permiso READ_ONLY (1), sin crear ninguna carpeta, y vence HOY', async () => {
+  it('comparte con permiso READ_ONLY (1), sin crear ninguna carpeta, y vence MAÑANA', async () => {
     let mkcolCalled = false
     let body: string | undefined
     vi.stubGlobal(
@@ -160,21 +175,30 @@ describe('createReadShare', () => {
     const share = await client.createReadShare('/Auditorias/AUD-1/Informes/rep-1.docx')
     expect(share.url).toBe('https://nextcloud.test/s/abc123')
     expect(mkcolCalled).toBe(false)
-    expect(new URLSearchParams(body).get('expireDate')).toBe('2026-03-05')
+    expect(new URLSearchParams(body).get('expireDate')).toBe('2026-03-06')
   })
 })
 
+/** El fetch que ve `shareWithUser` en el caso normal: la ruta no tiene shares previos (LIST vacío). */
+function stubNoExistingShares() {
+  return vi.fn(async (url: string, init: RequestInit) => {
+    if (init.method === 'GET' && url.toString().includes('/ocs/'))
+      return fakeResponse(200, { json: { ocs: { data: [] } } })
+    return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+  })
+}
+
 describe('shareWithUser', () => {
-  it('crea la carpeta y comparte con shareType=0 (usuario), sin expireDate: no vence', async () => {
+  it('sin share previo: lista (vacío), crea la carpeta y comparte con shareType=0, sin expireDate', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = []
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init: RequestInit) => {
         calls.push({ url: String(url), init })
-        return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+        return stubNoExistingShares()(url, init)
       }),
     )
-    await client.shareWithUser('/Auditorias/AUD-1/Informes', 'ana', 'EDIT')
+    await client.shareWithUser('/Auditorias/AUD-1/Informes', 'ana', 'EDIT_NO_DELETE')
 
     const mkcols = calls.filter((c) => c.init.method === 'MKCOL')
     expect(mkcols.at(-1)?.url).toBe(
@@ -184,7 +208,7 @@ describe('shareWithUser', () => {
     const params = new URLSearchParams(share.init.body as string)
     expect(params.get('shareType')).toBe('0')
     expect(params.get('shareWith')).toBe('ana')
-    expect(params.get('permissions')).toBe('15') // EDIT
+    expect(params.get('permissions')).toBe('3') // READ(1) + UPDATE(2), SIN CREATE ni DELETE
     expect(params.has('expireDate')).toBe(false)
   })
 
@@ -194,11 +218,43 @@ describe('shareWithUser', () => {
       'fetch',
       vi.fn(async (url: string, init: RequestInit) => {
         if (init.method === 'POST') body = init.body as string
-        return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+        return stubNoExistingShares()(url, init)
       }),
     )
     await client.shareWithUser('/Auditorias/AUD-1/Evidencias', 'ana', 'READ_ONLY')
     expect(new URLSearchParams(body).get('permissions')).toBe('1')
+  })
+
+  it('ya compartido con el MISMO permiso: no crea nada (idempotente, sin 502 al reintentar)', async () => {
+    const listed = { ocs: { data: [{ id: '5', share_type: 0, share_with: 'ana', permissions: 3 }] } }
+    let postCalled = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (init.method === 'POST' && url.toString().includes('/ocs/')) postCalled = true
+        if (init.method === 'GET' && url.toString().includes('/ocs/')) return fakeResponse(200, { json: listed })
+        return fakeResponse(201)
+      }),
+    )
+    await client.shareWithUser('/Auditorias/AUD-1/Informes', 'ana', 'EDIT_NO_DELETE')
+    expect(postCalled).toBe(false)
+  })
+
+  it('ya compartido con OTRO permiso: lo borra y lo crea de nuevo con el nuevo', async () => {
+    const listed = { ocs: { data: [{ id: '5', share_type: 0, share_with: 'ana', permissions: 3 }] } }
+    const calls: Array<{ url: string; method: string }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ url: String(url), method: init.method! })
+        if (init.method === 'GET' && url.toString().includes('/ocs/')) return fakeResponse(200, { json: listed })
+        return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+      }),
+    )
+    await client.shareWithUser('/Auditorias/AUD-1/Informes', 'ana', 'READ_ONLY')
+    const ocsCalls = calls.filter((c) => c.url.includes('/ocs/'))
+    expect(ocsCalls.map((c) => c.method)).toEqual(['GET', 'DELETE', 'POST'])
+    expect(ocsCalls[1]!.url).toContain('/shares/5')
   })
 })
 

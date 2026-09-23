@@ -45,6 +45,7 @@ export class DeleteEvidenceUseCase {
       evaluationId,
       controlTitle: template.tree.pathTo(evaluation.controlId).at(-1)!.title,
       fileName: evidence.fileName,
+      wasLocked: false, // esta vía exige la ventana editable (arriba); nunca puede pasar bloqueado
     })
   }
 }

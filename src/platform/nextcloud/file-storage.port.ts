@@ -21,8 +21,12 @@ export interface ReadShare {
   readonly url: string
 }
 
-/** `READ_ONLY`: ver y descargar. `EDIT`: además modificar — para la carpeta de informes, que el equipo trabaja en Nextcloud/OnlyOffice. */
-export type SharePermission = 'READ_ONLY' | 'EDIT'
+/**
+ * `READ_ONLY`: ver y descargar. `EDIT_NO_DELETE`: además modificar contenido — para la carpeta de informes, que el
+ * equipo trabaja en Nextcloud/OnlyOffice — pero NUNCA borrar ni crear archivos nuevos ahí: esa carpeta solo la llena
+ * el backend, y el informe es el consolidado final, no algo que un miembro del equipo pueda hacer desaparecer.
+ */
+export type SharePermission = 'READ_ONLY' | 'EDIT_NO_DELETE'
 
 export interface FileStoragePort {
   /** Crea la carpeta si no existe (idempotente) y un share de solo-subida sobre ella. */

@@ -233,7 +233,7 @@ describe('el webhook de Nextcloud (POST /webhooks/nextcloud/evidence-deleted)', 
     return payload.fileId
   }
 
-  it('borra la fila (deletedAt), sin importar el candado de edición: funciona aunque el criterio esté aprobado', async () => {
+  it('borra la fila (deletedAt) aunque el criterio esté aprobado; el evento queda marcado wasLocked: true (anómalo)', async () => {
     const ctx = await startedAudit(t)
     const roles = await evalOf(ctx.auditId, 'Roles')
     const fileId = await registered(ctx, roles.id)
@@ -246,6 +246,17 @@ describe('el webhook de Nextcloud (POST /webhooks/nextcloud/evidence-deleted)', 
 
     const event = (await historyOf(ctx.auditId)).find((e) => e.type === 'EvidenceDeleted')!
     expect(event.subjectId).toBe(roles.id)
+    expect((event.payload as { wasLocked: boolean }).wasLocked).toBe(true)
+    expect(renderEventMessage(event.type, event.payload)).toMatch(/^⚠ Se perdió "acta-comite\.pdf".*bloqueado/)
+  })
+
+  it('con el criterio en una ventana editable normal, wasLocked queda en false', async () => {
+    const ctx = await startedAudit(t)
+    const roles = await evalOf(ctx.auditId, 'Roles')
+    const fileId = await registered(ctx, roles.id) // sigue IN_PROGRESS: sí es editable
+    await postDeleteWebhook(fileId)
+    const event = (await historyOf(ctx.auditId)).find((e) => e.type === 'EvidenceDeleted')!
+    expect((event.payload as { wasLocked: boolean }).wasLocked).toBe(false)
   })
 
   it('idempotente: un fileId ya borrado, o uno que nunca se registró, es 204 sin efecto (no error)', async () => {

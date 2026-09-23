@@ -7,7 +7,7 @@ import { type Actor } from '../../domain/audit-policy.js'
 import { AuditErrors } from '../../domain/errors.js'
 import { AuditEvents } from '../../domain/events.js'
 import { assignedCount, listTeam, loadMember, manageableTeam } from '../team.queries.js'
-import { TeamFolderProvisioningService } from '../team-folder-provisioning.service.js'
+import { TeamFolderProvisioningService } from '../../infrastructure/team-folder-provisioning.service.js'
 
 @Injectable()
 export class RemoveMemberUseCase {

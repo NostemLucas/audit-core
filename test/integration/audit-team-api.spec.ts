@@ -178,7 +178,7 @@ describe('acceso persistente en Nextcloud (docs/07 §1.5)', () => {
     await add(id, ana, 'LEAD')
     const code = (await db.audit.findUniqueOrThrow({ where: { id } })).code
     expect(storage.userShares.get(`/Auditorias/${code}/Evidencias\x00ana`)).toBe('READ_ONLY')
-    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('EDIT')
+    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('EDIT_NO_DELETE')
   })
 
   it('quitar del equipo revoca los dos; a otro miembro no le toca', async () => {
@@ -199,7 +199,23 @@ describe('acceso persistente en Nextcloud (docs/07 §1.5)', () => {
     expect(storage.userShares.has(`/Auditorias/${code}/Informes\x00luis`)).toBe(false)
     // ana (líder) sigue con acceso: solo se revocó lo de luis
     expect(storage.userShares.get(`/Auditorias/${code}/Evidencias\x00ana`)).toBe('READ_ONLY')
-    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('EDIT')
+    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('EDIT_NO_DELETE')
+  })
+
+  it('cerrar la auditoría baja los informes del equipo a solo lectura; la evidencia no se toca (ya lo era)', async () => {
+    const id = await newAudit()
+    const { ana } = await people()
+    await add(id, ana, 'LEAD')
+    const code = (await db.audit.findUniqueOrThrow({ where: { id } })).code
+    await db.audit.update({ where: { id }, data: { status: 'IN_PROGRESS' } })
+    await db.evaluation.updateMany({ where: { auditId: id }, data: { status: 'APPROVED' } })
+
+    const res = await api()
+      .post(`${A}/${id}/close`)
+      .set('authorization', await as('manager'))
+    expect(res.status).toBe(200)
+    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('READ_ONLY')
+    expect(storage.userShares.get(`/Auditorias/${code}/Evidencias\x00ana`)).toBe('READ_ONLY')
   })
 })
 

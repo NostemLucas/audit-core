@@ -9,7 +9,7 @@ import { AuditErrors } from '../../domain/errors.js'
 import { AuditEvents } from '../../domain/events.js'
 import type { AddMemberT } from '../team.schemas.js'
 import { listTeam, manageableTeam } from '../team.queries.js'
-import { TeamFolderProvisioningService } from '../team-folder-provisioning.service.js'
+import { TeamFolderProvisioningService } from '../../infrastructure/team-folder-provisioning.service.js'
 
 @Injectable()
 export class AddMemberUseCase {
