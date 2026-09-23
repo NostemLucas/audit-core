@@ -511,8 +511,10 @@ estrategias de Passport. Valida firma, `iss`, `aud`, `exp`, algoritmo y exige `s
 - **El sistema nunca se queda sin ADMIN**: si Authentik le quitaría el rol al único administrador, se conserva y se avisa.
 - Dos primeros logins simultáneos chocan en un índice único: se reintenta **una vez** (`retryOnceOnIdentityConflict`, función
   pura probada de forma determinista); un conflicto que persiste es real y se propaga.
-- Grupos → roles: contiene `admin` → ADMIN, `gerente`/`manager` → GERENTE, `auditor` → AUDITOR (cada grupo aporta a lo sumo
-  un rol; admin gana). Un usuario sin grupos reconocidos existe sin roles: no puede nada salvo `GET /profile`.
+- Grupos → roles: el nombre del grupo debe ser EXACTAMENTE (sin distinguir mayúsculas) `ADMIN`, `GERENTE` o `AUDITOR` — nada
+  de coincidencia parcial (un grupo "authentik Admins" o un departamento "Administración" no dan ADMIN). Quién define qué es
+  un rol es este sistema; si los nombres de grupo en Authentik no coinciden, se corrige ahí, no con lógica difusa acá. Un
+  usuario sin grupos reconocidos existe sin roles: no puede nada salvo `GET /profile`.
 
 **Permisos (CASL 7).**
 - `platform/authz/abilities.ts` es la **única** fuente: una tabla `rol → concesiones`. Son permisos **gruesos**; los que

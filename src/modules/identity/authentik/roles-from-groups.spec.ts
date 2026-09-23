@@ -4,13 +4,8 @@ import { rolesFromGroups } from './roles-from-groups.js'
 describe('rolesFromGroups (convención de nombres de los grupos de Authentik)', () => {
   it.each([
     [['admin'], ['ADMIN']],
-    [['Administradores'], ['ADMIN']],
     [['gerente'], ['GERENTE']],
-    [['Gerentes de Auditoría'], ['GERENTE']],
-    [['manager'], ['GERENTE']],
-    [['Managers'], ['GERENTE']],
     [['auditor'], ['AUDITOR']],
-    [['Auditores Internos'], ['AUDITOR']],
   ])('%j → %j', (groups, roles) => {
     expect(rolesFromGroups(groups)).toEqual(roles)
   })
@@ -25,11 +20,17 @@ describe('rolesFromGroups (convención de nombres de los grupos de Authentik)', 
   })
 
   it('no repite roles', () => {
-    expect(rolesFromGroups(['admin', 'administradores', 'Admin-TI'])).toEqual(['ADMIN'])
+    expect(rolesFromGroups(['admin', 'admin'])).toEqual(['ADMIN'])
   })
 
-  it('cada grupo aporta a lo sumo UN rol, por orden de precedencia (admin gana)', () => {
-    expect(rolesFromGroups(['auditor-admin'])).toEqual(['ADMIN'])
+  it('exige coincidencia EXACTA: nombres parecidos o compuestos no matchean nada', () => {
+    expect(rolesFromGroups(['Administradores'])).toEqual([])
+    expect(rolesFromGroups(['authentik Admins'])).toEqual([])
+    expect(rolesFromGroups(['Administración'])).toEqual([])
+    expect(rolesFromGroups(['Account Managers'])).toEqual([])
+    expect(rolesFromGroups(['Gerentes de Auditoría'])).toEqual([])
+    expect(rolesFromGroups(['auditor-admin'])).toEqual([])
+    expect(rolesFromGroups(['manager'])).toEqual([])
   })
 
   it('sin grupos, o con grupos no reconocidos, no hay roles', () => {
@@ -37,7 +38,7 @@ describe('rolesFromGroups (convención de nombres de los grupos de Authentik)', 
     expect(rolesFromGroups(['ventas', 'ti', 'authentik'])).toEqual([])
   })
 
-  it('no distingue mayúsculas', () => {
+  it('no distingue mayúsculas, pero sí exige el nombre completo', () => {
     expect(rolesFromGroups(['ADMIN', 'GeReNtE'])).toEqual(['ADMIN', 'GERENTE'])
   })
 })
