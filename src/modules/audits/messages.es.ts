@@ -52,4 +52,6 @@ export const auditMessages = defineMessages(AuditEvents, {
   EvaluationReturned: (p) => `Devolvió «${p.controlTitle}»: ${p.comments}`,
   ReportGenerated: (p) => `Generó el informe "${p.title}"`,
   EvaluationReopened: (p) => `Reabrió «${p.controlTitle}» (estaba aprobado): ${p.comments}`,
+  EvidenceRegistered: (p) => `Adjuntó "${p.fileName}" como evidencia de «${p.controlTitle}»`,
+  EvidenceDeleted: (p) => `Se eliminó "${p.fileName}" de la evidencia de «${p.controlTitle}»`,
 })

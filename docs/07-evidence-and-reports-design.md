@@ -72,13 +72,33 @@ ningún otro modo. Con eso:
   la fila; la segunda entrega es `EVIDENCE_ALREADY_REGISTERED`, que el handler trata como éxito (200), no como error
   visible — es la garantía "idempotente y reintentable" de `03` regla 11.
 
-### 1.3 Listar y eliminar
+### 1.3 El webhook de borrado
+
+`POST /webhooks/nextcloud/evidence-deleted` — misma regla que 1.2: `@Public()`, firma HMAC obligatoria, mismo
+`NEXTCLOUD_WEBHOOK_SECRET`. Contrato mínimo (Nextcloud, en este punto, solo tiene el id del archivo — la ruta ya no
+existe):
+
+```jsonc
+{ "fileId": "nc-83920" }
+```
+
+Busca la evidencia por `storageFileId` y la marca `deletedAt` (`DeleteEvidenceWebhookUseCase`). A propósito **no**
+repite el chequeo `EVIDENCE_LOCKED` de 1.1/1.4: ese candado es sobre qué puede hacer un USUARIO desde esta app durante
+la revisión; aquí el archivo ya no existe en Nextcloud, la fuente de verdad, sin importar en qué estado quedó el
+criterio — reflejarlo no es una acción de negocio que deba bloquearse. Idempotente igual que 1.2: un `fileId` ya
+borrado, o uno que nunca se registró, es `204` sin efecto, no un error.
+
+Publica el mismo evento `EvidenceDeleted` que el borrado disparado desde esta app (§1.4): el historial no distingue
+quién lo inició, solo que se perdió — es lo único que le importa a quien lee el historial del criterio.
+
+### 1.4 Listar y eliminar desde la app
 
 `GET .../evidence` — quien vea el criterio (misma regla que `GET` del criterio). `DELETE .../evidence/:id` — el auditor
 asignado, en la misma ventana editable (`EVIDENCE_LOCKED` fuera de ella): soft-delete (`deletedAt`), nunca se borra la
 fila (`01`: "único soft-delete del sistema: la evidencia eliminada debe seguir siendo trazable" — si alguien adjunta y
 luego retira una evidencia, eso es parte de la historia del criterio). No se borra el archivo en Nextcloud desde aquí:
-igual que el registro, es responsabilidad de quien administra el storage (fuera de alcance; ver §5).
+igual que el registro, es responsabilidad de quien administra el storage (fuera de alcance; ver §5) — si alguien lo
+borra allá más tarde, el webhook de §1.3 termina de sincronizar el metadato.
 
 ## 2. Informes
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/app-events.js'
+import { renderEventMessage } from '../../src/platform/events/index.js'
 import { evidenceFolder } from '../../src/platform/nextcloud/index.js'
 import { signWebhook } from '../../src/platform/nextcloud/webhook-signature.js'
 import { type TestRole, useTestApi } from './support/api.js'
@@ -66,6 +67,18 @@ const postWebhook = (body: Record<string, unknown>, signature?: string) => {
   if (sig) req.set('x-nextcloud-signature', sig)
   return req.send(raw)
 }
+
+/** El webhook de BORRADO (docs/07 §1.3): Nextcloud solo manda el id del archivo. */
+const postDeleteWebhook = (fileId: string, signature?: string) => {
+  const body = { fileId }
+  const raw = JSON.stringify(body)
+  const sig = signature === undefined ? `sha256=${signWebhook(WEBHOOK_SECRET, raw)}` : signature
+  const req = api().post('/api/v1/webhooks/nextcloud/evidence-deleted').set('content-type', 'application/json')
+  if (sig) req.set('x-nextcloud-signature', sig)
+  return req.send(raw)
+}
+
+const historyOf = (auditId: string) => db.auditEvent.findMany({ where: { auditId }, orderBy: { createdAt: 'asc' } })
 
 describe('pedir un lugar para subir (POST .../evidence/upload-target)', () => {
   it('el auditor asignado obtiene la URL del share; la carpeta pedida sale del código de la auditoría y el criterio', async () => {
@@ -139,6 +152,10 @@ describe('el webhook de Nextcloud (POST /webhooks/nextcloud/evidence)', () => {
     const row = await db.evidence.findUniqueOrThrow({ where: { storageFileId: payload.fileId } })
     expect(row.evaluationId).toBe(roles.id)
     expect(row.deletedAt).toBeNull()
+
+    const event = (await historyOf(ctx.auditId)).find((e) => e.type === 'EvidenceRegistered')!
+    expect(event.subjectId).toBe(roles.id)
+    expect(renderEventMessage(event.type, event.payload)).toBe('Adjuntó "acta-comite.pdf" como evidencia de «Roles»')
   })
 
   it('sin firma, con una firma que no corresponde, o con el secreto equivocado: 401 WEBHOOK_SIGNATURE_INVALID', async () => {
@@ -208,6 +225,49 @@ describe('el webhook de Nextcloud (POST /webhooks/nextcloud/evidence)', () => {
   })
 })
 
+describe('el webhook de Nextcloud (POST /webhooks/nextcloud/evidence-deleted)', () => {
+  async function registered(ctx: StartedAudit, evaluationId: string) {
+    await start(ctx, evaluationId)
+    const payload = webhookPayload(evaluationId)
+    await postWebhook(payload)
+    return payload.fileId
+  }
+
+  it('borra la fila (deletedAt), sin importar el candado de edición: funciona aunque el criterio esté aprobado', async () => {
+    const ctx = await startedAudit(t)
+    const roles = await evalOf(ctx.auditId, 'Roles')
+    const fileId = await registered(ctx, roles.id)
+    await db.evaluation.update({ where: { id: roles.id }, data: { status: 'APPROVED' } }) // fuera de la ventana editable
+
+    const res = await postDeleteWebhook(fileId)
+    expect(res.status).toBe(204)
+    const row = await db.evidence.findUniqueOrThrow({ where: { storageFileId: fileId } })
+    expect(row.deletedAt).not.toBeNull()
+
+    const event = (await historyOf(ctx.auditId)).find((e) => e.type === 'EvidenceDeleted')!
+    expect(event.subjectId).toBe(roles.id)
+  })
+
+  it('idempotente: un fileId ya borrado, o uno que nunca se registró, es 204 sin efecto (no error)', async () => {
+    const ctx = await startedAudit(t)
+    const roles = await evalOf(ctx.auditId, 'Roles')
+    const fileId = await registered(ctx, roles.id)
+    expect((await postDeleteWebhook(fileId)).status).toBe(204)
+    expect((await postDeleteWebhook(fileId)).status).toBe(204) // ya estaba borrada
+    expect((await postDeleteWebhook('nc-nunca-existio')).status).toBe(204) // nunca se registró
+    expect((await historyOf(ctx.auditId)).filter((e) => e.type === 'EvidenceDeleted')).toHaveLength(1)
+  })
+
+  it('sin firma, o con una que no corresponde: 401 WEBHOOK_SIGNATURE_INVALID, no se borra', async () => {
+    const ctx = await startedAudit(t)
+    const roles = await evalOf(ctx.auditId, 'Roles')
+    const fileId = await registered(ctx, roles.id)
+    expect((await postDeleteWebhook(fileId, '')).status).toBe(401)
+    expect((await postDeleteWebhook(fileId, 'sha256=' + '0'.repeat(64))).status).toBe(401)
+    expect((await db.evidence.findUniqueOrThrow({ where: { storageFileId: fileId } })).deletedAt).toBeNull()
+  })
+})
+
 describe('ver la evidencia de un criterio', () => {
   it('la ven todos los que ven la auditoría; un auditor ajeno recibe 403; un criterio inexistente, 404', async () => {
     const ctx = await startedAudit(t)
@@ -249,7 +309,7 @@ describe('eliminar una evidencia (soft-delete)', () => {
     return (await db.evidence.findUniqueOrThrow({ where: { storageFileId: payload.fileId } })).id
   }
 
-  it('el auditor asignado la elimina; la fila queda (deletedAt), nunca se borra', async () => {
+  it('el auditor asignado la elimina; la fila queda (deletedAt), nunca se borra; queda en el historial', async () => {
     const ctx = await startedAudit(t)
     const roles = await evalOf(ctx.auditId, 'Roles')
     const evidenceId = await withEvidence(ctx, roles.id)
@@ -257,6 +317,12 @@ describe('eliminar una evidencia (soft-delete)', () => {
     expect(res.status).toBe(204)
     const row = await db.evidence.findUniqueOrThrow({ where: { id: evidenceId } })
     expect(row.deletedAt).not.toBeNull()
+
+    const event = (await historyOf(ctx.auditId)).find((e) => e.type === 'EvidenceDeleted')!
+    expect(event.subjectId).toBe(roles.id)
+    expect(renderEventMessage(event.type, event.payload)).toBe(
+      'Se eliminó "acta-comite.pdf" de la evidencia de «Roles»',
+    )
   })
 
   it('baja el `evidenceCount` del criterio: la regla de envío (docs/06 §3) lo nota', async () => {

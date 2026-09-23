@@ -109,6 +109,11 @@ export const AuditEvents = defineEvents({
   EvaluationReopened: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), comments: z.string() }),
   // Informes (docs/07 §2). El sujeto es la auditoría: un informe no tiene su propia historia aparte.
   ReportGenerated: z.object({ ...audit, reportId: z.uuid(), title: z.string() }),
+  // Evidencia (docs/07 §1). El sujeto es el criterio (evaluationId), igual que su ciclo de vida.
+  EvidenceRegistered: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), fileName: z.string() }),
+  /** También la dispara el webhook de Nextcloud cuando el archivo se borra ALLÁ (docs/07 §1.3): quien administra el
+   * storage es la fuente de verdad, no un botón de esta app. */
+  EvidenceDeleted: z.object({ ...audit, evaluationId: z.uuid(), controlTitle: z.string(), fileName: z.string() }),
 })
 
 export const AUDIT_EVENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AuditEvents))

@@ -30,4 +30,12 @@ export const NextcloudEvidenceWebhook = z.object({
 })
 export type NextcloudEvidenceWebhookT = z.infer<typeof NextcloudEvidenceWebhook>
 
+/**
+ * El contrato del webhook de BORRADO (docs/07 §1.3): Nextcloud es la fuente de verdad del archivo — si alguien lo
+ * elimina ALLÁ (no desde esta app), este backend se entera por aquí y refleja el borrado en su metadato. Solo el id
+ * de archivo: es lo único que sigue siendo válido una vez que el archivo ya no está en su ruta original.
+ */
+export const NextcloudEvidenceDeletedWebhook = z.object({ fileId: z.string().min(1) })
+export type NextcloudEvidenceDeletedWebhookT = z.infer<typeof NextcloudEvidenceDeletedWebhook>
+
 export const EvidenceId = z.uuid()

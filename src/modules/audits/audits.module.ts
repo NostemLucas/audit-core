@@ -14,6 +14,7 @@ import { AssignEvaluationsUseCase } from './evaluation/use-cases/assign-evaluati
 import { ListEvaluationsUseCase } from './evaluation/use-cases/list-evaluations.use-case.js'
 import { EvidenceController } from './evidence/evidence.controller.js'
 import { NextcloudWebhookController } from './evidence/nextcloud-webhook.controller.js'
+import { DeleteEvidenceWebhookUseCase } from './evidence/use-cases/delete-evidence-webhook.use-case.js'
 import { DeleteEvidenceUseCase } from './evidence/use-cases/delete-evidence.use-case.js'
 import { ListEvidenceUseCase } from './evidence/use-cases/list-evidence.use-case.js'
 import { RegisterEvidenceUseCase } from './evidence/use-cases/register-evidence.use-case.js'
@@ -103,6 +104,7 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     RequestEvidenceUploadUseCase,
     DeleteEvidenceUseCase,
     RegisterEvidenceUseCase,
+    DeleteEvidenceWebhookUseCase,
     GenerateReportUseCase,
     ListReportsUseCase,
     GetReportUseCase,
