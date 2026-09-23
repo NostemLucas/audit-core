@@ -4,9 +4,9 @@ import { EventBus } from '../../../../platform/events/index.js'
 import { LibraryReader } from '../../../library/index.js'
 import { assertAuditEvaluable } from '../../domain/audit.lifecycle.js'
 import { type Actor, assertOnAudit } from '../../domain/audit-policy.js'
-import { evaluationLifecycle } from '../../domain/evaluation.lifecycle.js'
 import { AuditEvents } from '../../domain/events.js'
 import { accessOf, loadAudit } from '../../infrastructure/audit.queries.js'
+import { transitionEvaluation } from '../../infrastructure/evaluation-transitions.js'
 import type { ApproveEvaluationT } from '../evaluation.schemas.js'
 import { loadEvaluation, toEvaluationViews } from '../evaluation.queries.js'
 
@@ -25,10 +25,9 @@ export class ApproveEvaluationUseCase {
     assertAuditEvaluable(audit.status)
     assertOnAudit('lead', actor, await accessOf(this.tx, actor, audit))
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
-    const to = evaluationLifecycle.next(evaluation.status, 'APPROVE')
 
     const requiresFollowUp = input.requiresFollowUp ?? false
-    await this.tx.evaluation.update({ where: { id: evaluationId }, data: { status: to, requiresFollowUp } })
+    await transitionEvaluation(this.tx, evaluationId, evaluation.status, 'APPROVE', { requiresFollowUp })
     const template = await this.library.getTemplate(audit.templateId)
     await this.events.publish(AuditEvents.EvaluationApproved, {
       auditId,

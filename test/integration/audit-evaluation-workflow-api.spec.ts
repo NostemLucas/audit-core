@@ -467,6 +467,28 @@ describe('revisar (solo el líder)', () => {
     expect((await giveBack(ctx, id, { comments: 'x' })).body.error.code).toBe('EVALUATION_INVALID_STATE')
   })
 
+  it('aprobar y devolver el MISMO criterio al mismo tiempo: uno gana, el otro recibe 409, nunca los dos', async () => {
+    const ctx = await inProgress()
+    const id = await sent(ctx)
+    const [approved, returned] = await Promise.all([
+      approve(ctx, id, { comments: 'Conforme' }),
+      giveBack(ctx, id, { comments: 'Falta algo' }),
+    ])
+    const statuses = [approved.status, returned.status].sort()
+    expect(statuses).toEqual([200, 409])
+    const loser = approved.status === 409 ? approved : returned
+    const finalStatus = await statusOf(id)
+    expect(finalStatus).toBe(approved.status === 200 ? 'APPROVED' : 'RETURNED')
+    // el que pierde ve el estado FRESCO que dejó el ganador, no el que leyó al empezar
+    expect(loser.body.error).toMatchObject({ code: 'EVALUATION_INVALID_STATE', details: { from: finalStatus } })
+
+    // la historia tiene UN solo evento de revisión, no los dos (no se pisaron)
+    const reviewEvents = (await historyOf(id)).filter(
+      (e) => e.type === 'EvaluationApproved' || e.type === 'EvaluationReturned',
+    )
+    expect(reviewEvents).toHaveLength(1)
+  })
+
   it('con la auditoría fuera de curso no se revisa nada (409 AUDIT_NOT_EVALUABLE), tampoco reabrir en una cerrada', async () => {
     const ctx = await inProgress()
     const id = await sent(ctx)

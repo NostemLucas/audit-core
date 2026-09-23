@@ -10,6 +10,7 @@ import { evaluationLifecycle } from '../../domain/evaluation.lifecycle.js'
 import { AuditEvents } from '../../domain/events.js'
 import { missingForCompletion } from '../../domain/evaluation-completion.js'
 import { accessOf, loadAudit } from '../../infrastructure/audit.queries.js'
+import { transitionEvaluation } from '../../infrastructure/evaluation-transitions.js'
 import { loadEvaluation, toEvaluationViews } from '../evaluation.queries.js'
 
 @Injectable()
@@ -27,7 +28,7 @@ export class CompleteEvaluationUseCase {
     assertAuditEvaluable(audit.status)
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
     assertCanEvaluate(actor, await accessOf(this.tx, actor, audit), evaluation.assignedUserId)
-    const to = evaluationLifecycle.next(evaluation.status, 'COMPLETE')
+    evaluationLifecycle.next(evaluation.status, 'COMPLETE') // valida temprano, antes de exigir que esté completo
 
     const scale = await this.library.getScale(audit.scaleId)
     const byId = new Map(scale.levels.map((level) => [level.id, level] as const))
@@ -43,7 +44,7 @@ export class CompleteEvaluationUseCase {
     )
     if (missing.length > 0) throw new DomainError(AuditErrors.EVALUATION_INCOMPLETE, { missing })
 
-    await this.tx.evaluation.update({ where: { id: evaluationId }, data: { status: to } })
+    await transitionEvaluation(this.tx, evaluationId, evaluation.status, 'COMPLETE')
 
     const template = await this.library.getTemplate(audit.templateId)
     const evidence = await this.tx.evidence.findMany({
