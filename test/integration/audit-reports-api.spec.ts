@@ -35,9 +35,29 @@ const get = async (ctx: StartedAudit, reportId: string, role: TestRole = 'manage
 
 const documentXmlOf = (buffer: Buffer): string => new PizZip(buffer).file('word/document.xml')!.asText()
 
+/**
+ * Todo APROBADO y la auditoría CERRADA, directo en la BD (aquí se prueba el informe, no el flujo de cierre): conserva
+ * lo que la API ya haya puesto (nivel alcanzado, no aplica) y completa el resto igualando el nivel alcanzado al
+ * esperado (cumple exacto, sin brecha nueva) para no alterar qué criterios cuentan como brecha en el test.
+ */
+const closeAudit = async (ctx: StartedAudit) => {
+  const evaluations = await db.evaluation.findMany({ where: { auditId: ctx.auditId } })
+  for (const e of evaluations) {
+    await db.evaluation.update({
+      where: { id: e.id },
+      data: {
+        status: 'APPROVED',
+        ...(e.achievedLevelId || e.isNotApplicable ? {} : { achievedLevelId: e.expectedLevelId }),
+      },
+    })
+  }
+  await db.audit.update({ where: { id: ctx.auditId }, data: { status: 'CLOSED', closedAt: new Date() } })
+}
+
 describe('generar un informe (POST /audits/:id/reports)', () => {
   it('el manager genera uno con el título de la auditoría por defecto; sube el .docx a Nextcloud y crea el registro', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     const res = await generate(ctx)
     expect(res.status).toBe(201)
     expect(res.body.data).toMatchObject({ type: 'COMPLIANCE', title: 'Auditoría ISO 27001' })
@@ -71,6 +91,7 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
       .patch(`${A}/${ctx.auditId}/evaluations/${politicas.id}`)
       .set('authorization', ana)
       .send({ achievedLevelId: cumple.id, version: politicas.version })
+    await closeAudit(ctx)
 
     const [resultsRes, gapsRes, reportRes] = await Promise.all([
       api()
@@ -116,6 +137,7 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
       .patch(`${A}/${ctx.auditId}/evaluations/${roles.id}`)
       .set('authorization', await as('auditor', 'ana'))
       .send({ achievedLevelId: parcial.id, findings: 'x', severity: 'MINOR', version: roles.version })
+    await closeAudit(ctx)
 
     const res = await generate(ctx)
     expect(res.status).toBe(201)
@@ -141,6 +163,7 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
 
   it('el líder también genera; un auditor sin ser líder, otro GERENTE y el ADMIN no: 403', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     expect((await generate(ctx, {}, 'auditor', 'lider')).status).toBe(201)
     expect((await generate(ctx, {}, 'auditor', 'ana')).status).toBe(403)
     expect((await generate(ctx, {}, 'manager', 'otro')).status).toBe(403)
@@ -149,6 +172,7 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
 
   it('el tipo y el título se pueden indicar; se registra en el historial de la auditoría', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     const res = await generate(ctx, { type: 'GAP_ANALYSIS', title: 'Informe de brechas — cierre Q3' })
     expect(res.status).toBe(201)
     expect(res.body.data).toMatchObject({ type: 'GAP_ANALYSIS', title: 'Informe de brechas — cierre Q3' })
@@ -158,11 +182,18 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
     expect(renderEventMessage(event.type, event.payload)).toBe('Generó el informe "Informe de brechas — cierre Q3"')
   })
 
-  it('funciona en cualquier estado, incluido un borrador sin nada evaluado (una foto de lo que hay)', async () => {
+  it('solo con la auditoría CERRADA o ARCHIVADA: en cualquier otro estado, 409 AUDIT_NOT_REPORTABLE', async () => {
     const ctx = await startedAudit(t)
-    await db.audit.update({ where: { id: ctx.auditId }, data: { status: 'DRAFT' } })
-    const res = await generate(ctx)
-    expect(res.status).toBe(201)
+    for (const status of ['DRAFT', 'IN_PROGRESS'] as const) {
+      await db.audit.update({ where: { id: ctx.auditId }, data: { status } })
+      const res = await generate(ctx)
+      expect(res.status).toBe(409)
+      expect(res.body.error.code).toBe('AUDIT_NOT_REPORTABLE')
+    }
+    await closeAudit(ctx) // deja CLOSED
+    expect((await generate(ctx)).status).toBe(201)
+    await db.audit.update({ where: { id: ctx.auditId }, data: { status: 'ARCHIVED' } })
+    expect((await generate(ctx)).status).toBe(201)
   })
 
   it('una auditoría inexistente es 404; un título vacío o demasiado largo, 400', async () => {
@@ -177,6 +208,7 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
 describe('listar y ver un informe', () => {
   it('lo ven todos los que ven la auditoría, lo más reciente primero; un auditor ajeno recibe 403', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     const first = await generate(ctx, { title: 'Primero' })
     const second = await generate(ctx, { title: 'Segundo' })
     for (const [role, who] of [
@@ -196,6 +228,7 @@ describe('listar y ver un informe', () => {
 
   it('GET de uno trae la URL de descarga (un share de solo lectura pedido al vuelo)', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     const created = await generate(ctx)
     const res = await get(ctx, created.body.data.id)
     expect(res.status).toBe(200)
@@ -207,6 +240,7 @@ describe('listar y ver un informe', () => {
 
   it('cada GET pide un share nuevo (no se guarda, se puede revocar y renovar sin tocar el informe)', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     const created = await generate(ctx)
     await get(ctx, created.body.data.id)
     await get(ctx, created.body.data.id)
@@ -215,6 +249,7 @@ describe('listar y ver un informe', () => {
 
   it('un auditor ajeno a la auditoría no puede pedir un informe puntual: 403', async () => {
     const ctx = await startedAudit(t)
+    await closeAudit(ctx)
     const created = await generate(ctx)
     expect((await get(ctx, created.body.data.id, 'auditor', 'ajeno')).status).toBe(403)
     expect(storage.readShares).toHaveLength(0) // ni siquiera llegó a pedirse el share
@@ -222,6 +257,7 @@ describe('listar y ver un informe', () => {
 
   it('un informe inexistente, o de otra auditoría, es 404', async () => {
     const one = await startedAudit(t)
+    await closeAudit(one)
     const two = await startedAudit(t, 'CONFORMITY', '-2')
     const created = await generate(one)
     expect((await get(one, UNKNOWN_ID)).status).toBe(404)

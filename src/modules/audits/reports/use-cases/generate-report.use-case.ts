@@ -6,6 +6,7 @@ import { EventBus } from '../../../../platform/events/index.js'
 import { DOCX_MIME } from '../../../../platform/http/index.js'
 import { FILE_STORAGE, type FileStoragePort, reportPath } from '../../../../platform/nextcloud/index.js'
 import { LibraryReader } from '../../../library/index.js'
+import { assertAuditReportable } from '../../domain/audit.lifecycle.js'
 import { type Actor, assertOnAudit } from '../../domain/audit-policy.js'
 import { AuditEvents } from '../../domain/events.js'
 import { computeResults } from '../../domain/scoring.js'
@@ -41,10 +42,13 @@ export class GenerateReportUseCase {
    * Genera un informe con los MISMOS datos que `GET /results` y `GET /gaps` (docs/07 §2: nada de un cálculo paralelo),
    * los mete en la plantilla y sube el resultado a Nextcloud. Solo se persiste si la subida tuvo éxito: un intento
    * fallido no deja rastro (`AuditErrors.REPORT_GENERATION_FAILED` o `PlatformErrors.UPSTREAM_UNAVAILABLE` del puerto).
+   * Exige la auditoría CERRADA (o archivada): un informe es el consolidado final, no una foto a medio evaluar llena de
+   * huecos y placeholders (`AUDIT_NOT_REPORTABLE`).
    */
   @Transactional()
   async execute(actor: Actor, auditId: string, input: GenerateReportT) {
     const audit = await loadAuditView(this.tx, auditId)
+    assertAuditReportable(audit.status)
     assertOnAudit('report', actor, await accessOf(this.tx, actor, audit))
 
     const [template, scale, rows] = await Promise.all([

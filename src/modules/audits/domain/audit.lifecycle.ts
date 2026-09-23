@@ -8,10 +8,13 @@ import { AuditErrors } from './errors.js'
  *  - `staffable`: el equipo se arma y se cambia en borrador y en curso.
  *  - `evaluable`: solo en curso se evalúa y se adjunta evidencia.
  *  - `followable`: una auditoría cerrada (o ya archivada) puede tomarse de referencia para un seguimiento (docs/06 §9).
+ *  - `reportable`: se puede generar un informe — el consolidado final, no una foto a medio evaluar con huecos y
+ *    placeholders. Hoy coincide con `followable` (CLOSED y ARCHIVED), pero es una regla de negocio distinta: se
+ *    declara aparte para que un cambio futuro en una no mueva la otra por accidente.
  */
 export const AUDIT_EVENTS = ['START', 'CLOSE', 'ARCHIVE'] as const
 export type AuditEvent = (typeof AUDIT_EVENTS)[number]
-export type AuditTag = 'editable' | 'staffable' | 'evaluable' | 'followable'
+export type AuditTag = 'editable' | 'staffable' | 'evaluable' | 'followable' | 'reportable'
 
 export const auditLifecycle = defineLifecycle<AuditStatus, AuditEvent, AuditTag>({
   entity: 'AUDIT',
@@ -19,8 +22,8 @@ export const auditLifecycle = defineLifecycle<AuditStatus, AuditEvent, AuditTag>
   states: {
     DRAFT: { on: { START: 'IN_PROGRESS' }, tags: ['editable', 'staffable'] },
     IN_PROGRESS: { on: { CLOSE: 'CLOSED' }, tags: ['staffable', 'evaluable'] },
-    CLOSED: { on: { ARCHIVE: 'ARCHIVED' }, tags: ['followable'] },
-    ARCHIVED: { on: {}, tags: ['followable'] },
+    CLOSED: { on: { ARCHIVE: 'ARCHIVED' }, tags: ['followable', 'reportable'] },
+    ARCHIVED: { on: {}, tags: ['followable', 'reportable'] },
   },
 })
 
@@ -38,4 +41,9 @@ export function assertAuditEvaluable(status: AuditStatus): void {
 /** Lanza AUDIT_NOT_EDITABLE si la auditoría no está en borrador. */
 export function assertAuditEditable(status: AuditStatus): void {
   auditLifecycle.assert(status, 'editable', AuditErrors.AUDIT_NOT_EDITABLE)
+}
+
+/** Lanza AUDIT_NOT_REPORTABLE si la auditoría no está cerrada (ni archivada): un informe es el consolidado final. */
+export function assertAuditReportable(status: AuditStatus): void {
+  auditLifecycle.assert(status, 'reportable', AuditErrors.AUDIT_NOT_REPORTABLE)
 }

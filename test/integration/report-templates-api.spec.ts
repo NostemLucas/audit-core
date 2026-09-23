@@ -148,10 +148,14 @@ describe('la plantilla personalizada se usa al generar (docs/07 §2)', () => {
       .set('authorization', await as('manager'))
       .send({ type })
 
+  /** Generar un informe exige la auditoría cerrada; aquí no importa el resultado, solo cuál plantilla se usó. */
+  const closeAudit = (auditId: string) => db.audit.update({ where: { id: auditId }, data: { status: 'CLOSED' } })
+
   const xmlOf = (buffer: Buffer): string => new PizZip(buffer).file('word/document.xml')!.asText()
 
   it('sin plantilla propia: usa la de fábrica (sin cambios de comportamiento)', async () => {
     const ctx = await startedAudit(t, 'CONFORMITY', '-sin-plantilla')
+    await closeAudit(ctx.auditId)
     const res = await generate(ctx.auditId, 'COMPLIANCE')
     expect(res.status).toBe(201)
     const uploaded = t.storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
@@ -161,6 +165,7 @@ describe('la plantilla personalizada se usa al generar (docs/07 §2)', () => {
   it('con un comodín (sin dimension): se usa para cualquier dimensión de escala de ese tipo', async () => {
     await upload(markedTemplate('marcador-comodin'), { type: 'COMPLIANCE' })
     const ctx = await startedAudit(t, 'MATURITY', '-comodin')
+    await closeAudit(ctx.auditId)
     const res = await generate(ctx.auditId, 'COMPLIANCE')
     const uploaded = t.storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
     expect(xmlOf(uploaded.content)).toContain('marcador-comodin')
@@ -170,6 +175,7 @@ describe('la plantilla personalizada se usa al generar (docs/07 §2)', () => {
     await upload(markedTemplate('marcador-comodin'), { type: 'COMPLIANCE' })
     await upload(markedTemplate('marcador-exacto'), { type: 'COMPLIANCE', dimension: 'CONFORMITY' })
     const ctx = await startedAudit(t, 'CONFORMITY', '-exacta')
+    await closeAudit(ctx.auditId)
     const res = await generate(ctx.auditId, 'COMPLIANCE')
     const uploaded = t.storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
     const xml = xmlOf(uploaded.content)
@@ -180,6 +186,7 @@ describe('la plantilla personalizada se usa al generar (docs/07 §2)', () => {
   it('la plantilla de otro tipo de informe no aplica', async () => {
     await upload(markedTemplate('marcador-gap-analysis'), { type: 'GAP_ANALYSIS' })
     const ctx = await startedAudit(t, 'CONFORMITY', '-otro-tipo')
+    await closeAudit(ctx.auditId)
     const res = await generate(ctx.auditId, 'COMPLIANCE')
     const uploaded = t.storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
     expect(xmlOf(uploaded.content)).not.toContain('marcador-gap-analysis')

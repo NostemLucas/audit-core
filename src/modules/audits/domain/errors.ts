@@ -115,6 +115,11 @@ export const AuditErrors = defineErrors({
   // ── Informes ───────────────────────────────────────────────────────────────
   REPORT_NOT_FOUND: { http: 404, message: 'Informe no encontrado' },
   REPORT_GENERATION_FAILED: { http: 502, message: 'No se pudo generar el informe' },
+  /** Capacidad `reportable` (docs/03): un informe es el consolidado final, no una foto a medio evaluar con huecos. */
+  AUDIT_NOT_REPORTABLE: {
+    http: 409,
+    message: 'Solo una auditoría cerrada o archivada puede generar un informe',
+  },
 
   // ── Plantillas de informe (docs/07 §2) ──────────────────────────────────────
   REPORT_TEMPLATE_NOT_FOUND: { http: 404, message: 'Plantilla de informe no encontrada' },

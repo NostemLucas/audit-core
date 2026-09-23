@@ -89,8 +89,11 @@ buffer, mimeType)`) y se edita después en OnlyOffice como cualquier otro docume
 para eso: es exactamente la delegación que `01 §0` pide.
 
 `POST /audits/:auditId/reports` — el **manager** o el **líder** (mismo criterio que revisar: quien responde por el
-contenido; política contextual nueva, `audit-policy.ts` acción `report`). Sin otra precondición: se puede informar en
-cualquier estado, también un borrador con todo pendiente — es una foto de lo que hay, no una certificación. El caso de uso:
+contenido; política contextual nueva, `audit-policy.ts` acción `report`). Exige la auditoría **CERRADA o ARCHIVADA**
+(capacidad `reportable`, `audit.lifecycle.ts`; en cualquier otro estado, `409 AUDIT_NOT_REPORTABLE`) — un informe es el
+consolidado final, no una foto a medio evaluar llena de huecos y placeholders. (Decisión revisada: la versión original
+de esta fase permitía generar en cualquier estado; se corrigió porque en la práctica producía informes con secciones
+vacías que nadie quería repartir.) El caso de uso:
 1. Junta los datos con los MISMOS cálculos que `GET /results` y `GET /gaps` (`scoring.ts`, `results.queries.ts`): **no
    se inventa una fuente paralela para el informe**.
 2. Rellena la plantilla por defecto (`reports/assets/compliance-report.docx`, generada por
