@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { evaluationIdFromEvidencePath, evidenceFolder, reportPath } from './storage-paths.js'
+import {
+  evaluationIdFromEvidencePath,
+  evidenceFolder,
+  evidenceRootFolder,
+  reportPath,
+  reportsRootFolder,
+} from './storage-paths.js'
 
 describe('storage-paths', () => {
   it('la carpeta de evidencia se deriva del código de la auditoría y el id del criterio, nunca de nombres', () => {
     expect(evidenceFolder('AUD-2026-00042', 'eval-1')).toBe('/Auditorias/AUD-2026-00042/Evidencias/eval-1')
+  })
+
+  it('las carpetas raíz (para compartir con el equipo) son las mismas, sin el segmento del id', () => {
+    expect(evidenceRootFolder('AUD-2026-00042')).toBe('/Auditorias/AUD-2026-00042/Evidencias')
+    expect(reportsRootFolder('AUD-2026-00042')).toBe('/Auditorias/AUD-2026-00042/Informes')
   })
 
   it('la ruta de un informe usa su propio id y la extensión pedida (por defecto docx)', () => {

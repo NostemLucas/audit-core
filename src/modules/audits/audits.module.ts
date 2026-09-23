@@ -46,6 +46,7 @@ import { StartAuditUseCase } from './lifecycle/use-cases/start-audit.use-case.js
 import { TransferAuditUseCase } from './lifecycle/use-cases/transfer-audit.use-case.js'
 import { UpdateAuditUseCase } from './lifecycle/use-cases/update-audit.use-case.js'
 import { TeamController } from './team/team.controller.js'
+import { TeamFolderProvisioningService } from './team/team-folder-provisioning.service.js'
 import { AddMemberUseCase } from './team/use-cases/add-member.use-case.js'
 import { ChangeMemberRoleUseCase } from './team/use-cases/change-member-role.use-case.js'
 import { ListMembersUseCase } from './team/use-cases/list-members.use-case.js'
@@ -83,6 +84,7 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     AddMemberUseCase,
     ChangeMemberRoleUseCase,
     RemoveMemberUseCase,
+    TeamFolderProvisioningService,
     ListEvaluationsUseCase,
     AssignEvaluationsUseCase,
     SetExpectedLevelUseCase,

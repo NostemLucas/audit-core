@@ -8,7 +8,7 @@ const A = '/api/v1/audits'
 const UNKNOWN_ID = '0199c0de-0000-7000-8000-000000000001'
 
 const t = useTestApi()
-const { api, as, db } = t
+const { api, as, db, storage } = t
 
 let lib: LibraryFixture
 beforeEach(async () => {
@@ -168,6 +168,38 @@ describe('armar el equipo (solo el manager)', () => {
     const manager = await db.user.findUniqueOrThrow({ where: { authentikId: 'sub-manager' } })
     expect(event).toMatchObject({ actorId: manager.id, targetUserId: ana, subjectType: 'AuditMember' })
     expect(renderEventMessage(event.type, event.payload)).toBe('Agregó a ana al equipo como líder')
+  })
+})
+
+describe('acceso persistente en Nextcloud (docs/07 §1.5)', () => {
+  it('agregar da acceso a TODA la evidencia (solo lectura) y a los informes (editable), por username', async () => {
+    const id = await newAudit()
+    const { ana } = await people()
+    await add(id, ana, 'LEAD')
+    const code = (await db.audit.findUniqueOrThrow({ where: { id } })).code
+    expect(storage.userShares.get(`/Auditorias/${code}/Evidencias\x00ana`)).toBe('READ_ONLY')
+    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('EDIT')
+  })
+
+  it('quitar del equipo revoca los dos; a otro miembro no le toca', async () => {
+    const id = await newAudit()
+    const { ana, luis } = await people()
+    await add(id, ana, 'LEAD')
+    await add(id, luis, 'MEMBER')
+    const code = (await db.audit.findUniqueOrThrow({ where: { id } })).code
+    const member = await db.auditMember.findFirstOrThrow({ where: { userId: luis } })
+    expect(
+      (
+        await api()
+          .delete(`${members(id)}/${member.id}`)
+          .set('authorization', await as('manager'))
+      ).status,
+    ).toBe(200)
+    expect(storage.userShares.has(`/Auditorias/${code}/Evidencias\x00luis`)).toBe(false)
+    expect(storage.userShares.has(`/Auditorias/${code}/Informes\x00luis`)).toBe(false)
+    // ana (líder) sigue con acceso: solo se revocó lo de luis
+    expect(storage.userShares.get(`/Auditorias/${code}/Evidencias\x00ana`)).toBe('READ_ONLY')
+    expect(storage.userShares.get(`/Auditorias/${code}/Informes\x00ana`)).toBe('EDIT')
   })
 })
 

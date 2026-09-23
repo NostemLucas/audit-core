@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { CLOCK, type Clock } from '../clock/index.js'
 import { ENV, type Env } from '../config/index.js'
 import { DomainError, PlatformErrors } from '../errors/index.js'
-import type { FileStoragePort, ReadShare, UploadedFile, UploadTarget } from './file-storage.port.js'
+import type { FileStoragePort, ReadShare, SharePermission, UploadedFile, UploadTarget } from './file-storage.port.js'
 
 /**
  * Adaptador real, por WebDAV (subir, crear carpetas) y la API OCS de *Files sharing* (compartir). Mismos bitmask de
@@ -18,6 +18,8 @@ import type { FileStoragePort, ReadShare, UploadedFile, UploadTarget } from './f
  */
 const PERMISSIONS = { READ_ONLY: 1, UPLOAD_ONLY: 7, EDIT: 15 } as const
 const SHARE_TYPE_PUBLIC_LINK = 3
+const SHARE_TYPE_USER = 0
+const PERMISSION_BITMASK: Record<SharePermission, number> = { READ_ONLY: PERMISSIONS.READ_ONLY, EDIT: PERMISSIONS.EDIT }
 
 @Injectable()
 export class NextcloudHttpClient implements FileStoragePort {
@@ -48,6 +50,32 @@ export class NextcloudHttpClient implements FileStoragePort {
   async createReadShare(path: string): Promise<ReadShare> {
     const share = await this.createShare(path, PERMISSIONS.READ_ONLY)
     return { url: share.url }
+  }
+
+  async shareWithUser(path: string, username: string, permission: SharePermission): Promise<void> {
+    await this.ensureFolder(path)
+    const body = new URLSearchParams({
+      path,
+      shareType: String(SHARE_TYPE_USER),
+      shareWith: username,
+      permissions: String(PERMISSION_BITMASK[permission]),
+    })
+    await this.request(`${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'ocs-apirequest': 'true' },
+      body,
+    })
+  }
+
+  async unshareUser(path: string, username: string): Promise<void> {
+    const shares = await this.listShares(path)
+    for (const share of shares) {
+      if (share.shareType !== SHARE_TYPE_USER || share.shareWith !== username) continue
+      await this.request(
+        `${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares/${share.id}?format=json`,
+        { method: 'DELETE' },
+      )
+    }
   }
 
   async ping(): Promise<void> {
@@ -85,6 +113,18 @@ export class NextcloudHttpClient implements FileStoragePort {
     if (!url)
       throw new DomainError(PlatformErrors.UPSTREAM_UNAVAILABLE, { service: 'nextcloud', reason: 'respuesta sin url' })
     return { url }
+  }
+
+  /** Los shares existentes sobre una ruta (para `unshareUser`: hay que borrar por id, la API no borra "por usuario"). */
+  private async listShares(path: string): Promise<Array<{ id: string; shareType: number; shareWith: string }>> {
+    const res = await this.request(
+      `${this.env.NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json&path=${encodeURIComponent(path)}`,
+      { method: 'GET' },
+    )
+    const json = (await res.json()) as {
+      ocs?: { data?: Array<{ id: string; share_type: number; share_with: string }> }
+    }
+    return (json.ocs?.data ?? []).map((d) => ({ id: d.id, shareType: d.share_type, shareWith: d.share_with }))
   }
 
   private davUrl(path: string): string {

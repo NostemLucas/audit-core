@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { FileStoragePort, ReadShare, UploadedFile, UploadTarget } from '../file-storage.port.js'
+import type { FileStoragePort, ReadShare, SharePermission, UploadedFile, UploadTarget } from '../file-storage.port.js'
 
 /**
  * Nextcloud en memoria, para las pruebas de integración de `evidence`/`reports` (docs/07 §3): no hay Nextcloud real en
@@ -11,6 +11,8 @@ export class FakeFileStorage implements FileStoragePort {
   readonly uploadTargets: string[] = []
   readonly uploaded: Array<{ path: string; content: Buffer; mimeType: string }> = []
   readonly readShares: string[] = []
+  /** Cada `shareWithUser` vigente: clave `path\0username`, para poder consultar y para que `unshareUser` la borre. */
+  readonly userShares = new Map<string, SharePermission>()
 
   async createUploadTarget(path: string): Promise<UploadTarget> {
     this.uploadTargets.push(path)
@@ -27,6 +29,14 @@ export class FakeFileStorage implements FileStoragePort {
     return { url: `https://nextcloud.test/s/read-${++this.sequence}` }
   }
 
+  async shareWithUser(path: string, username: string, permission: SharePermission): Promise<void> {
+    this.userShares.set(`${path}\0${username}`, permission)
+  }
+
+  async unshareUser(path: string, username: string): Promise<void> {
+    this.userShares.delete(`${path}\0${username}`)
+  }
+
   async ping(): Promise<void> {}
 
   /** Para el `beforeEach` de los tests de integración: `resetDb` vacía la BD, esto vacía lo que se recuerda aquí. */
@@ -35,5 +45,6 @@ export class FakeFileStorage implements FileStoragePort {
     this.uploadTargets.length = 0
     this.uploaded.length = 0
     this.readShares.length = 0
+    this.userShares.clear()
   }
 }

@@ -100,6 +100,31 @@ luego retira una evidencia, eso es parte de la historia del criterio). No se bor
 igual que el registro, es responsabilidad de quien administra el storage (fuera de alcance; ver §5) — si alguien lo
 borra allá más tarde, el webhook de §1.3 termina de sincronizar el metadato.
 
+### 1.5 Acceso persistente del equipo
+
+Los shares de 1.1/2 son de un solo uso — un link efímero, vence hoy (§1.1). Aparte de eso, el equipo de la auditoría
+tiene acceso PERSISTENTE, directo en Nextcloud, mientras sea miembro: cada usuario ya tiene su propia cuenta ahí
+(`User.username` = `preferred_username` de Authentik, "es el usuario de Nextcloud al compartir carpetas" — el campo lo
+decía desde `01`, solo que nadie lo usaba todavía para esto).
+
+Al agregarlo al equipo (`AddMemberUseCase`) se comparten dos carpetas RAÍZ con su usuario de Nextcloud (`shareType=0`,
+no un link — `FileStoragePort.shareWithUser`), sin vencer:
+
+- `/Auditorias/{code}/Evidencias` — **solo lectura**: ve TODA la evidencia de la auditoría (no una por una, como el
+  share de 1.1) para poder revisarla sin pasar por esta API. El candado real de qué se puede subir/editar lo sigue
+  imponiendo esta API (`EVIDENCE_LOCKED`, etc.) — Nextcloud solo se lo enseña, no lo deja tocar.
+- `/Auditorias/{code}/Informes` — **editable**: para abrirlos y trabajar en Nextcloud/OnlyOffice directo, sin pasar
+  por esta API cada vez (`§2`: "se edita después en OnlyOffice como cualquier otro documento").
+
+Al quitarlo del equipo (`RemoveMemberUseCase`) se revoca lo mismo (`unshareUser`): deja de ver ambas carpetas. Como la
+API OCS no tiene "borrar el share de este usuario" directo, `unshareUser` lista los shares de la ruta y borra por id
+solo los que son de ese usuario (`shareType=0` y `shareWith` coincide) — no toca los links efímeros de 1.1/§2, que son
+`shareType=3` y expiran solos.
+
+No cubre al manager si nunca se agrega como miembro del equipo (`isEligibleForTeam`/`isEligibleManager` son cosas
+distintas): tiene acceso completo vía esta API igual, pero no una carpeta compartida en Nextcloud a menos que también
+sea miembro — una ampliación posible, no construida en esta fase por no tener un pedido concreto todavía.
+
 ## 2. Informes
 
 **Plantilla docx + relleno de datos**, la misma técnica que el proyecto anterior (`docxtemplater` + `pizzip`,

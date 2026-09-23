@@ -21,6 +21,9 @@ export interface ReadShare {
   readonly url: string
 }
 
+/** `READ_ONLY`: ver y descargar. `EDIT`: además modificar — para la carpeta de informes, que el equipo trabaja en Nextcloud/OnlyOffice. */
+export type SharePermission = 'READ_ONLY' | 'EDIT'
+
 export interface FileStoragePort {
   /** Crea la carpeta si no existe (idempotente) y un share de solo-subida sobre ella. */
   createUploadTarget(path: string): Promise<UploadTarget>
@@ -28,6 +31,13 @@ export interface FileStoragePort {
   upload(path: string, content: Buffer, mimeType: string): Promise<UploadedFile>
   /** Un share de solo lectura sobre un archivo ya subido. */
   createReadShare(path: string): Promise<ReadShare>
+  /**
+   * Comparte una carpeta con UN usuario de Nextcloud (no un link — docs/07 §1.5), sin vencer: dura mientras sea
+   * miembro del equipo de la auditoría, se revoca con `unshareUser`. Crea la carpeta si no existe.
+   */
+  shareWithUser(path: string, username: string, permission: SharePermission): Promise<void>
+  /** Revoca lo que `shareWithUser` le dio a ese usuario sobre esa carpeta. Si no había nada que revocar, no es error. */
+  unshareUser(path: string, username: string): Promise<void>
   /** Para `/health/ready`: que el servidor responda, nada más. */
   ping(): Promise<void>
 }

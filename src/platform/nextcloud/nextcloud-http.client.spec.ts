@@ -164,6 +164,94 @@ describe('createReadShare', () => {
   })
 })
 
+describe('shareWithUser', () => {
+  it('crea la carpeta y comparte con shareType=0 (usuario), sin expireDate: no vence', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ url: String(url), init })
+        return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+      }),
+    )
+    await client.shareWithUser('/Auditorias/AUD-1/Informes', 'ana', 'EDIT')
+
+    const mkcols = calls.filter((c) => c.init.method === 'MKCOL')
+    expect(mkcols.at(-1)?.url).toBe(
+      'https://nextcloud.test/remote.php/dav/files/audit-core-test/Auditorias/AUD-1/Informes',
+    )
+    const share = calls.find((c) => c.init.method === 'POST')!
+    const params = new URLSearchParams(share.init.body as string)
+    expect(params.get('shareType')).toBe('0')
+    expect(params.get('shareWith')).toBe('ana')
+    expect(params.get('permissions')).toBe('15') // EDIT
+    expect(params.has('expireDate')).toBe(false)
+  })
+
+  it('READ_ONLY manda el bitmask 1', async () => {
+    let body: string | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (init.method === 'POST') body = init.body as string
+        return url.toString().includes('/ocs/') ? fakeResponse(200, { json: OCS_SHARE_OK }) : fakeResponse(201)
+      }),
+    )
+    await client.shareWithUser('/Auditorias/AUD-1/Evidencias', 'ana', 'READ_ONLY')
+    expect(new URLSearchParams(body).get('permissions')).toBe('1')
+  })
+})
+
+describe('unshareUser', () => {
+  it('lista los shares de la ruta y borra por id solo el del usuario dado (shareType=0)', async () => {
+    const listed = {
+      ocs: {
+        data: [
+          { id: '10', share_type: 0, share_with: 'ana' },
+          { id: '11', share_type: 0, share_with: 'luis' },
+          { id: '12', share_type: 3, share_with: '' }, // un link público sobre la misma ruta: no se toca
+        ],
+      },
+    }
+    const deletes: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (init.method === 'DELETE') {
+          deletes.push(String(url))
+          return fakeResponse(200)
+        }
+        return fakeResponse(200, { json: listed })
+      }),
+    )
+    await client.unshareUser('/Auditorias/AUD-1/Informes', 'ana')
+    expect(deletes).toEqual(['https://nextcloud.test/ocs/v2.php/apps/files_sharing/api/v1/shares/10?format=json'])
+  })
+
+  it('sin ningún share de ese usuario sobre la ruta: no borra nada, no es error', async () => {
+    let deleteCalled = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        if (init.method === 'DELETE') deleteCalled = true
+        return fakeResponse(200, { json: { ocs: { data: [] } } })
+      }),
+    )
+    await expect(client.unshareUser('/Auditorias/AUD-1/Informes', 'nadie')).resolves.toBeUndefined()
+    expect(deleteCalled).toBe(false)
+  })
+
+  it('un error de red al listar se traduce a UPSTREAM_UNAVAILABLE', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('ECONNREFUSED')
+      }),
+    )
+    await expect(client.unshareUser('/x', 'ana')).rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' })
+  })
+})
+
 describe('ping', () => {
   it('consulta `/status.php` SIN autenticación; 200 no lanza', async () => {
     let sawAuth = false
