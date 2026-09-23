@@ -3,7 +3,7 @@ import type { RawBodyRequest } from '@nestjs/common'
 import type { Request } from 'express'
 import { Public } from '../../../platform/authz/index.js'
 import { ENV, type Env } from '../../../platform/config/index.js'
-import { InjectTx, type Tx } from '../../../platform/db/index.js'
+import { DB, type Db } from '../../../platform/db/index.js'
 import { DomainError, PlatformErrors } from '../../../platform/errors/index.js'
 import { Responds } from '../../../platform/http/index.js'
 import { verifyWebhookSignature } from '../../../platform/nextcloud/index.js'
@@ -21,7 +21,7 @@ import { RegisterEvidenceUseCase } from './use-cases/register-evidence.use-case.
 export class NextcloudWebhookController {
   constructor(
     @Inject(ENV) private readonly env: Env,
-    @InjectTx() private readonly tx: Tx,
+    @Inject(DB) private readonly db: Db,
     private readonly registerUseCase: RegisterEvidenceUseCase,
   ) {}
 
@@ -42,8 +42,11 @@ export class NextcloudWebhookController {
       return await this.registerUseCase.execute(parsed.data)
     } catch (error) {
       // El mismo archivo entregado dos veces (reintento de Nextcloud) es éxito, no error: se trata como idempotente.
+      // Lectura simple (`db`, no `tx`): la transacción de registerUseCase ya se revirtió en este punto, no hay
+      // ninguna activa que esta lectura debiera ver (docs/02 §... regla de acceso a BD: InjectTx solo junto a
+      // @Transactional en métodos que escriben).
       if (error instanceof DomainError && error.code === AuditErrors.EVIDENCE_ALREADY_REGISTERED.code) {
-        return await findEvidenceByStorageFileId(this.tx, parsed.data.fileId)
+        return await findEvidenceByStorageFileId(this.db, parsed.data.fileId)
       }
       throw error
     }
