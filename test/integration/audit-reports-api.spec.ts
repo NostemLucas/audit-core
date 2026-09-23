@@ -57,12 +57,20 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
   it('el contenido del .docx refleja el estado REAL de la auditoría: los mismos números que /results y /gaps', async () => {
     const ctx = await startedAudit(t)
     const roles = await db.evaluation.findFirstOrThrow({ where: { auditId: ctx.auditId, control: { title: 'Roles' } } })
+    const politicas = await db.evaluation.findFirstOrThrow({
+      where: { auditId: ctx.auditId, control: { title: 'Políticas' } },
+    })
     const parcial = ctx.lib.scale.levels.find((l) => l.label === 'Parcial')!
+    const cumple = ctx.lib.scale.levels.find((l) => l.label === 'Cumple')!
     const ana = await as('auditor', 'ana')
     await api()
       .patch(`${A}/${ctx.auditId}/evaluations/${roles.id}`)
       .set('authorization', ana)
       .send({ achievedLevelId: parcial.id, findings: 'Cubre solo la mitad', severity: 'MINOR', version: roles.version })
+    await api()
+      .patch(`${A}/${ctx.auditId}/evaluations/${politicas.id}`)
+      .set('authorization', ana)
+      .send({ achievedLevelId: cumple.id, version: politicas.version })
 
     const [resultsRes, gapsRes, reportRes] = await Promise.all([
       api()
@@ -90,6 +98,14 @@ describe('generar un informe (POST /audits/:id/reports)', () => {
     expect(xml).toContain('Cubre solo la mitad')
     expect(xml).toContain(gap.expectedLevel.label)
     expect(xml).toContain(gap.achievedLevel.label)
+
+    // catálogo de controles: TODA la estructura, incluidos agrupadores (p. ej. "Selección", que no es evaluable)
+    expect(xml).toContain('Organizacionales / A.5.1 Políticas — nivel 1 (evaluable)')
+    expect(xml).toContain('Personas / — Selección — nivel 1 (agrupador)')
+
+    // todos los resultados: Roles (por debajo) Y Políticas (cumple), no solo lo que falló como en "gaps"
+    expect(xml).toContain('Organizacionales / A.5.2 Roles: esperado Cumple, alcanzado Parcial (no cumple)')
+    expect(xml).toContain('Organizacionales / A.5.1 Políticas: esperado Cumple, alcanzado Cumple (cumple)')
   })
 
   it('el gráfico embebido es un PNG real, del tamaño que declara la plantilla y con color (no el marcador en blanco)', async () => {

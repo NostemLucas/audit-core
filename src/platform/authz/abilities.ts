@@ -21,6 +21,7 @@ export const SUBJECTS = [
   'Evaluation',
   'Evidence',
   'Report',
+  'ReportTemplate', // el .docx personalizado por tipo de informe (docs/07 §2), no el informe generado
   'Dashboard',
 ] as const
 export type Subject = (typeof SUBJECTS)[number] | 'all'
@@ -42,13 +43,13 @@ interface Grant {
  */
 const GRANTS: Readonly<Record<Role, readonly Grant[]>> = {
   ADMIN: [
-    { actions: ['manage'], subjects: ['User', 'Organization', 'Template', 'Scale'] },
+    { actions: ['manage'], subjects: ['User', 'Organization', 'Template', 'Scale', 'ReportTemplate'] },
     { actions: ['read'], subjects: ['Audit', 'AuditMember', 'Evaluation', 'Evidence', 'Report', 'Dashboard'] },
   ],
 
   GERENTE: [
     { actions: ['manage'], subjects: ['Audit', 'AuditMember', 'Evaluation', 'Evidence', 'Report'] },
-    { actions: ['manage'], subjects: ['Template', 'Scale', 'Organization'] },
+    { actions: ['manage'], subjects: ['Template', 'Scale', 'Organization', 'ReportTemplate'] },
     { actions: ['read'], subjects: ['User', 'Dashboard'] },
   ],
 

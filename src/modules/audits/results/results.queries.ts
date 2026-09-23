@@ -54,3 +54,33 @@ export function countBySeverity(
   for (const gap of gaps) if (gap.severity) counts[gap.severity] += 1
   return counts
 }
+
+/**
+ * TODAS las hojas evaluadas (aplicables, con nivel alcanzado y esperado), en orden de lectura, con su resultado
+ * completo — a diferencia de `computeGapViews`, que solo trae las que quedaron por debajo. Para un catálogo de
+ * informe con "todos los resultados", no solo los fallos (docs/07 §2).
+ */
+export function computeResultViews(rows: readonly ResultRow[], template: TemplateForAudit) {
+  const leaves = toScoredLeaves(rows, template)
+  const gapById = new Map(rows.map((row, index) => [row.id, leafGap(leaves[index]!)] as const))
+  return toEvaluationViews(
+    rows.filter((row) => gapById.get(row.id) !== null),
+    template,
+  ).map((view) => ({ ...view, meetsExpected: gapById.get(view.id)! >= 0 }))
+}
+
+/**
+ * TODOS los nodos de la plantilla (dominios, agrupadores y hojas), en orden de lectura — solo estructura, sin datos
+ * de evaluación: para un informe que necesita mostrar la jerarquía completa (con o sin agrupadores), no un resultado
+ * (docs/07 §2). Única fuente: el mismo árbol que usa el resto del sistema (`TemplateForAudit.tree`).
+ */
+export function computeControlViews(template: TemplateForAudit) {
+  const { tree } = template
+  return tree.readingOrder().map((node) => ({
+    domain: tree.rootOf(node.id).title,
+    reference: node.reference,
+    title: node.title,
+    depth: tree.depthOf(node.id),
+    isLeaf: tree.isLeaf(node.id),
+  }))
+}

@@ -12,9 +12,16 @@ import { computeResults } from '../../domain/scoring.js'
 import { SEVERITY_LABELS } from '../../messages.es.js'
 import { findEvaluations } from '../../evaluation/evaluation.queries.js'
 import { accessOf, loadAuditView } from '../../infrastructure/audit.queries.js'
-import { computeGapViews, countBySeverity, toScoredLeaves } from '../../results/results.queries.js'
+import {
+  computeControlViews,
+  computeGapViews,
+  computeResultViews,
+  countBySeverity,
+  toScoredLeaves,
+} from '../../results/results.queries.js'
 import { renderChartPng } from '../chart-renderer.js'
 import { buildDomainChartSvg } from '../domain-chart.js'
+import { findReportTemplate } from '../report-template.queries.js'
 import { loadReport } from '../reports.queries.js'
 import { renderReport } from '../report-renderer.js'
 import { loadDefaultTemplate } from '../report.template.js'
@@ -60,10 +67,11 @@ export class GenerateReportUseCase {
     }))
     const scaleMax = Math.max(...scale.levels.map((level) => level.value))
     const chartPng = await renderChartPng(buildDomainChartSvg(domains, scaleMax))
+    const customTemplate = await findReportTemplate(this.tx, input.type, scale.dimension)
 
     const title = input.title ?? audit.name
     const buffer = renderReport(
-      loadDefaultTemplate(),
+      customTemplate ?? loadDefaultTemplate(),
       {
         auditCode: audit.code,
         auditName: audit.name,
@@ -86,6 +94,17 @@ export class GenerateReportUseCase {
           achievedLabel: gap.achievedLevel?.label ?? null,
           findings: gap.findings,
           severity: gap.severity ? SEVERITY_LABELS[gap.severity] : null,
+        })),
+        controls: computeControlViews(template),
+        results: computeResultViews(rows, template).map((result) => ({
+          domain: result.control.domain,
+          reference: result.control.reference,
+          title: result.control.title,
+          expectedLabel: result.expectedLevel?.label ?? null,
+          achievedLabel: result.achievedLevel?.label ?? null,
+          meetsExpected: result.meetsExpected,
+          severity: result.severity ? SEVERITY_LABELS[result.severity] : null,
+          findings: result.findings,
         })),
       },
       chartPng,

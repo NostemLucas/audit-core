@@ -156,6 +156,7 @@ si aplica, `targetUserId` y el id de lo que cambia (`evaluationId`, `memberId`, 
 | **3i** (hecho) | Conteo de hallazgos por gravedad en el informe (docs/07 §2) |
 | **3j** (hecho) | `GET .../evaluations/:evaluationId/previous`: resultado anterior de un criterio en un seguimiento (§9) |
 | **3k** (hecho) | Gráfico embebido en el informe: nivel esperado vs. alcanzado por dominio (docs/07 §2) |
+| **3l** (hecho) | Catálogo de datos ampliado (`controls[]`, `results[]`) y plantilla de informe editable por tipo (`ReportTemplate`, docs/07 §2.1) |
 
 La **evidencia** (subir archivos, Nextcloud) y los **informes** son la Fase 4. La regla de evidencia de §3 se aplica contando los
 registros de evidencia; hasta la Fase 4 no hay forma real de crearlos (las pruebas los insertan directamente).

@@ -67,6 +67,14 @@ const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     ${paragraph('{#gaps}')}
     ${paragraph('[{severity}] {domain} / {reference} {title}: esperado {expectedLabel}, alcanzado {achievedLabel}. {findings}')}
     ${paragraph('{/gaps}')}
+    ${paragraph('Todos los resultados', 'Heading1')}
+    ${paragraph('{#results}')}
+    ${paragraph('[{severity}] {domain} / {reference} {title}: esperado {expectedLabel}, alcanzado {achievedLabel} ({#meetsExpected}cumple{/meetsExpected}{^meetsExpected}no cumple{/meetsExpected}). {findings}')}
+    ${paragraph('{/results}')}
+    ${paragraph('Catálogo de controles', 'Heading1')}
+    ${paragraph('{#controls}')}
+    ${paragraph('{domain} / {reference} {title} — nivel {depth} ({#isLeaf}evaluable{/isLeaf}{^isLeaf}agrupador{/isLeaf})')}
+    ${paragraph('{/controls}')}
     <w:sectPr/>
   </w:body>
 </w:document>`

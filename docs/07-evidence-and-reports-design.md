@@ -112,7 +112,18 @@ notación de punto**:
 {majorCount} {minorCount} {observationCount}
 {#domains} {title} {averageExpected} {averageAchieved} {gap} {/domains}
 {#gaps} {severity} {domain} {reference} {title} {expectedLabel} {achievedLabel} {findings} {/gaps}
+{#controls} {domain} {reference} {title} {depth} {#isLeaf}…{/isLeaf}{^isLeaf}…{/isLeaf} {/controls}
+{#results} {domain} {reference} {title} {expectedLabel} {achievedLabel} {#meetsExpected}…{/meetsExpected}{^meetsExpected}…{/meetsExpected} {severity} {findings} {/results}
 ```
+
+**Catálogo, de más agregado a más detallado** (decidido 2026-09-23, a pedido del usuario: "el peor problema de los
+informes es el formato y los snippets"): `domains[]` (promedio por dominio) → `controls[]` (TODOS los nodos —
+dominios, agrupadores y hojas — solo estructura, sin datos de evaluación: para mostrar jerarquía y a qué dominio
+pertenece cada uno) → `results[]` (TODAS las hojas evaluadas con su resultado completo, cumplan o no — a diferencia
+de `gaps[]`, que solo trae las que fallaron) → `gaps[]` (solo lo que quedó por debajo). Cada plantilla usa la
+combinación de bucles/marcadores que necesite; `{#tag}`/`{^tag}` de `docxtemplater` sirve como bucle O como
+condicional según el tipo del valor (`isLeaf`, `meetsExpected` son booleanos: úsalos para si/no dentro del bucle, sin
+necesitar dos colecciones separadas para "todo" vs. "solo lo evaluable").
 
 **Se probó, no se asumió, y se encontró un error real: `docxtemplater` (sin módulos de pago) no entra a un objeto
 anidado.** `{overall.evaluated}` no significa "el campo `evaluated` de `overall`": busca la clave literal
@@ -164,6 +175,41 @@ real de cada uno.
 - **Verificado abriendo el documento de verdad**, no solo generándolo: `soffice --headless --convert-to pdf` sobre un
   informe con datos reales confirma que LibreOffice (y por transitividad, Word) acepta el XML de la imagen y la
   muestra correctamente — la misma disciplina que ya encontró el bug de `docxtemplater` con notación de punto (`4c`).
+
+### 2.1 Plantilla editable por tipo de informe (`ReportTemplate`, decidido 2026-09-23)
+
+Cada organización puede reemplazar la plantilla de fábrica **por `ReportType`** (COMPLIANCE, GAP_ANALYSIS…) y,
+opcionalmente, por **dimensión de escala** (CONFORMITY/MATURITY) — la más específica gana:
+
+1. `(type, dimension)` exacto.
+2. `(type, dimension: null)` — el "comodín": aplica a cualquier dimensión de ese tipo.
+3. La plantilla de fábrica compilada en el código, si no hay ninguna de las dos anteriores.
+
+**`ReportTemplate` guarda los bytes del `.docx` en la BD, no en Nextcloud**: es configuración del sistema (chica,
+poco frecuente), no evidencia de una auditoría — no tiene sentido inventarle una ruta de Nextcloud. Un índice único
+normal cubre `(type, dimension)` cuando se indica una dimensión; el comodín (`dimension: null`) necesita un índice
+único PARCIAL a mano (Postgres no considera dos `NULL` iguales, así que un `UNIQUE(type, dimension)` normal no
+bloquea un segundo comodín del mismo tipo) — mismo patrón que `audit_members_one_lead`.
+
+**Se valida ANTES de guardar, no al generar** (`report-template-validation.ts`): renderiza el `.docx` subido con
+datos de prueba que ejercitan TODO el catálogo (ningún campo de esos datos es legítimamente `null`) usando un
+`nullGetter` propio que, en vez de escribir "—", ANOTA el nombre del marcador que lo llamó — como ninguno debería
+llamarse nunca con datos completos, cualquier llamada es, por descarte, un marcador mal escrito o que no corresponde
+a ningún campo. Así se detecta al SUBIR el typo que en la fase 4c solo se encontró inspeccionando un informe real
+(`REPORT_TEMPLATE_INVALID`, con el nombre exacto del marcador en `details.markers`). Si el `.docx` es válido pero no
+trae `word/media/chart1.png` (el marcador de imagen del gráfico), se guarda igual, con un aviso: una plantilla sin
+gráfico es válida, solo no lo mostrará.
+
+**Permisos**: lo administra el GERENTE (como el resto de la biblioteca de contenido — plantillas de controles,
+escalas, textos predefinidos), o el ADMIN (que administra catálogos de plataforma); un AUDITOR no lo ve ni lo
+administra. Subir un `.docx` distinto para el mismo `(type, dimension)` REEMPLAZA al anterior — no se versiona
+(decisión ya tomada aparte: el versionado de contenido no es para este proyecto).
+
+`GenerateReportUseCase` resuelve la plantilla ANTES de renderizar (`findReportTemplate`, `report-template.queries.ts`)
+usando la dimensión de la ESCALA de la auditoría (no un campo "tipo de auditoría": no existe tal cosa en el modelo).
+`API`: `POST /report-templates?type=&dimension=` (multipart `file`), `GET /report-templates` (lista),
+`GET /report-templates/:id` (descarga los bytes tal cual, para editar y volver a subir), `DELETE /report-templates/:id`
+(vuelve a la de fábrica).
 
 ## 3. El puerto (`FileStoragePort`)
 

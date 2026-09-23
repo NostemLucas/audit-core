@@ -8,7 +8,7 @@ const can = (roles: Role[], action: Action, subject: Subject) => defineAbilityFo
 
 describe('permisos globales por rol', () => {
   it('ADMIN administra la PLATAFORMA (usuarios, organizaciones, biblioteca): todas las acciones', () => {
-    for (const subject of ['User', 'Organization', 'Template', 'Scale'] as const) {
+    for (const subject of ['User', 'Organization', 'Template', 'Scale', 'ReportTemplate'] as const) {
       for (const action of ACTIONS) expect(can(['ADMIN'], action, subject), `${action} ${subject}`).toBe(true)
     }
   })
@@ -38,6 +38,7 @@ describe('permisos globales por rol', () => {
       'Template',
       'Scale',
       'Organization',
+      'ReportTemplate',
     ] as const) {
       for (const action of ACTIONS) expect(can(['GERENTE'], action, subject), `${action} ${subject}`).toBe(true)
     }
@@ -79,6 +80,7 @@ describe('permisos globales por rol', () => {
     }
     expect(can(['AUDITOR'], 'read', 'Organization')).toBe(false)
     expect(can(['AUDITOR'], 'read', 'User')).toBe(false)
+    expect(can(['AUDITOR'], 'read', 'ReportTemplate')).toBe(false)
   })
 
   it('el equipo lo arma el manager (GERENTE): el AUDITOR solo lo ve, aunque sea el líder', () => {

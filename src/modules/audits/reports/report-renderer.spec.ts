@@ -28,6 +28,22 @@ const DATA: ReportData = {
       severity: 'No conformidad menor',
     },
   ],
+  controls: [
+    { domain: 'Organizacionales', reference: 'A.5', title: 'Organizacionales', depth: 0, isLeaf: false },
+    { domain: 'Organizacionales', reference: 'A.5.2', title: 'Roles', depth: 1, isLeaf: true },
+  ],
+  results: [
+    {
+      domain: 'Organizacionales',
+      reference: 'A.5.2',
+      title: 'Roles',
+      expectedLabel: 'Cumple',
+      achievedLabel: 'Parcial',
+      meetsExpected: false,
+      severity: 'No conformidad menor',
+      findings: 'Cubre la mitad',
+    },
+  ],
 }
 
 /** Ningún marcador (`{...}`) sobrevive, y `docxtemplater` nunca escribió su "undefined" por defecto (docs/07 §2). */
@@ -90,8 +106,43 @@ describe('renderReport', () => {
     expect(xml).toContain('[—] Personas / — Antecedentes: esperado Cumple, alcanzado No cumple. No existe')
   })
 
+  it('el bucle de resultados trae TODO lo evaluado, cumpla o no (a diferencia de gaps, que solo trae los fallos)', async () => {
+    const buffer = renderReport(loadDefaultTemplate(), {
+      ...DATA,
+      results: [
+        ...DATA.results,
+        {
+          domain: 'Organizacionales',
+          reference: 'A.5.1',
+          title: 'Políticas',
+          expectedLabel: 'Cumple',
+          achievedLabel: 'Cumple',
+          meetsExpected: true,
+          severity: null,
+          findings: null,
+        },
+      ],
+    })
+    const { default: PizZip } = await import('pizzip')
+    const xml = new PizZip(buffer).file('word/document.xml')!.asText()
+    assertFullySubstituted(xml)
+    expect(xml).toContain(
+      '[No conformidad menor] Organizacionales / A.5.2 Roles: esperado Cumple, alcanzado Parcial (no cumple). Cubre la mitad',
+    )
+    expect(xml).toContain('[—] Organizacionales / A.5.1 Políticas: esperado Cumple, alcanzado Cumple (cumple). —')
+  })
+
+  it('el bucle de controles trae la estructura completa (agrupadores y hojas), sin datos de evaluación', async () => {
+    const buffer = renderReport(loadDefaultTemplate(), DATA)
+    const { default: PizZip } = await import('pizzip')
+    const xml = new PizZip(buffer).file('word/document.xml')!.asText()
+    assertFullySubstituted(xml)
+    expect(xml).toContain('Organizacionales / A.5 Organizacionales — nivel 0 (agrupador)')
+    expect(xml).toContain('Organizacionales / A.5.2 Roles — nivel 1 (evaluable)')
+  })
+
   it('sin dominios ni brechas, los bucles quedan vacíos: nada de "undefined" ni de marcadores sueltos', async () => {
-    const buffer = renderReport(loadDefaultTemplate(), { ...DATA, domains: [], gaps: [] })
+    const buffer = renderReport(loadDefaultTemplate(), { ...DATA, domains: [], gaps: [], controls: [], results: [] })
     const { default: PizZip } = await import('pizzip')
     const xml = new PizZip(buffer).file('word/document.xml')!.asText()
     assertFullySubstituted(xml)

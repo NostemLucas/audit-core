@@ -29,6 +29,9 @@ const UNMAPPED_UNIQUES: Readonly<Record<string, string>> = {
   evaluations_auditId_controlId_key: 'las evaluaciones las crea el inicializador de la auditoría; un choque es un bug',
   suggested_findings_controlId_levelId_key: 'siempre se escribe con upsert; un choque es un bug',
   reports_storageFileId_key: 'el archivo lo genera y sube el propio sistema; un choque es un bug',
+  report_templates_type_dimension_key:
+    'operación de administración, muy poco frecuente; una carrera real (dos subidas a la vez para el mismo tipo) cae como 409 genérico, no 500',
+  report_templates_one_wildcard: 'mismo caso que report_templates_type_dimension_key, para el comodín (dimension null)',
 }
 
 describe('catálogo de errores', () => {

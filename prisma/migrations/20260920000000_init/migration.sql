@@ -228,6 +228,20 @@ CREATE TABLE "reports" (
 );
 
 -- CreateTable
+CREATE TABLE "report_templates" (
+    "id" UUID NOT NULL,
+    "type" "ReportType" NOT NULL,
+    "dimension" "ScaleDimension",
+    "content" BYTEA NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
+    "createdById" UUID,
+    "updatedById" UUID,
+
+    CONSTRAINT "report_templates_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "audit_events" (
     "id" UUID NOT NULL,
     "auditId" UUID NOT NULL,
@@ -321,6 +335,9 @@ CREATE UNIQUE INDEX "reports_storageFileId_key" ON "reports"("storageFileId");
 CREATE INDEX "reports_auditId_createdAt_idx" ON "reports"("auditId", "createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "report_templates_type_dimension_key" ON "report_templates"("type", "dimension");
+
+-- CreateIndex
 CREATE INDEX "audit_events_auditId_createdAt_idx" ON "audit_events"("auditId", "createdAt");
 
 -- CreateIndex
@@ -404,6 +421,7 @@ ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_actorId_fkey" FOREIGN KE
 -- AddForeignKey
 ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_targetUserId_fkey" FOREIGN KEY ("targetUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- Objetos que Prisma no modela (fuente única de estas reglas de integridad).
 -- Cualquier cambio a estos objetos se hace en una migración nueva, a mano.
@@ -454,3 +472,7 @@ ALTER TABLE "evidences"
 -- audit_events
 ALTER TABLE "audit_events"
   ADD CONSTRAINT "audit_events_payload_object" CHECK (jsonb_typeof("payload") = 'object');
+
+-- report_templates: UN SOLO comodín (dimension = null) por tipo — Postgres no aplica UNIQUE(type, dimension) a dos
+-- filas con dimension NULL (NULL nunca es "igual" a NULL). Índice único parcial, mismo patrón que audit_members_one_lead.
+CREATE UNIQUE INDEX "report_templates_one_wildcard" ON "report_templates"("type") WHERE "dimension" IS NULL;

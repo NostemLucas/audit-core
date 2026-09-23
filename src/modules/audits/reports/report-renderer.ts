@@ -40,6 +40,27 @@ export interface ReportData {
     /** Ya traducida (docs/06 §3): `null` cuando no se clasificó (siempre el caso en capacidad, opcional en conformidad). */
     readonly severity: string | null
   }>
+  /** TODOS los nodos de la plantilla (dominios, agrupadores y hojas): solo estructura, sin datos de evaluación. Para
+   *  una plantilla que necesite mostrar la jerarquía completa (docs/07 §2). */
+  readonly controls: ReadonlyArray<{
+    readonly domain: string
+    readonly reference: string | null
+    readonly title: string
+    readonly depth: number
+    readonly isLeaf: boolean
+  }>
+  /** TODAS las hojas evaluadas (no solo las que quedaron por debajo, a diferencia de `gaps`): un catálogo de
+   *  resultados completo (docs/07 §2). */
+  readonly results: ReadonlyArray<{
+    readonly domain: string
+    readonly reference: string | null
+    readonly title: string
+    readonly expectedLabel: string | null
+    readonly achievedLabel: string | null
+    readonly meetsExpected: boolean
+    readonly severity: string | null
+    readonly findings: string | null
+  }>
 }
 
 /**

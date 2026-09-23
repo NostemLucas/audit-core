@@ -450,6 +450,28 @@ model Report {
   @@map("reports")
 }
 
+/// Plantilla `.docx` personalizada del informe, por tipo (docs/07 §2). NO vive en Nextcloud (no es evidencia de una
+/// auditoría: es configuración del sistema, chica y poco frecuente) — se guarda como bytes aquí mismo. `dimension`
+/// null = comodín (aplica a cualquier dimensión de escala para ese tipo); con valor = solo esa dimensión. Al generar
+/// un informe gana la más específica: (type, dimension exacto) > (type, comodín) > la plantilla de fábrica.
+/// Subir reemplaza (no versiona): un caso de uso hace upsert por (type, dimension).
+model ReportTemplate {
+  id        String          @id @default(uuid(7)) @db.Uuid
+  type      ReportType
+  dimension ScaleDimension?
+  content   Bytes
+
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  createdById String?  @db.Uuid
+  updatedById String?  @db.Uuid
+
+  /// Solo cubre el caso `dimension` NO nula (Postgres no considera dos NULL iguales); el comodín (dimension = null)
+  /// se garantiza único con un índice parcial a mano (bloque final de la migración inicial).
+  @@unique([type, dimension])
+  @@map("report_templates")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Historial
 // ─────────────────────────────────────────────────────────────────────────────

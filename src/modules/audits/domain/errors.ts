@@ -115,4 +115,9 @@ export const AuditErrors = defineErrors({
   // ── Informes ───────────────────────────────────────────────────────────────
   REPORT_NOT_FOUND: { http: 404, message: 'Informe no encontrado' },
   REPORT_GENERATION_FAILED: { http: 502, message: 'No se pudo generar el informe' },
+
+  // ── Plantillas de informe (docs/07 §2) ──────────────────────────────────────
+  REPORT_TEMPLATE_NOT_FOUND: { http: 404, message: 'Plantilla de informe no encontrada' },
+  /** El .docx no es válido, o al rellenarlo con datos de prueba queda algún marcador sin resolver o el texto "undefined". */
+  REPORT_TEMPLATE_INVALID: { http: 422, message: 'La plantilla no es un .docx válido para generar informes' },
 })
