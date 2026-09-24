@@ -15,10 +15,12 @@ import { accessOf, loadAuditForUpdate } from './audit.queries.js'
  *     toda transición: serializa contra `CloseAudit` y evita el deadlock con el `FOR KEY SHARE` de `audit_events`.
  *  2. Carga el estado completo que el decider necesita (criterio, acceso, escala, evidencia, título del control).
  *  3. Decide (puro).
- *  4. Escribe con compare-and-swap sobre la VERSIÓN leída — no solo el estado: si el contenido cambió entre la
- *     lectura y la escritura, lo copiado en el evento ya no sería lo que se aprobó. Con el candado del paso 1 no
- *     debería perderse nunca; si pasa, es `VERSION_CONFLICT` y quien llama relee — nunca un éxito sin escritura.
- *  5. Publica el evento de la decisión, en la misma transacción.
+ *  4. Escribe con compare-and-swap sobre la VERSIÓN — la leída acá, o la que mandó el cliente si el comando expone
+ *     bloqueo optimista (`options.expectedVersion`, editar contenido — docs/06 §10). No solo el estado: si el
+ *     contenido cambió entre la lectura y la escritura, lo copiado en el evento ya no sería lo que se aprobó. Con el
+ *     candado del paso 1 no debería perderse nunca (salvo con `expectedVersion` de un cliente con una copia vieja);
+ *     si pasa, es `VERSION_CONFLICT` y quien llama relee — nunca un éxito sin escritura.
+ *  5. Publica el evento de la decisión, si el comando anunció alguno (editar contenido sin arrancar no anuncia nada).
  *
  * Quien llama pone `@Transactional()`: el store no abre transacciones, participa de la del caso de uso.
  */
@@ -35,6 +37,11 @@ export class EvaluationStore {
     auditId: string,
     evaluationId: string,
     decide: (state: EvaluationState) => EvaluationDecision,
+    options: {
+      /** Versión que mandó el CLIENTE (docs/06 §10): si se da, el CAS es contra ESA, no la que se acaba de leer —
+       * lo usan los comandos que exponen bloqueo optimista al cliente (editar contenido), no los de revisión. */
+      expectedVersion?: number
+    } = {},
   ) {
     const audit = await loadAuditForUpdate(this.tx, auditId)
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
@@ -65,16 +72,18 @@ export class EvaluationStore {
         minimum: scale.levels[0]!.value,
         expected: valueOf(evaluation.expectedLevelId)?.value ?? null,
         achieved: valueOf(evaluation.achievedLevelId),
+        levels: scale.levels,
       },
       evidence,
     })
 
+    const expected = options.expectedVersion ?? evaluation.version
     const { count } = await this.tx.evaluation.updateMany({
-      where: { id: evaluationId, version: evaluation.version },
+      where: { id: evaluationId, version: expected },
       data: { ...patch, status: to },
     })
-    if (count === 0) throw versionConflict('Evaluation', evaluationId, evaluation.version)
-    await this.events.publish(event.def, event.payload)
+    if (count === 0) throw versionConflict('Evaluation', evaluationId, expected)
+    if (event) await this.events.publish(event.def, event.payload)
 
     return { row: await loadEvaluation(this.tx, auditId, evaluationId), template }
   }

@@ -7,10 +7,17 @@ import {
   type EvaluationState,
   reopenEvaluation,
   returnEvaluation,
+  updateEvaluationContent,
 } from './evaluation.decider.js'
 
 const ANA: Actor = { id: 'ana', roles: ['AUDITOR'] } // la auditora asignada (MEMBER)
 const LIDER: Actor = { id: 'lider', roles: ['AUDITOR'] }
+
+const LEVELS = [
+  { id: 'no-cumple', value: 0, label: 'No cumple' },
+  { id: 'parcial', value: 50, label: 'Parcial' },
+  { id: 'cumple', value: 100, label: 'Cumple' },
+]
 
 /** Un criterio en curso, asignado a Ana, que ya cumple todo para enviarse (conformidad, alcanzó lo esperado). */
 const state = (over: Partial<EvaluationState> = {}, actor: Actor = ANA): EvaluationState => ({
@@ -29,7 +36,13 @@ const state = (over: Partial<EvaluationState> = {}, actor: Actor = ANA): Evaluat
     severity: null,
     notes: 'nota',
   },
-  scale: { dimension: 'CONFORMITY', minimum: 0, expected: 100, achieved: { value: 100, label: 'Cumple' } },
+  scale: {
+    dimension: 'CONFORMITY',
+    minimum: 0,
+    expected: 100,
+    achieved: { value: 100, label: 'Cumple' },
+    levels: LEVELS,
+  },
   evidence: [{ id: 'e-1', title: 'Acta' }],
   ...over,
 })
@@ -39,8 +52,8 @@ describe('completeEvaluation (el auditor envía a revisión)', () => {
     const decision = completeEvaluation(state(), ANA)
     expect(decision.to).toBe('COMPLETED')
     expect(decision.patch).toEqual({})
-    expect(decision.event.def.name).toBe('EvaluationCompleted')
-    expect(decision.event.payload).toMatchObject({
+    expect(decision.event!.def.name).toBe('EvaluationCompleted')
+    expect(decision.event!.payload).toMatchObject({
       auditId: 'audit-1',
       evaluationId: 'ev-1',
       controlTitle: 'Roles',
@@ -72,7 +85,13 @@ describe('completeEvaluation (el auditor envía a revisión)', () => {
 
   it('por debajo de lo esperado en conformidad exige hallazgo y gravedad; por encima del mínimo, evidencia', () => {
     const below = state({
-      scale: { dimension: 'CONFORMITY', minimum: 0, expected: 100, achieved: { value: 50, label: 'Parcial' } },
+      scale: {
+        dimension: 'CONFORMITY',
+        minimum: 0,
+        expected: 100,
+        achieved: { value: 50, label: 'Parcial' },
+        levels: LEVELS,
+      },
       evidence: [],
     })
     expect(() => completeEvaluation(below, ANA)).toThrow(
@@ -86,7 +105,7 @@ describe('completeEvaluation (el auditor envía a revisión)', () => {
   it('"no aplica" con motivo se envía sin nivel ni evidencia', () => {
     const na = state({
       content: { ...state().content, achievedLevelId: null, isNotApplicable: true, notApplicableReason: 'Sin sedes' },
-      scale: { dimension: 'CONFORMITY', minimum: 0, expected: 100, achieved: null },
+      scale: { dimension: 'CONFORMITY', minimum: 0, expected: 100, achieved: null, levels: LEVELS },
       evidence: [],
     })
     expect(completeEvaluation(na, ANA).to).toBe('COMPLETED')
@@ -104,14 +123,14 @@ describe('acciones del líder', () => {
     const decision = approveEvaluation(sent(), LIDER, { comments: null, requiresFollowUp: true })
     expect(decision.to).toBe('APPROVED')
     expect(decision.patch).toEqual({ requiresFollowUp: true })
-    expect(decision.event.def.name).toBe('EvaluationApproved')
-    expect(decision.event.payload).toMatchObject({ comments: null, requiresFollowUp: true, controlTitle: 'Roles' })
+    expect(decision.event!.def.name).toBe('EvaluationApproved')
+    expect(decision.event!.payload).toMatchObject({ comments: null, requiresFollowUp: true, controlTitle: 'Roles' })
   })
 
   it('devolver: RETURNED con el comentario en el evento', () => {
     const decision = returnEvaluation(sent(), LIDER, { comments: 'Falta el acta firmada' })
     expect(decision.to).toBe('RETURNED')
-    expect(decision.event.payload).toMatchObject({ comments: 'Falta el acta firmada' })
+    expect(decision.event!.payload).toMatchObject({ comments: 'Falta el acta firmada' })
   })
 
   it('reabrir: solo desde APPROVED, y deja de ser un traslado (carriedFromId = null)', () => {
@@ -138,5 +157,62 @@ describe('acciones del líder', () => {
     expect(() => act(sent({ access: { managerId: 'gerente', memberRole: null } }), manager)).toThrow(
       expect.objectContaining({ code: 'AUDIT_ACCESS_DENIED' }),
     )
+  })
+})
+
+describe('updateEvaluationContent (el auditor edita)', () => {
+  it('el primer envío arranca el criterio y anuncia EvaluationStarted', () => {
+    const decision = updateEvaluationContent(state({ status: 'NOT_STARTED' }), ANA, { notes: 'en curso' })
+    expect(decision.to).toBe('IN_PROGRESS')
+    expect(decision.patch).toEqual({ notes: 'en curso' })
+    expect(decision.event!.def.name).toBe('EvaluationStarted')
+  })
+
+  it('editar sin arrancar (ya IN_PROGRESS o RETURNED) no cambia el estado ni anuncia nada', () => {
+    const decision = updateEvaluationContent(state({ status: 'IN_PROGRESS' }), ANA, { notes: 'actualizado' })
+    expect(decision.to).toBe('IN_PROGRESS')
+    expect(decision.event).toBeUndefined()
+    expect(updateEvaluationContent(state({ status: 'RETURNED' }), ANA, { notes: 'x' }).to).toBe('RETURNED')
+  })
+
+  it('enviado a revisión o aprobado no se edita: EVALUATION_NOT_EDITABLE', () => {
+    for (const status of ['COMPLETED', 'APPROVED'] as const) {
+      expect(() => updateEvaluationContent(state({ status }), ANA, { notes: 'x' })).toThrow(
+        expect.objectContaining({ code: 'EVALUATION_NOT_EDITABLE' }),
+      )
+    }
+  })
+
+  it('solo el auditor asignado edita; auditoría fuera de curso, tampoco', () => {
+    expect(() => updateEvaluationContent(state({ assignedUserId: 'otro' }), ANA, { notes: 'x' })).toThrow(
+      expect.objectContaining({ code: 'AUDIT_ACCESS_DENIED' }),
+    )
+    expect(() => updateEvaluationContent(state({ auditStatus: 'CLOSED' }), ANA, { notes: 'x' })).toThrow(
+      expect.objectContaining({ code: 'AUDIT_NOT_EVALUABLE' }),
+    )
+  })
+
+  it('un nivel que no pertenece a la escala: EVALUATION_LEVEL_NOT_IN_SCALE', () => {
+    expect(() => updateEvaluationContent(state(), ANA, { achievedLevelId: 'de-otra-escala' })).toThrow(
+      expect.objectContaining({ code: 'EVALUATION_LEVEL_NOT_IN_SCALE' }),
+    )
+  })
+
+  it('"no aplica" y nivel alcanzado son excluyentes: hay que desmarcar "no aplica" primero', () => {
+    const na = state({ content: { ...state().content, isNotApplicable: true } })
+    expect(() => updateEvaluationContent(na, ANA, { achievedLevelId: 'cumple' })).toThrow(
+      expect.objectContaining({ code: 'EVALUATION_IS_NOT_APPLICABLE' }),
+    )
+    // desmarcando explícitamente sí se puede
+    const decision = updateEvaluationContent(na, ANA, { achievedLevelId: 'cumple', isNotApplicable: false })
+    expect(decision.patch).toMatchObject({ achievedLevelId: 'cumple', isNotApplicable: false })
+  })
+
+  it('marcar "no aplica" exige un motivo (propio o ya guardado)', () => {
+    expect(() => updateEvaluationContent(state(), ANA, { isNotApplicable: true })).toThrow(
+      expect.objectContaining({ code: 'NOT_APPLICABLE_REASON_REQUIRED' }),
+    )
+    const decision = updateEvaluationContent(state(), ANA, { isNotApplicable: true, notApplicableReason: 'Sin sedes' })
+    expect(decision.patch).toMatchObject({ isNotApplicable: true, achievedLevelId: null, severity: null })
   })
 })

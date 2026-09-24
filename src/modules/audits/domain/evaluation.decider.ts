@@ -40,6 +40,8 @@ export interface EvaluationState {
     readonly minimum: number
     readonly expected: number | null
     readonly achieved: { readonly value: number; readonly label: string } | null
+    /** La lista completa (id + valor): solo la usa `updateEvaluationContent`, para validar un nivel elegido. */
+    readonly levels: ReadonlyArray<{ readonly id: string; readonly value: number; readonly label: string }>
   }
   /** La evidencia vigente (sin las borradas): se cuenta para completar y se copia en el evento. */
   readonly evidence: ReadonlyArray<{ readonly id: string; readonly title: string }>
@@ -54,8 +56,18 @@ export interface DecidedEvent {
 export interface EvaluationDecision {
   readonly to: EvaluationStatus
   /** Columnas que el comando cambia además del estado. */
-  readonly patch: { readonly requiresFollowUp?: boolean; readonly carriedFromId?: null }
-  readonly event: DecidedEvent
+  readonly patch: {
+    readonly requiresFollowUp?: boolean
+    readonly carriedFromId?: null
+    readonly achievedLevelId?: string | null
+    readonly findings?: string | null
+    readonly notes?: string | null
+    readonly severity?: EvaluationSeverity | null
+    readonly isNotApplicable?: boolean
+    readonly notApplicableReason?: string | null
+  }
+  /** Ausente cuando el comando no tiene nada que anunciar (editar contenido sin arrancar el criterio). */
+  readonly event?: DecidedEvent
 }
 
 const emit = <N extends string, P>(def: EventDef<N, P>, payload: P): DecidedEvent => ({
@@ -156,5 +168,60 @@ export function reopenEvaluation(
     to: evaluationLifecycle.next(s.status, 'REOPEN'),
     patch: { carriedFromId: null },
     event: emit(AuditEvents.EvaluationReopened, { ...subject(s), comments: input.comments }),
+  }
+}
+
+/**
+ * El auditor asignado edita el contenido: nivel alcanzado, hallazgos, notas, o lo marca "no aplica". El primer envío
+ * arranca el criterio (`NOT_STARTED` → `IN_PROGRESS`, con su propio evento); después solo se edita en `IN_PROGRESS` y
+ * `RETURNED`. No cambia de estado por sí sola: enviar a revisión es un comando aparte (`completeEvaluation`).
+ */
+export function updateEvaluationContent(
+  s: EvaluationState,
+  actor: Actor,
+  input: {
+    readonly achievedLevelId?: string | null
+    readonly findings?: string | null
+    readonly notes?: string | null
+    readonly severity?: EvaluationSeverity | null
+    readonly isNotApplicable?: boolean
+    readonly notApplicableReason?: string | null
+  },
+): EvaluationDecision {
+  assertAuditEvaluable(s.auditStatus)
+  assertCanEvaluate(actor, s.access, s.assignedUserId)
+
+  const starting = evaluationLifecycle.can(s.status, 'START')
+  if (!starting && !evaluationLifecycle.has(s.status, 'editable')) {
+    throw new DomainError(AuditErrors.EVALUATION_NOT_EDITABLE, { evaluationId: s.evaluationId, status: s.status })
+  }
+
+  if (input.achievedLevelId) {
+    // "No aplica" y nivel alcanzado son excluyentes: hay que desmarcar antes "no aplica" de forma explícita.
+    if (s.content.isNotApplicable && input.isNotApplicable !== false) {
+      throw new DomainError(AuditErrors.EVALUATION_IS_NOT_APPLICABLE, { evaluationId: s.evaluationId })
+    }
+    if (!s.scale.levels.some((level) => level.id === input.achievedLevelId)) {
+      throw new DomainError(AuditErrors.EVALUATION_LEVEL_NOT_IN_SCALE, { levelId: input.achievedLevelId })
+    }
+  }
+  if (input.isNotApplicable === true) {
+    const reason = input.notApplicableReason ?? s.content.notApplicableReason
+    if (!reason) throw new DomainError(AuditErrors.NOT_APPLICABLE_REASON_REQUIRED, { evaluationId: s.evaluationId })
+  }
+
+  return {
+    to: starting ? evaluationLifecycle.next(s.status, 'START') : s.status,
+    patch: {
+      ...(input.achievedLevelId !== undefined && { achievedLevelId: input.achievedLevelId }),
+      ...(input.findings !== undefined && { findings: input.findings }),
+      ...(input.notes !== undefined && { notes: input.notes }),
+      ...(input.severity !== undefined && { severity: input.severity }),
+      ...(input.isNotApplicable === true && { isNotApplicable: true, achievedLevelId: null, severity: null }),
+      ...(input.isNotApplicable === false && { isNotApplicable: false, notApplicableReason: null }),
+      ...(input.notApplicableReason !== undefined &&
+        input.isNotApplicable !== false && { notApplicableReason: input.notApplicableReason }),
+    },
+    event: starting ? emit(AuditEvents.EvaluationStarted, subject(s)) : undefined,
   }
 }
