@@ -179,11 +179,24 @@ lectura: se muestra su tipo (§4).
 Sin pesos ni puntajes guardados (`05` §6, §11); una sola escala por auditoría; «no aplica» es una marca de la evaluación con
 motivo, no una opción de la escala; el nivel esperado es **por criterio**.
 
-## 10. Bloqueo optimista
+## 10. Bloqueo optimista (y la única excepción pesimista)
 
 Editar datos de la auditoría (`PATCH /audits/:id`) y editar el contenido de un criterio (`PATCH /audits/:id/evaluations/:id`)
 son los dos sitios donde dos personas pueden pisarse: dos ediciones a la vez, o una edición sobre algo que alguien ya cambió.
 Sin bloqueos de fila (decisión de fase-2i): en su lugar, la columna `version` de `audits` y `evaluations`.
+
+**Excepción, a propósito (fase-5l/5m):** las transiciones de estado de `Evaluation` (arrancar, enviar, aprobar, devolver,
+reabrir) SÍ toman un bloqueo pesimista (`SELECT ... FOR UPDATE` sobre la fila de `Audit`, `loadAuditForUpdate` en
+`audits/infrastructure/audit.queries.ts`), y `CloseAudit` también. No es optimista aquí porque `transitionEvaluation`
+(el CAS de abajo) protege la fila de la EVALUACIÓN, pero cerrar depende de un invariante que cruza TODAS las evaluaciones
+de la auditoría a la vez ("¿está aprobada CADA UNA en este instante?") — algo que un CAS de una sola fila no puede
+expresar. Verificado con una prueba de concurrencia real: sin el candado, un `REOPEN` sobre un criterio aprobado se
+colaba entre que `CloseAudit` contaba los pendientes y escribía, dejando la auditoría CERRADA con un criterio sin
+aprobar. **Todas** las transiciones de evaluación toman el candado, no solo aprobar/reabrir: cualquiera de ellas
+inserta en `audit_events`, cuya clave foránea ya pide un `FOR KEY SHARE` sobre esa misma fila — si no todas piden el
+candado ANTES y en el mismo orden, dos transiciones concurrentes se deadlockean entre sí (confirmado con un deadlock
+real de Postgres al agregarlo solo en algunas). El candado se libera solo al terminar la transacción; nunca queda
+retenido más que una operación corta.
 
 - **El cliente manda la versión que leyó** (`version` en el cuerpo, obligatorio en ambos PATCH). La escritura va con
   `WHERE id = ? AND version = ?`; si no tocó ninguna fila, alguien la cambió entre medias → `409 VERSION_CONFLICT` (con

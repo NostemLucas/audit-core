@@ -32,6 +32,27 @@ export async function loadAudit(tx: Tx, id: string) {
   return audit
 }
 
+/**
+ * Igual que `loadAudit`, pero con `SELECT ... FOR UPDATE`: bloqueo pesimista de fila, a propósito (docs/06 §10 lo
+ * amplía; el resto del proyecto usa CAS optimista porque ahí alcanza — acá no). Cerrar la auditoría exige que NINGÚN
+ * criterio cambie de estado mientras se decide si se puede cerrar; un `UPDATE ... WHERE NOT EXISTS` solo, sin este
+ * candado, deja pasar la carrera real (verificado con una prueba de concurrencia: `evaluations` y `audits` son
+ * tablas distintas, sin bloqueo en común, así que un `REOPEN` se cuela igual). Por eso TODA transición de evaluación
+ * que dependa de que la auditoría siga evaluable (`assertAuditEvaluable`) toma este MISMO candado antes de escribir:
+ * si `CloseAudit` ya tiene la fila bloqueada, la transición espera a que termine y relee el estado ya actualizado
+ * (`CLOSED` → `AUDIT_NOT_EVALUABLE`); si la transición la tiene bloqueada primero, `CloseAudit` espera y su propio
+ * `NOT EXISTS` ve el cambio ya escrito. Se libera solo al terminar la transacción (commit o rollback) — nunca queda
+ * bloqueada más que una operación corta.
+ */
+export async function loadAuditForUpdate(tx: Tx, id: string): Promise<Awaited<ReturnType<typeof loadAudit>>> {
+  const rows = await tx.$queryRaw<Array<Awaited<ReturnType<typeof loadAudit>>>>`
+    SELECT * FROM audits WHERE id = ${id} FOR UPDATE
+  `
+  const audit = rows[0]
+  if (!audit) throw new DomainError(AuditErrors.AUDIT_NOT_FOUND, { id })
+  return audit
+}
+
 export async function loadAuditView(tx: Tx, id: string) {
   const audit = await tx.audit.findUnique({ where: { id }, include: AUDIT_INCLUDE })
   if (!audit) throw new DomainError(AuditErrors.AUDIT_NOT_FOUND, { id })

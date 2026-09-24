@@ -24,7 +24,7 @@ afterEach(() => {
 })
 
 describe('createUploadTarget', () => {
-  it('crea cada segmento de la ruta (MKCOL) y comparte con permiso UPLOAD_ONLY (7), con Basic Auth', async () => {
+  it('crea cada segmento de la ruta (MKCOL) y comparte con permiso UPLOAD_ONLY (5: READ+CREATE, sin UPDATE), con Basic Auth', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = []
     vi.stubGlobal(
       'fetch',
@@ -52,7 +52,7 @@ describe('createUploadTarget', () => {
     const share = calls.find((c) => c.url.includes('/ocs/'))!
     expect(share.init.method).toBe('POST')
     const params = new URLSearchParams(share.init.body as string)
-    expect(params.get('permissions')).toBe('7')
+    expect(params.get('permissions')).toBe('5') // READ(1) + CREATE(4), SIN UPDATE: no se puede sobrescribir
     expect(params.get('expireDate')).toBe('2026-03-06') // vence MAÑANA, nunca hoy (podría ya estar "en el pasado")
   })
 

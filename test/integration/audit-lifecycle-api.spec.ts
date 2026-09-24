@@ -298,6 +298,28 @@ describe('cerrar (solo el manager)', () => {
     expect(res.body.error).toMatchObject({ code: 'AUDIT_HAS_PENDING_EVALUATIONS', details: { pending: 2 } })
   })
 
+  it('cerrar y reabrir un criterio aprobado al mismo tiempo: nunca queda CERRADA con un criterio sin aprobar', async () => {
+    const id = await inProgress()
+    await db.evaluation.updateMany({ where: { auditId: id }, data: { status: 'APPROVED' } })
+    const [target] = await db.evaluation.findMany({ where: { auditId: id } })
+    const [closed] = await Promise.all([
+      close(id),
+      api()
+        .post(`${A}/${id}/evaluations/${target!.id}/reopen`)
+        .set('authorization', await as('auditor', 'lider'))
+        .send({ comments: 'Apareció algo' }),
+    ])
+    const audit = await db.audit.findUniqueOrThrow({ where: { id } })
+    if (audit.status === 'CLOSED') {
+      // si cerró, TODOS sus criterios deben seguir aprobados — ninguno pudo quedar RETURNED
+      expect(await db.evaluation.count({ where: { auditId: id, status: { not: 'APPROVED' } } })).toBe(0)
+    } else {
+      // si el reabrir ganó la carrera, cerrar debió rechazarse (no una "victoria" fantasma)
+      expect(closed.status).not.toBe(200)
+      expect(audit.status).toBe('IN_PROGRESS')
+    }
+  })
+
   it('solo el manager; solo en curso (borrador: 409)', async () => {
     const { id: draftId } = await newAudit('CONFORMITY', '-draft')
     expect((await close(draftId)).body.error.code).toBe('AUDIT_INVALID_STATE')

@@ -5,7 +5,7 @@ import { LibraryReader } from '../../../library/index.js'
 import { assertAuditEvaluable } from '../../domain/audit.lifecycle.js'
 import { type Actor, assertOnAudit } from '../../domain/audit-policy.js'
 import { AuditEvents } from '../../domain/events.js'
-import { accessOf, loadAudit } from '../../infrastructure/audit.queries.js'
+import { accessOf, loadAuditForUpdate } from '../../infrastructure/audit.queries.js'
 import { transitionEvaluation } from '../../infrastructure/evaluation-transitions.js'
 import type { ReturnEvaluationT } from '../evaluation.schemas.js'
 import { loadEvaluation, toEvaluationViews } from '../evaluation.queries.js'
@@ -18,10 +18,16 @@ export class ReopenEvaluationUseCase {
     private readonly library: LibraryReader,
   ) {}
 
-  /** El LÍDER reabre un criterio ya aprobado, con comentario obligatorio. Excepcional: vuelve a `RETURNED`. */
+  /**
+   * El LÍDER reabre un criterio ya aprobado, con comentario obligatorio. Excepcional: vuelve a `RETURNED`.
+   * `loadAuditForUpdate` bloquea la fila de la auditoría (docs/06 §10), en el MISMO orden que toda transición de
+   * evaluación: serializa esto contra `CloseAudit` (sin este candado, un reabrir podía colarse mientras se decidía
+   * si la auditoría podía cerrar, dejándola CERRADA con este criterio ya no aprobado — confirmado con una prueba de
+   * concurrencia real) y evita un deadlock con las demás transiciones (mismo motivo que `approve-evaluation`).
+   */
   @Transactional()
   async execute(actor: Actor, auditId: string, evaluationId: string, input: ReturnEvaluationT) {
-    const audit = await loadAudit(this.tx, auditId)
+    const audit = await loadAuditForUpdate(this.tx, auditId)
     assertAuditEvaluable(audit.status)
     assertOnAudit('lead', actor, await accessOf(this.tx, actor, audit))
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)

@@ -6,12 +6,19 @@ import type { FileStoragePort, ReadShare, SharePermission, UploadedFile, UploadT
 
 /**
  * Adaptador real, por WebDAV (subir, crear carpetas) y la API OCS de *Files sharing* (compartir). Bitmask de
- * permisos de Nextcloud: `READ=1`, `UPDATE=2`, `CREATE=4`, `DELETE=8`, `SHARE=16`. `READ_ONLY=1` y `UPLOAD_ONLY=7`
- * (READ+UPDATE+CREATE) son los del proyecto anterior (docs/07 §1.1). `EDIT_NO_DELETE=3` (READ+UPDATE, SIN CREATE ni
- * DELETE) es propio de acá — no `15` (RWCD, "editar" completo): el equipo puede abrir y modificar un informe en
- * OnlyOffice (docs/07 §1.5), pero NUNCA borrarlo ni crear archivos nuevos ahí — la carpeta de informes solo la llena
- * el backend (`upload()`, cuenta de servicio); un `MEMBER` con permiso de borrar podría eliminar el consolidado
- * final sin que quede más rastro que el `Report` en la BD apuntando a un archivo que ya no existe.
+ * permisos de Nextcloud: `READ=1`, `UPDATE=2`, `CREATE=4`, `DELETE=8`, `SHARE=16`. `READ_ONLY=1` es del proyecto
+ * anterior (docs/07 §1.1). `UPLOAD_ONLY=5` (READ+CREATE, SIN `UPDATE`) es distinto del proyecto anterior a propósito:
+ * el `7` original (READ+UPDATE+CREATE) dejaba sobrescribir un archivo YA subido sin cambiar su `fileId` — quien
+ * tuviera el share podía reemplazar el contenido de una evidencia ya registrada sin que este backend se enterara (no
+ * hay hash guardado). Sin `UPDATE`, un segundo `PUT` al mismo nombre lo rechaza Nextcloud (403), no lo permite en
+ * silencio; quien sube debe usar un nombre nuevo para un archivo nuevo. No se compensa esto guardando un hash o un
+ * estado paralelo en la BD: la fuente de verdad del archivo es Nextcloud, y una segunda fuente (nuestra BD) tratando
+ * de reflejar lo mismo se desincroniza rápido — si algún día hace falta *detectar* un intento de sobrescritura, la
+ * vía es un webhook de Nextcloud (como evidencia/borrado, docs/07 §1.2-1.3), no una comparación desde acá.
+ * `EDIT_NO_DELETE=3` (READ+UPDATE, SIN CREATE ni DELETE) es propio de acá también: el equipo puede abrir y modificar
+ * un informe en OnlyOffice (docs/07 §1.5), pero NUNCA borrarlo ni crear archivos nuevos ahí — la carpeta de informes
+ * solo la llena el backend (`upload()`, cuenta de servicio); un `MEMBER` con permiso de borrar podría eliminar el
+ * consolidado final sin que quede más rastro que el `Report` en la BD apuntando a un archivo que ya no existe.
  *
  * Todo share lleva `expireDate` = MAÑANA: nada vive para siempre. La API de Nextcloud solo vence por día
  * (`YYYY-MM-DD`, confirmado contra su documentación — no hay minutos ni horas). MAÑANA y no HOY, a propósito: un
@@ -23,7 +30,7 @@ import type { FileStoragePort, ReadShare, SharePermission, UploadedFile, UploadT
  * verificando que construye las peticiones correctas (`nextcloud-http.client.spec.ts`). Cualquier fallo de red o
  * respuesta inesperada se traduce a `UPSTREAM_UNAVAILABLE` (docs/03 regla 11): nunca se afirma éxito sin confirmarlo.
  */
-const PERMISSIONS = { READ_ONLY: 1, UPLOAD_ONLY: 7, EDIT_NO_DELETE: 3 } as const
+const PERMISSIONS = { READ_ONLY: 1, UPLOAD_ONLY: 5, EDIT_NO_DELETE: 3 } as const
 const SHARE_TYPE_PUBLIC_LINK = 3
 const SHARE_TYPE_USER = 0
 const PERMISSION_BITMASK: Record<SharePermission, number> = {

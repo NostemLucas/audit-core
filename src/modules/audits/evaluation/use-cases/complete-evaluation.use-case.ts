@@ -9,7 +9,7 @@ import { AuditErrors } from '../../domain/errors.js'
 import { evaluationLifecycle } from '../../domain/evaluation.lifecycle.js'
 import { AuditEvents } from '../../domain/events.js'
 import { missingForCompletion } from '../../domain/evaluation-completion.js'
-import { accessOf, loadAudit } from '../../infrastructure/audit.queries.js'
+import { accessOf, loadAuditForUpdate } from '../../infrastructure/audit.queries.js'
 import { transitionEvaluation } from '../../infrastructure/evaluation-transitions.js'
 import { loadEvaluation, toEvaluationViews } from '../evaluation.queries.js'
 
@@ -21,10 +21,16 @@ export class CompleteEvaluationUseCase {
     private readonly library: LibraryReader,
   ) {}
 
-  /** El auditor asignado envía el criterio a revisión. Guarda una copia del contenido en el evento (docs/06 §4). */
+  /**
+   * El auditor asignado envía el criterio a revisión. Guarda una copia del contenido en el evento (docs/06 §4).
+   * `loadAuditForUpdate`: mismo orden de bloqueo que el resto de las transiciones (docs/06 §10) — necesario para
+   * evitar un deadlock real de Postgres (el `INSERT` en `audit_events` ya pide un `FOR KEY SHARE` sobre la fila de
+   * la auditoría por la clave foránea; si esta transición no toma el mismo candado ANTES, en el mismo orden que las
+   * demás, dos transiciones concurrentes se pueden bloquear en ciclo).
+   */
   @Transactional()
   async execute(actor: Actor, auditId: string, evaluationId: string) {
-    const audit = await loadAudit(this.tx, auditId)
+    const audit = await loadAuditForUpdate(this.tx, auditId)
     assertAuditEvaluable(audit.status)
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
     assertCanEvaluate(actor, await accessOf(this.tx, actor, audit), evaluation.assignedUserId)

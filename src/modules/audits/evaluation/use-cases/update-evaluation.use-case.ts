@@ -8,7 +8,7 @@ import { type Actor, assertCanEvaluate } from '../../domain/audit-policy.js'
 import { AuditErrors } from '../../domain/errors.js'
 import { evaluationLifecycle } from '../../domain/evaluation.lifecycle.js'
 import { AuditEvents } from '../../domain/events.js'
-import { accessOf, loadAudit } from '../../infrastructure/audit.queries.js'
+import { accessOf, loadAuditForUpdate } from '../../infrastructure/audit.queries.js'
 import type { UpdateEvaluationContentT } from '../evaluation.schemas.js'
 import { loadEvaluation, toEvaluationViews } from '../evaluation.queries.js'
 
@@ -24,10 +24,14 @@ export class UpdateEvaluationUseCase {
    * El auditor asignado edita el contenido: nivel alcanzado, hallazgos, notas, o lo marca "no aplica". El primer envío
    * arranca el criterio (`NOT_STARTED` → `IN_PROGRESS`, con su propio evento); después solo se edita en `IN_PROGRESS` y
    * `RETURNED` (`EVALUATION_NOT_EDITABLE`). No cambia de estado por sí sola: enviar a revisión es una acción aparte.
+   *
+   * `loadAuditForUpdate`: mismo orden de bloqueo que las demás transiciones de evaluación (docs/06 §10) — al arrancar
+   * el criterio también se inserta en `audit_events`, cuya clave foránea pide el mismo candado sobre la fila de la
+   * auditoría; sin este orden consistente en TODAS, dos transiciones concurrentes pueden deadlockear.
    */
   @Transactional()
   async execute(actor: Actor, auditId: string, evaluationId: string, input: UpdateEvaluationContentT) {
-    const audit = await loadAudit(this.tx, auditId)
+    const audit = await loadAuditForUpdate(this.tx, auditId)
     assertAuditEvaluable(audit.status)
     const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)
     assertCanEvaluate(actor, await accessOf(this.tx, actor, audit), evaluation.assignedUserId)
