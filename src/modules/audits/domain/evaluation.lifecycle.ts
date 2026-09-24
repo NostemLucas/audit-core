@@ -8,8 +8,8 @@ import { AuditErrors } from './errors.js'
  *  - `reassignable`: el líder puede cambiar su responsable; no cuando ya está enviado a revisión o aprobado.
  *  - `awaitingReview`: enviado, espera al líder.
  *  - `locked`: aprobado; no se toca salvo que el líder lo reabra (con comentario).
- * Dato puro: sin I/O. La transición ATÓMICA contra la BD (compare-and-swap sobre el estado) vive en
- * `infrastructure/evaluation-transitions.ts` — aquí solo importan `platform/state` y `shared/enums`.
+ * Dato puro: sin I/O. Qué exige cada comando lo decide `evaluation.decider.ts`; la escritura atómica (candado +
+ * compare-and-swap por versión) la hace `infrastructure/evaluation.store.ts`.
  */
 export type EvaluationEvent = 'START' | 'COMPLETE' | 'APPROVE' | 'RETURN' | 'REOPEN'
 type EvaluationTag = 'editable' | 'reassignable' | 'awaitingReview' | 'locked'

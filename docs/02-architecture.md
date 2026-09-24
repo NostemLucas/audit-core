@@ -216,10 +216,10 @@ carpeta con clases que repiten las columnas. La misma estructura para todos:
 ```
 audits/
   domain/                 ← compartido dentro del módulo, puro, sin Prisma
-    audit.lifecycle.ts   evaluation.lifecycle.ts   scoring.ts   audit-policy.ts
+    audit.lifecycle.ts   evaluation.lifecycle.ts   evaluation.decider.ts   scoring.ts   audit-policy.ts
     events.ts          errors.ts               evaluation-completion.ts
   infrastructure/         ← consultas y escrituras compartidas entre cortes, Prisma directo (p. ej.
-                             audit.queries.ts, evaluation-transitions.ts) — junto con platform/db y
+                             audit.queries.ts, evaluation.store.ts) — junto con platform/db y
                              shared/enums.ts, la única carpeta que puede importar el cliente de Prisma generado
   lifecycle/  scope/  team/  evaluation/  evidence/  reports/  results/  history/     ← cortes verticales
      <corte>.controller.ts
@@ -239,34 +239,38 @@ sustituye al `_shared/` actual (7.1k líneas de todo mezclado): aquí `domain/` 
 
 Una operación = 1 use-case + 1 método de controller + sus esquemas (en el `.schemas.ts` del recurso).
 
-Tal como queda de verdad en un módulo Tier A (sin port ni entidad — §4): el use-case carga la fila con `Tx`, le
-pregunta a `domain/` qué es válido, y escribe con `Tx` de nuevo.
+Tal como queda de verdad en un módulo Tier A (sin port ni entidad — §4), para un agregado con transiciones (`Evaluation`):
+un **decider** puro en `domain/` decide y un **store** en `infrastructure/` hace todo lo demás, siempre igual.
 
 ```ts
-@Injectable()
-export class ApproveEvaluationUseCase {
-  constructor(
-    @InjectTx() private readonly tx: Tx,
-    private readonly events: EventBus,
-    private readonly library: LibraryReader,
-  ) {}
-
-  @Transactional()
-  async execute(actor: Actor, auditId: string, evaluationId: string, input: ApproveEvaluationT) {
-    const audit = await loadAudit(this.tx, auditId)                          // infrastructure/: consulta compartida
-    assertAuditEvaluable(audit.status)                                       // dominio: ciclo de vida de la auditoría
-    assertOnAudit('lead', actor, await accessOf(this.tx, actor, audit))      // dominio: política contextual
-    const evaluation = await loadEvaluation(this.tx, auditId, evaluationId)  // infrastructure/: consulta compartida
-
-    // infrastructure/: escritura ATÓMICA — primero valida con evaluationLifecycle.next() (dominio), compare-and-swap
-    // sobre el estado leído; si otra transacción ya lo movió, pierde la carrera en vez de pisarla (docs/03 §5).
-    await transitionEvaluation(this.tx, evaluationId, evaluation.status, 'APPROVE', { requiresFollowUp })
-
-    await this.events.publish(AuditEvents.EvaluationApproved, { auditId, evaluationId, comments, requiresFollowUp })
-    return toEvaluationViews([await loadEvaluation(this.tx, auditId, evaluationId)], template)[0]
+// domain/evaluation.decider.ts — PURO: estado + comando → qué escribir y qué publicar (o un DomainError)
+export function approveEvaluation(s: EvaluationState, actor: Actor, input: { comments; requiresFollowUp }) {
+  assertAuditEvaluable(s.auditStatus)                   // auditoría en curso
+  assertOnAudit('lead', actor, s.access)                // política contextual
+  return {
+    to: evaluationLifecycle.next(s.status, 'APPROVE'),  // ciclo de vida
+    patch: { requiresFollowUp: input.requiresFollowUp },
+    event: emit(AuditEvents.EvaluationApproved, { ...subject(s), ...input }),
   }
 }
+
+// evaluation/use-cases/approve-evaluation.use-case.ts — solo traduce la petición al comando
+@Transactional()
+async execute(actor: Actor, auditId: string, evaluationId: string, input: ApproveEvaluationT) {
+  const { row, template } = await this.store.execute(actor, auditId, evaluationId, (s) =>
+    approveEvaluation(s, actor, { comments: input.comments ?? null, requiresFollowUp: input.requiresFollowUp ?? false }),
+  )
+  return toEvaluationViews([row], template)[0]!
+}
 ```
+
+`EvaluationStore.execute` es el ÚNICO camino para aplicar un comando: candado de la auditoría (`FOR UPDATE`, §06 §10) →
+carga del estado completo → `decide` → `UPDATE … WHERE version = leída` (si no escribe, `VERSION_CONFLICT`; nunca un
+éxito sin escritura) → publica el evento. Un comando nuevo es una función en el decider (con su test puro) y un
+use-case de 5 líneas; no puede olvidarse del candado, del orden de las comprobaciones ni del evento.
+
+Los agregados sin transiciones (o los cortes Tier B) siguen con el use-case directo: carga con `Tx`, pregunta a `domain/`,
+escribe con `Tx`. El decider se justifica donde hay estados, permisos contextuales y concurrencia real — no en todo.
 
 Convenciones fijas:
 - `execute(actor, …)`. El actor se pasa **explícito**; el dominio nunca lee CLS. CLS solo lo usan la extensión

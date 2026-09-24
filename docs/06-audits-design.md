@@ -187,12 +187,13 @@ Sin bloqueos de fila (decisión de fase-2i): en su lugar, la columna `version` d
 
 **Excepción, a propósito (fase-5l/5m):** las transiciones de estado de `Evaluation` (arrancar, enviar, aprobar, devolver,
 reabrir) SÍ toman un bloqueo pesimista (`SELECT ... FOR UPDATE` sobre la fila de `Audit`, `loadAuditForUpdate` en
-`audits/infrastructure/audit.queries.ts`), y `CloseAudit` también. No es optimista aquí porque `transitionEvaluation`
-(el CAS de abajo) protege la fila de la EVALUACIÓN, pero cerrar depende de un invariante que cruza TODAS las evaluaciones
+`audits/infrastructure/audit.queries.ts`), y `CloseAudit` también. No es optimista aquí porque el compare-and-swap de
+`EvaluationStore` (sobre la versión) protege la fila de la EVALUACIÓN, pero cerrar depende de un invariante que cruza TODAS las evaluaciones
 de la auditoría a la vez ("¿está aprobada CADA UNA en este instante?") — algo que un CAS de una sola fila no puede
 expresar. Verificado con una prueba de concurrencia real: sin el candado, un `REOPEN` sobre un criterio aprobado se
 colaba entre que `CloseAudit` contaba los pendientes y escribía, dejando la auditoría CERRADA con un criterio sin
-aprobar. **Todas** las transiciones de evaluación toman el candado, no solo aprobar/reabrir: cualquiera de ellas
+aprobar. **Todas** las transiciones de evaluación toman el candado (en enviar, aprobar, devolver y reabrir lo
+garantiza `EvaluationStore`, el único camino para aplicar esos comandos; arrancar va en `UpdateEvaluation`), no solo aprobar/reabrir: cualquiera de ellas
 inserta en `audit_events`, cuya clave foránea ya pide un `FOR KEY SHARE` sobre esa misma fila — si no todas piden el
 candado ANTES y en el mismo orden, dos transiciones concurrentes se deadlockean entre sí (confirmado con un deadlock
 real de Postgres al agregarlo solo en algunas). El candado se libera solo al terminar la transacción; nunca queda

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/app-events.js'
-import { transitionEvaluation } from '../../src/modules/audits/infrastructure/evaluation-transitions.js'
 import { renderEventMessage } from '../../src/platform/events/index.js'
 import { type TestRole, useTestApi } from './support/api.js'
 import { libraryFixture } from './support/audits.js'
@@ -488,19 +487,6 @@ describe('revisar (solo el líder)', () => {
       (e) => e.type === 'EvaluationApproved' || e.type === 'EvaluationReturned',
     )
     expect(reviewEvents).toHaveLength(1)
-  })
-
-  it('transitionEvaluation nunca da un falso éxito: perder la carrera falla SIEMPRE, aunque el estado fresco también admita el mismo evento (ABA)', async () => {
-    const ctx = await inProgress()
-    const id = await evaluationOf(ctx, 'Roles')
-    // la fila está REALMENTE en RETURNED — no en IN_PROGRESS, que es lo que esta llamada "cree" (una lectura vieja)
-    await db.evaluation.update({ where: { id }, data: { status: 'RETURNED' } })
-    // RETURNED también admite COMPLETE (igual que IN_PROGRESS): si la función no fuera estricta, devolvería éxito
-    // sin haber escrito nada
-    await expect(transitionEvaluation(db, id, 'IN_PROGRESS', 'COMPLETE')).rejects.toMatchObject({
-      code: 'EVALUATION_INVALID_STATE',
-    })
-    expect(await statusOf(id)).toBe('RETURNED') // no cambió
   })
 
   it('con la auditoría fuera de curso no se revisa nada (409 AUDIT_NOT_EVALUABLE), tampoco reabrir en una cerrada', async () => {
