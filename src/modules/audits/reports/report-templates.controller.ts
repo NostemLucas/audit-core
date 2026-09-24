@@ -33,6 +33,7 @@ import { UploadReportTemplateUseCase } from './use-cases/upload-report-template.
 /**
  * Plantillas de informe personalizadas por tipo (y, opcionalmente, dimensión de escala) — docs/07 §2. No confundir
  * con `ReportsController`: eso son los informes YA generados; esto es la plantilla `.docx` que los genera.
+ * (Tier B, docs/02 §4: mismo corte que `reports.controller.ts`.)
  */
 @Controller('report-templates')
 export class ReportTemplatesController {

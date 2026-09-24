@@ -26,6 +26,7 @@ import {
   type UpdateScaleLevelT,
 } from './scale.schemas.js'
 
+/** Escalas de calificación (niveles y su valor numérico), reutilizables entre auditorías. (Tier B, docs/02 §4) */
 @Controller('scales')
 export class ScalesController {
   constructor(

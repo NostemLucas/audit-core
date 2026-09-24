@@ -5,6 +5,7 @@ import { Responds } from '../../platform/http/index.js'
 import { GetProfileUseCase } from './use-cases/get-profile.use-case.js'
 import { ProfileView } from './profile.schemas.js'
 
+/** El usuario autenticado, sus permisos empaquetados y su barra lateral. (Tier B, docs/02 §4) */
 @Controller('profile')
 export class ProfileController {
   constructor(private readonly getProfile: GetProfileUseCase) {}

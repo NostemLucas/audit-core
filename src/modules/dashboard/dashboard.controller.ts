@@ -6,7 +6,7 @@ import { DashboardSummaryView, MyWorkView } from './dashboard.schemas.js'
 import { GetDashboardSummaryUseCase } from './use-cases/get-dashboard-summary.use-case.js'
 import { GetMyWorkUseCase } from './use-cases/get-my-work.use-case.js'
 
-/** Solo lectura, cruzando auditorías (docs/08): nunca escribe, no tiene `domain/` propio (Tier C). */
+/** Solo lectura, cruzando auditorías (docs/08): nunca escribe, no tiene `domain/` propio. (Tier C, docs/02 §4) */
 @Controller('dashboard')
 export class DashboardController {
   constructor(

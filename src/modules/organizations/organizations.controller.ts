@@ -18,6 +18,7 @@ import {
   type UpdateOrganizationT,
 } from './organization.schemas.js'
 
+/** A quién se audita: nombre y si se puede elegir para auditorías nuevas. (Tier B, docs/02 §4) */
 @Controller('organizations')
 export class OrganizationsController {
   constructor(

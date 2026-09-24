@@ -107,9 +107,19 @@ descubiertas al probar contra Postgres:
 
 | Tier | Cuándo | Módulos | Estructura permitida |
 |------|--------|---------|----------------------|
-| **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits`, `library/templates` | `domain/` (puro) + `infrastructure/` (consultas y escrituras compartidas, Prisma directo) + `<corte>/use-cases/` por corte vertical. **Sin repositorio ni mapper** — ver más abajo por qué |
-| **B · CRUD** | Sin reglas más allá de validar y guardar | `identity`, `organizations`, `library/scales`, `audits/scope`, `audits/team`, `audits/evidence` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
-| **C · Lectura** | Agregaciones, listados, informes; nunca escribe | `dashboard`, `audits/reports`, listados de `audits` | *query services* con Prisma directo. Sin dominio |
+| **A · Dominio** | Reglas de negocio ricas, invariantes, ciclos de vida | `audits/lifecycle`, `audits/evaluation`, `library/templates` | `domain/` (puro) + `infrastructure/` (consultas y escrituras compartidas, Prisma directo) + `<corte>/use-cases/` por corte vertical. **Sin repositorio ni mapper** — ver más abajo por qué |
+| **B · CRUD** | Sin reglas más allá de validar y guardar (una `.rules.ts` para una invariante aislada, como mucho) | `identity`, `organizations`, `library/scales`, `audits/scope`, `audits/team`, `audits/evidence`, `audits/reports` | `controller` → `use-case` → `PrismaService`. Sin ports ni repositorio |
+| **C · Lectura** | Agregaciones y listados; NUNCA escribe | `dashboard`, `audits/results`, `audits/history` | *query services* con Prisma directo. Sin dominio |
+
+Cada controlador declara su tier en un comentario `(Tier X, docs/02 §4)` justo antes de la clase — `test/architecture-tiers.spec.ts`
+lo verifica contra un mapa fijo: un controlador sin tag, o con un tag que no coincide con el mapa, rompe el CI. Es la misma
+lógica que el resto de §7: no depende de que alguien se acuerde de venir a actualizar esta tabla (así se desalineó `audits`,
+fase-5k) — un cambio de tier exige tocar el código Y el test a la vez, a propósito.
+
+**`audits/reports` es Tier B, no C**, pese a que su nombre suene a "solo lectura": generar un informe SÍ escribe (`Report`
++ la subida a Nextcloud). No tiene repositorio ni `domain/` propio — usa `scoring.ts` del `domain/` compartido de `audits` — y
+su única regla (que la plantilla `.docx` sea válida) es una función pura con su test (`report-template-validation.ts`), la
+forma exacta de un `.rules.ts` de Tier B.
 
 Reglas por tier:
 
@@ -147,6 +157,37 @@ dominio con los mismos campos que la fila que mantener sincronizada, ni un port 
 (Prisma) que sería ceremonia. Lo que sí sale de `domain/` es lo que no es lógica pura: la lectura del YAML de una
 plantilla, y en `audits` las consultas compartidas entre cortes y las escrituras atómicas (p. ej. una transición de
 `Evaluation` con compare-and-swap sobre el estado) — eso va en `infrastructure/`.
+
+### Dónde vive `domain/`/`infrastructure/`: al nivel donde de verdad se comparte
+
+Regla, para que no se confunda con inconsistencia lo que es una diferencia real: `domain/` e `infrastructure/` viven
+en la carpeta del **módulo** cuando varios cortes verticales los comparten, y **dentro del corte** cuando solo uno los
+usa.
+
+- `audits/domain/` e `infrastructure/` están en la raíz del módulo porque CASI TODOS sus cortes los necesitan:
+  `evaluation/` y `lifecycle/` comparten `audit.lifecycle.ts`/`evaluation.lifecycle.ts`/`scoring.ts`; `evidence/`,
+  `reports/` y `team/` comparten `audit.queries.ts`/`loadAuditForUpdate`.
+- `library/templates/domain/` e `infrastructure/` están DENTRO de `templates/`, no en la raíz de `library/`, porque
+  `scales/` (el otro corte de `library`) no usa nada de eso — es Tier B, sin reglas propias. Promoverlos a
+  `library/domain/` sería una carpeta compartida con un solo consumidor real.
+
+Si un módulo tiene un solo corte Tier A, su `domain/` nace adentro de ese corte. Si aparece un segundo corte que
+también lo necesita, ESE es el momento de promoverlo a la raíz del módulo — no antes.
+
+### El patrón "reader": una fachada de lectura pública, por módulo
+
+Cuando un módulo necesita leer datos de OTRO sin escribirlos (`audits` necesita el árbol de una plantilla; `dashboard`
+también), la única puerta es una clase inyectable, de solo lectura, exportada por el `index.ts` del módulo dueño —
+nunca los archivos internos de ese módulo (`modulos-solo-por-su-index`, §7). Tres módulos ya lo usan, con distinto
+nombre a propósito (el nombre es del vocabulario del dominio, no una convención de sufijo obligatoria):
+`library.reader.ts` → `LibraryReader`, `organizations.reader.ts` → `OrganizationsReader`,
+`identity/user-directory.ts` → `UserDirectory`. Las tres cumplen el mismo contrato:
+
+- Sin escrituras — ningún método muta nada.
+- Sin tipos de Prisma en su interfaz pública: devuelve formas propias (`TemplateForAudit`, `ScaleForAudit`,
+  `DirectoryUser`), no filas.
+- Un solo punto de entrada por módulo — si aparece una segunda clase así en el mismo módulo, probablemente debería
+  ser un método más de la primera, no una fachada nueva.
 
 ### Estructura de un módulo Tier B (y por qué no tiene `domain/`)
 
@@ -252,11 +293,15 @@ Convenciones fijas:
 | **Un enum nuevo o valor** | 1–2 | `schema.prisma`; `labels.es.ts` falla en compilación hasta que se traduzca. |
 | **Una regla de cálculo** | 1 | `scoring.ts` (+ su test). |
 | **Un módulo nuevo** | — | Elegir tier (§4), copiar su plantilla, declarar dependencias permitidas en `.dependency-cruiser.cjs`. |
+| **Un corte nuevo dentro de un módulo Tier A** | — | `<corte>.controller.ts` con su tag `(Tier X, docs/02 §4)` + fila nueva en `test/architecture-tiers.spec.ts`. Si necesita algo de `domain/`/`infrastructure/` que hoy vive dentro de OTRO corte, ESE es el momento de promoverlo a la raíz del módulo (nunca antes de que un segundo consumidor real lo pida). |
+| **Algo compartido entre dos o más cortes** (un servicio, una consulta) | 1 archivo + los imports que lo usan | Va en `infrastructure/` del módulo (no dentro de un corte, ni copiado en cada uno). Ejemplo real: `TeamFolderProvisioningService` (`audits/infrastructure/`), que usan `team/` (otorgar/revocar) y `lifecycle/` (bajar a solo lectura al cerrar). |
+| **Una transición que depende de un invariante entre VARIAS filas** (no una sola) | El `.lifecycle.ts` de esa fila sigue con CAS optimista; la transición pasa a leer con `loadXForUpdate` (`SELECT ... FOR UPDATE`) | Excepción a "sin bloqueos de fila" (docs/06 §10), a propósito: un CAS de una sola fila no puede expresar "¿se cumple esto en TODAS las filas relacionadas, en este instante?". Si otra escritura sobre esas mismas filas también inserta en una tabla con clave foránea hacia la fila bloqueada (como `audit_events` → `audits`), esa otra escritura TAMBIÉN debe tomar el mismo candado, en el mismo orden — si no, deadlock real de Postgres (confirmado en fase-5m). |
 
 ## 7. Cómo se impone (no depende de disciplina)
 
 | Regla | Mecanismo |
 |-------|-----------|
+| Cada controlador declara su tier (§4) y coincide con el mapa de referencia | `test/architecture-tiers.spec.ts` |
 | `domain/` no importa Nest ni Prisma (salvo enums) | `dependency-cruiser` en CI |
 | Un módulo solo importa el `index.ts` de otro; sin ciclos; respeta el grafo de §2 | `dependency-cruiser` |
 | `status ===` / `switch` sobre `.status` fuera de `*.lifecycle.ts` (solo en `src/modules`) | ESLint `no-restricted-syntax` (`eslint/rules.js`, alcance en `eslint.config.js`) |

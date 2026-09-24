@@ -7,7 +7,7 @@ import { AddScopeItem, type AddScopeItemT, ScopeItemId, ScopeItemView } from './
 import { AddScopeItemUseCase } from './use-cases/add-scope-item.use-case.js'
 import { RemoveScopeItemUseCase } from './use-cases/remove-scope-item.use-case.js'
 
-/** El alcance de una auditoría (qué se audita). Devuelve la lista completa tras cada cambio. */
+/** El alcance de una auditoría (qué se audita). Devuelve la lista completa tras cada cambio. (Tier B, docs/02 §4) */
 @Controller('audits/:auditId/scope-items')
 export class ScopeController {
   constructor(

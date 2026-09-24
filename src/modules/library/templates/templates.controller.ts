@@ -43,6 +43,7 @@ import {
   type UpdateTemplateT,
 } from './template.schemas.js'
 
+/** Plantillas de auditoría: árbol de controles y ciclo de vida (borrador/publicada/archivada). (Tier A, docs/02 §4) */
 @Controller('templates')
 export class TemplatesController {
   constructor(

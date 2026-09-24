@@ -8,7 +8,11 @@ import { GenerateReportUseCase } from './use-cases/generate-report.use-case.js'
 import { GetReportUseCase } from './use-cases/get-report.use-case.js'
 import { ListReportsUseCase } from './use-cases/list-reports.use-case.js'
 
-/** Informes de una auditoría (docs/07 §2): la plantilla se rellena con los mismos datos que `GET /results` y `/gaps`. */
+/**
+ * Informes de una auditoría (docs/07 §2): la plantilla se rellena con los mismos datos que `GET /results` y `/gaps`.
+ * (Tier B, docs/02 §4 — no Tier C pese al nombre: generar SÍ escribe, `Report` + la subida a Nextcloud; sin
+ * repositorio ni `domain/` propio, la validación vive en `report-template-validation.ts` como un `.rules.ts`.)
+ */
 @Controller('audits/:auditId/reports')
 export class ReportsController {
   constructor(

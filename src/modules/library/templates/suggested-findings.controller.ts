@@ -39,7 +39,7 @@ import { TemplateId } from './template.schemas.js'
 
 /**
  * Hallazgos sugeridos: ayuda de redacción por (control, opción de escala). Se editan en cualquier estado de la plantilla
- * (ver SetSuggestedFindingUseCase).
+ * (ver SetSuggestedFindingUseCase). (Tier A, docs/02 §4)
  */
 @Controller('templates/:templateId')
 export class SuggestedFindingsController {

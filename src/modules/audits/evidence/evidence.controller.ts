@@ -9,7 +9,7 @@ import { DeleteEvidenceUseCase } from './use-cases/delete-evidence.use-case.js'
 import { ListEvidenceUseCase } from './use-cases/list-evidence.use-case.js'
 import { RequestEvidenceUploadUseCase } from './use-cases/request-evidence-upload.use-case.js'
 
-/** Evidencia de un criterio (docs/07 §1): el backend nunca ve el archivo, solo su metadato. */
+/** Evidencia de un criterio (docs/07 §1): el backend nunca ve el archivo, solo su metadato. (Tier B, docs/02 §4) */
 @Controller('audits/:auditId/evaluations/:evaluationId/evidence')
 export class EvidenceController {
   constructor(

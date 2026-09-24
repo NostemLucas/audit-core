@@ -18,7 +18,7 @@ import {
 } from './control.schemas.js'
 import { TemplateId } from './template.schemas.js'
 
-/** Los controles de una plantilla. Las operaciones que cambian el árbol devuelven la lista completa (las posiciones de los hermanos cambian). */
+/** Los controles de una plantilla. Las operaciones que cambian el árbol devuelven la lista completa (las posiciones de los hermanos cambian). (Tier A, docs/02 §4) */
 @Controller('templates/:templateId/controls')
 export class ControlsController {
   constructor(

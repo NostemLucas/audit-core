@@ -16,7 +16,7 @@ import { ChangeMemberRoleUseCase } from './use-cases/change-member-role.use-case
 import { ListMembersUseCase } from './use-cases/list-members.use-case.js'
 import { RemoveMemberUseCase } from './use-cases/remove-member.use-case.js'
 
-/** El equipo de la auditoría. Lo arma el MANAGER; todos los miembros lo ven. Devuelve el equipo completo tras cada cambio. */
+/** El equipo de la auditoría. Lo arma el MANAGER; todos los miembros lo ven. Devuelve el equipo completo tras cada cambio. (Tier B, docs/02 §4) */
 @Controller('audits/:auditId/members')
 export class TeamController {
   constructor(

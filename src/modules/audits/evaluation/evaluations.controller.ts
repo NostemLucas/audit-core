@@ -30,7 +30,7 @@ import { ReturnEvaluationUseCase } from './use-cases/return-evaluation.use-case.
 import { SetExpectedLevelUseCase } from './use-cases/set-expected-level.use-case.js'
 import { UpdateEvaluationUseCase } from './use-cases/update-evaluation.use-case.js'
 
-/** Los criterios de una auditoría: lista, asignación, nivel esperado (3c) y el flujo de contenido y revisión (3d). */
+/** Los criterios de una auditoría: lista, asignación, nivel esperado (3c) y el flujo de contenido y revisión (3d). (Tier A, docs/02 §4) */
 @Controller('audits/:auditId')
 export class EvaluationsController {
   constructor(

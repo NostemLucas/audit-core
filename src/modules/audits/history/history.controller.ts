@@ -8,7 +8,7 @@ import { AuditEventView, EvaluationHistoryEntry, ListHistoryQuery, type ListHist
 import { GetEvaluationHistoryUseCase } from './use-cases/get-evaluation-history.use-case.js'
 import { ListAuditHistoryUseCase } from './use-cases/list-audit-history.use-case.js'
 
-/** Historial de la auditoría y de cada criterio: se lee de `audit_events`, el único mecanismo de historia (docs/06 §4). */
+/** Historial de la auditoría y de cada criterio: se lee de `audit_events`, el único mecanismo de historia (docs/06 §4). (Tier C, docs/02 §4: solo lectura, "listados de audits".) */
 @Controller('audits/:auditId')
 export class HistoryController {
   constructor(

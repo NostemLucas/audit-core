@@ -7,7 +7,7 @@ import { AuditResultsView, GapView } from './results.schemas.js'
 import { GetAuditResultsUseCase } from './use-cases/get-audit-results.use-case.js'
 import { ListGapsUseCase } from './use-cases/list-gaps.use-case.js'
 
-/** Lecturas derivadas de los criterios (3e): cómo va la auditoría y qué criterios no llegaron a lo esperado. */
+/** Lecturas derivadas de los criterios (3e): cómo va la auditoría y qué criterios no llegaron a lo esperado. (Tier C, docs/02 §4) */
 @Controller('audits/:auditId')
 export class ResultsController {
   constructor(

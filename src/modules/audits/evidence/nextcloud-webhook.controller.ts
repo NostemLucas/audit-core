@@ -16,7 +16,7 @@ import { RegisterEvidenceUseCase } from './use-cases/register-evidence.use-case.
 /**
  * Nextcloud avisa aquí cuando llega o se borra un archivo de evidencia (docs/07 §1.2, §1.3). No hay JWT de Authentik:
  * se autentica con la firma HMAC, sobre el CUERPO CRUDO (`rawBody`, activado en `main.ts`/`app.ts` — un espacio de
- * más cambia la firma), misma regla para las dos rutas.
+ * más cambia la firma), misma regla para las dos rutas. (Tier B, docs/02 §4: mismo corte que `evidence.controller.ts`.)
  */
 @Public()
 @Controller('webhooks/nextcloud')

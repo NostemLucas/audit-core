@@ -26,7 +26,7 @@ import { UpdateAuditUseCase } from './use-cases/update-audit.use-case.js'
 
 /**
  * Los permisos globales (`@Can`) deciden si la ruta se puede llamar; lo que depende de ESTA auditoría (¿soy su manager?
- * ¿su líder? ¿miembro?) lo decide cada caso de uso con `audit-policy.ts` (docs/06 §1).
+ * ¿su líder? ¿miembro?) lo decide cada caso de uso con `audit-policy.ts` (docs/06 §1). (Tier A, docs/02 §4)
  */
 @Controller('audits')
 export class AuditsController {
