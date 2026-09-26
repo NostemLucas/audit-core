@@ -38,6 +38,13 @@ Reglas del equipo:
 - Pueden ser miembros los usuarios con rol global AUDITOR o GERENTE.
 - El equipo lo cambia **solo el manager**, con la auditoría en borrador o en curso. No se quita a un miembro que tiene criterios
   asignados (se reasignan antes). Cambiar de líder en curso es posible.
+- **Quitar o degradar al único líder con la auditoría en curso es válido**, no un estado inconsistente: la deja
+  temporalmente sin nadie con rol LEAD (aprobar/devolver/reabrir quedan bloqueados hasta que el manager designe
+  reemplazo), pero eso es una decisión del manager, no un dato corrupto — no hay invariante de "mínimo un líder"
+  mientras está en curso, solo el índice único de "máximo uno". Cambiar de líder es un baile manual de dos pasos
+  (degradar al actual, luego promover al nuevo) precisamente porque el índice único no permite dos LEAD a la vez;
+  intentar promover al nuevo ANTES de degradar al actual es `AUDIT_LEAD_ALREADY_ASSIGNED`. Decidido/confirmado
+  fase-5q tras descartar por error la hipótesis contraria (ver memoria de esa fase).
 - Todos los miembros ven toda la auditoría; **editar** solo lo asignado.
 
 Permisos contextuales (`audits/domain/audit-policy.ts`, función pura):
