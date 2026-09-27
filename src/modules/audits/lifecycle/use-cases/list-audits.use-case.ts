@@ -17,6 +17,7 @@ export class ListAuditsUseCase {
       ...(query.mine ? participates : visibleAuditsWhere(actor)),
       ...(query.status && { status: query.status }),
       ...(query.organizationId && { organizationId: query.organizationId }),
+      ...(query.memberId && { members: { some: { userId: query.memberId } } }),
       ...(query.q && {
         AND: [
           {

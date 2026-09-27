@@ -318,6 +318,19 @@ describe('listar', () => {
     expect(res.body.meta.total).toBe(1)
   })
 
+  it('memberId deja solo las auditorías donde ese usuario es líder o miembro', async () => {
+    const a = await idOf(auditBody(lib, { name: 'Con auditor1' }))
+    const b = await idOf(auditBody(lib, { name: 'Sin auditor1' }))
+    const auditorId = await t.userId('auditor')
+    await db.auditMember.create({ data: { auditId: a, userId: auditorId, role: 'MEMBER' } })
+    const res = await api()
+      .get(A)
+      .query({ memberId: auditorId })
+      .set('authorization', await as('manager'))
+    expect(res.body.data.map((x: { name: string }) => x.name)).toEqual(['Con auditor1'])
+    expect(b).toBeTruthy()
+  })
+
   it('filtra por estado, por organización y por texto (nombre o código, sin distinguir mayúsculas); pagina', async () => {
     const other = await libraryFixture(db, '-2')
     const one = await idOf(auditBody(lib, { name: 'Auditoría de Backups' }))

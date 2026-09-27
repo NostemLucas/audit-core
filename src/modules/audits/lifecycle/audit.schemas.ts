@@ -113,6 +113,9 @@ export const ListAuditsQuery = z.object({
   organizationId: z.uuid().optional(),
   /** Solo las auditorías donde soy el manager o miembro del equipo (un GERENTE o ADMIN las ve todas si no lo pide). */
   mine: z.stringbool().optional(),
+  /** Solo las auditorías donde ESTE usuario es líder o miembro del equipo (para que un manager/admin busque "las
+   * auditorías de fulano" desde la lista, sin depender de `mine`, que es siempre sobre quien hace la consulta). */
+  memberId: z.uuid().optional(),
 })
 export type ListAuditsQueryT = z.infer<typeof ListAuditsQuery>
 
