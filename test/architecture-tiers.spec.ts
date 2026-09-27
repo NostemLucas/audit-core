@@ -22,6 +22,7 @@ const EXPECTED_TIERS: Readonly<Record<string, 'A' | 'B' | 'C'>> = {
   'src/modules/audits/team/team.controller.ts': 'B',
   'src/modules/dashboard/dashboard.controller.ts': 'C',
   'src/modules/identity/profile.controller.ts': 'B',
+  'src/modules/identity/users.controller.ts': 'B',
   'src/modules/library/scales/scales.controller.ts': 'B',
   'src/modules/library/templates/controls.controller.ts': 'A',
   'src/modules/library/templates/suggested-findings.controller.ts': 'A',

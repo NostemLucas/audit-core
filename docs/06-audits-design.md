@@ -36,6 +36,11 @@ Reglas del equipo:
 - **Un solo líder por auditoría**, garantizado por la BD con un **índice único parcial** (`audit_members(auditId) WHERE role =
   'LEAD'`), sin bloqueos.
 - Pueden ser miembros los usuarios con rol global AUDITOR o GERENTE.
+- **Directorio de usuarios** (`GET /users`, fase-6a): para elegir a quién agregar al equipo, quien dirige auditorías necesita
+  buscar usuarios. Solo LECTURA sobre el espejo de Authentik (`users` se crea/actualiza únicamente al iniciar sesión; no hay
+  alta ni edición acá): paginado (`page`, `pageSize`), `q` (nombre, usuario o correo, sin distinguir mayúsculas), `role`
+  (ADMIN|GERENTE|AUDITOR) y `eligible=true` (= puede ser miembro: rol AUDITOR o GERENTE). Lo leen GERENTE y ADMIN (permiso
+  `read User`); un AUDITOR no. Solo aparecen quienes ya iniciaron sesión alguna vez.
 - El equipo lo cambia **solo el manager**, con la auditoría en borrador o en curso. No se quita a un miembro que tiene criterios
   asignados (se reasignan antes). Cambiar de líder en curso es posible.
 - **Quitar o degradar al único líder con la auditoría en curso es válido**, no un estado inconsistente: la deja
