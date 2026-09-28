@@ -1,0 +1,109 @@
+# Nextcloud local (real, no mock)
+
+Postgres + Nextcloud (apache) + un proxy nginx que termina TLS y agrega los headers CORS que Nextcloud nunca pone
+solo (necesario porque el navegador sube evidencia directo a un share público de Nextcloud — `docs/07` §1.1 de
+`audit-core`) + un worker de background jobs + el adaptador que traduce el webhook nativo de Nextcloud al contrato
+que `audit-core` exige.
+
+## 0. Encontrar tu propia IP LAN y reemplazarla
+
+Todo esto usa `192.168.0.11.sslip.io` como nombre — resuelve por DNS público a `192.168.0.11`, la IP LAN de la
+máquina donde se armó esto. **sslip.io no aloja nada tuyo ni necesita configurarse**: cualquier nombre con forma
+`<ip>.sslip.io` resuelve a esa IP para cualquiera, siempre — es solo una forma de tener un nombre DNS de verdad sin
+depender de "`localhost`" (que significa una cosa distinta en el host y en cada contenedor; ver `../README.md`).
+
+```bash
+hostname -I | awk '{print $1}'   # tu IP LAN
+```
+
+Reemplazar `192.168.0.11` por esa IP (buscar y reemplazar literal) en estos 4 archivos antes de seguir:
+
+- `docker-compose.yml` (`OVERWRITEHOST`, `OVERWRITECLIURL`, `NEXTCLOUD_TRUSTED_DOMAINS`)
+- `nginx-cors.conf` (`server_name`)
+- `run-webhook-adapter.sh` (`NC_BASE`)
+- `register-webhooks.sh` (`BASE`, `ADAPTER_URI`)
+
+## 1. Certificado
+
+```bash
+# instalar mkcert si hace falta: https://github.com/FiloSottile/mkcert#installation
+mkdir -p certs
+CAROOT="$(pwd)/certs/mkcert-ca" mkcert -install=false -cert-file certs/nextcloud.pem -key-file certs/nextcloud-key.pem <tu-ip>.sslip.io
+```
+
+(`-install=false`: no lo instala en el almacén de certificados del sistema/navegador — queda como certificado
+autofirmado normal. Si querés que el navegador no muestre la advertencia, correr `mkcert -install` en cambio y
+reiniciar el navegador; en Linux con Chrome hace falta además `sudo` para el almacén del sistema, no alcanza con la
+base NSS del usuario — Chrome moderno no la usa para esto.)
+
+## 2. Levantar todo
+
+```bash
+cp .env.example .env   # completar los 4 valores, ver el propio archivo
+docker compose up -d
+```
+
+Nextcloud tarda un minuto en instalarse solo (usa `NEXTCLOUD_ADMIN_USER=admin` + `NEXTCLOUD_ADMIN_PASSWORD` de
+`.env`). Verificar con `curl -k https://<tu-ip>.sslip.io:8443/status.php` (`"installed":true`).
+
+## 3. Usuario de servicio (el que usa `audit-core` para hablarle a Nextcloud)
+
+```bash
+docker compose exec -u www-data app php occ user:add --password-from-env --display-name "Audit Core Service" audit-core
+# (pide NEXTCLOUD_SERVICE_PASSWORD por variable de entorno OC_PASS, no por stdin normal:)
+#   docker compose exec -u www-data -e OC_PASS="$NEXTCLOUD_SERVICE_PASSWORD" app php occ user:add --password-from-env --display-name "Audit Core Service" audit-core
+
+docker compose exec -u www-data app php occ config:app:set core shareapi_allow_public_upload --value=yes
+docker compose exec -u www-data app php occ config:app:set core shareapi_allow_links --value=yes
+docker compose exec -u www-data app php occ config:app:set core shareapi_enforce_links_password --value=no
+```
+
+## 4. Login de Nextcloud vía Authentik (opcional — `audit-core` no lo necesita, ver más abajo)
+
+```bash
+docker compose exec -u www-data app php occ app:install user_oidc   # ya viene instalada en NC 30, por si acaso
+docker compose exec -u www-data app php occ config:system:set allow_local_remote_servers --value=true --type=boolean
+# ^ Nextcloud bloquea por defecto pedirle algo a una IP privada (protección SSRF) — Authentik local ES una IP
+#   privada, así que hace falta esto para que Nextcloud pueda llegar a buscar el discovery document.
+
+docker compose exec -u www-data app php occ user_oidc:provider authentik \
+  --clientid=<client_id que imprimió ../authentik/setup.py> \
+  --clientsecret=<client_secret que imprimió ../authentik/setup.py> \
+  --discoveryuri="http://<tu-ip>:9000/application/o/nextcloud/.well-known/openid-configuration" \
+  --mapping-uid=preferred_username --mapping-display-name=name --mapping-email=email --unique-uid=0
+```
+
+Nextcloud aprovisiona la cuenta local sola en el primer login, con el mismo username que Authentik (`auditor1` →
+`auditor1`, etc.) — probado en navegador, ver el botón "Login with authentik" en `/login`.
+
+**Por qué esto es aparte, no algo que `audit-core` necesite:** la integración real nunca pasa por el login web de
+Nextcloud — solo WebDAV/OCS con la cuenta de servicio del paso 3, o links de un solo uso por token. Esto es una
+demostración de que Nextcloud PUEDE compartir identidad con Authentik, útil si alguna vez alguien necesita entrar a
+la interfaz de Nextcloud directamente.
+
+## 5. El webhook de evidencia (la parte que hace que subir un archivo se refleje en `audit-core`)
+
+```bash
+docker compose exec -u www-data app php occ background:cron   # backgroundjobs_mode=cron — el worker del compose hace el resto
+./run-webhook-adapter.sh &     # deja esto corriendo (o systemd/pm2/lo que prefieras en un entorno más permanente)
+./register-webhooks.sh         # una sola vez por instancia de Nextcloud — ver el propio script
+```
+
+`webhook-adapter.mjs` documenta en sus propios comentarios el porqué de cada pieza (traduce el evento nativo de
+Nextcloud al contrato de `audit-core`, por qué hace falta un worker de background jobs dedicado, y por qué el
+borrado usa sondeo cada 60s en vez de push — la papelera de Nextcloud no dispara el evento nativo de borrado,
+comprobado en vivo, no es una limitación de este adaptador).
+
+## 6. Apuntar `audit-core` acá
+
+En `audit-core/.env` (raíz del repo):
+
+```
+NEXTCLOUD_BASE_URL=https://<tu-ip>.sslip.io:8443
+NEXTCLOUD_SERVICE_USER=audit-core
+NEXTCLOUD_SERVICE_PASSWORD=<el de este .env>
+NEXTCLOUD_WEBHOOK_SECRET=<cualquier valor — el mismo que lee run-webhook-adapter.sh de audit-core/.env>
+NODE_EXTRA_CA_CERTS=<ruta absoluta a>/local-dev/nextcloud/certs/mkcert-ca/rootCA.pem
+```
+
+Verificar con `curl http://localhost:4000/health/ready` → `"nextcloud":"up"`.

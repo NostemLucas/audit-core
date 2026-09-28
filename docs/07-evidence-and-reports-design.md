@@ -50,8 +50,11 @@ Se verifica con una firma HMAC-SHA256 sobre el cuerpo crudo, con `NEXTCLOUD_WEBH
 `401 WEBHOOK_SIGNATURE_INVALID` (ya en el catálogo de errores desde antes de esta fase).
 
 **Nextcloud no tiene un formato propio de webhook de subida** (varía según versión/app instalada: *Flow*, *Webhook
-Listeners*…); en su lugar, este es **el contrato que este backend exige**, y quien administre Nextcloud configura una
-regla de *Flow* que lo cumpla (lo documenta el runbook de despliegue, no este repo):
+Listeners*…); en su lugar, este es **el contrato que este backend exige**, y quien administre Nextcloud configura algo
+que lo cumpla — un adaptador que traduzca el evento nativo de Nextcloud a esta forma y lo firme, no una integración
+directa. `local-dev/nextcloud/webhook-adapter.mjs` es esa pieza para el entorno de referencia de este repo (2026-09-28:
+verificado en vivo contra Nextcloud 30 real — subida por push en segundos vía su app `webhook_listeners`, borrado por
+sondeo cada 60s porque la papelera de Nextcloud no dispara el evento nativo de borrado):
 
 ```jsonc
 {

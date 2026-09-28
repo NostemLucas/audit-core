@@ -1,0 +1,13 @@
+# Secretos reales: cada quien genera los suyos a partir de los .env.example.
+authentik/.env
+nextcloud/.env
+
+# Certificado local (mkcert): cada máquina genera el suyo para su propia LAN IP — no tiene sentido compartirlo.
+nextcloud/certs/
+
+# Estado de los contenedores (no es código, y pesa).
+authentik/data/
+authentik/certs/
+nextcloud-data/
+
+authentik/__pycache__/
