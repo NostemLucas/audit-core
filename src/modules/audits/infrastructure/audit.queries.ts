@@ -72,13 +72,18 @@ export async function accessOf(tx: Tx, actor: Actor, audit: { id: string; manage
   return { managerId: audit.managerId, memberRole: await memberRoleOf(tx, audit.id, actor.id) }
 }
 
-/** Los usuarios de Nextcloud (username) de todo el equipo actual — para revocar/ajustar sus shares (docs/07 §1.5). */
+/**
+ * Los usuarios de Nextcloud (username) de todo el equipo actual — para revocar/ajustar sus shares (docs/07 §1.5).
+ * Incluye al manager: también tiene acceso persistente a Evidencias/Informes (otorgado al crear o transferir la
+ * auditoría), así que también debe bajar a solo lectura al cerrar.
+ */
 export async function teamUsernames(tx: Tx, auditId: string): Promise<readonly string[]> {
-  const members = await tx.auditMember.findMany({
-    where: { auditId },
-    select: { user: { select: { username: true } } },
-  })
-  return members.map((m) => m.user.username)
+  const [audit, members] = await Promise.all([
+    tx.audit.findUniqueOrThrow({ where: { id: auditId }, select: { manager: { select: { username: true } } } }),
+    tx.auditMember.findMany({ where: { auditId }, select: { user: { select: { username: true } } } }),
+  ])
+  const usernames = new Set([audit.manager.username, ...members.map((m) => m.user.username)])
+  return [...usernames]
 }
 
 /** El acceso del actor a VARIAS auditorías con una sola consulta (para los listados). */

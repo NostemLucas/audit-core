@@ -5,6 +5,7 @@ import { DomainError } from '../../../../platform/errors/index.js'
 import { EventBus } from '../../../../platform/events/index.js'
 import { LibraryReader } from '../../../library/index.js'
 import { OrganizationsReader } from '../../../organizations/index.js'
+import { UserDirectory } from '../../../identity/index.js'
 import { formatAuditCode } from '../../domain/audit-code.js'
 import { auditLifecycle } from '../../domain/audit.lifecycle.js'
 import { type Actor } from '../../domain/audit-policy.js'
@@ -12,6 +13,7 @@ import { AuditErrors } from '../../domain/errors.js'
 import { AuditEvents } from '../../domain/events.js'
 import { carriesOver } from '../../domain/follow-up.js'
 import { loadAudit, loadAuditView } from '../../infrastructure/audit.queries.js'
+import { TeamFolderProvisioningService } from '../../infrastructure/team-folder-provisioning.service.js'
 import { withAccess } from '../audit.presenter.js'
 import type { CreateAuditT } from '../audit.schemas.js'
 
@@ -23,6 +25,8 @@ export class CreateAuditUseCase {
     private readonly events: EventBus,
     private readonly organizations: OrganizationsReader,
     private readonly library: LibraryReader,
+    private readonly users: UserDirectory,
+    private readonly folders: TeamFolderProvisioningService,
   ) {}
 
   /**
@@ -84,6 +88,10 @@ export class CreateAuditUseCase {
     await this.tx.evaluation.createMany({
       data: evaluations.map((evaluation) => ({ auditId: audit.id, ...evaluation })),
     })
+    // El manager también necesita acceso persistente en Nextcloud (docs/07 §1.5), igual que un miembro del equipo:
+    // sin esto no puede abrir los informes generados en OnlyOffice.
+    const manager = await this.users.getOrFail(actor.id)
+    await this.folders.grant(code, manager.username)
     await this.events.publish(AuditEvents.AuditCreated, {
       auditId: audit.id,
       code,

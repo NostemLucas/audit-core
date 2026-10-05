@@ -7,6 +7,7 @@ import { type Actor, assertCanTransfer, isEligibleManager } from '../../domain/a
 import { AuditErrors } from '../../domain/errors.js'
 import { AuditEvents } from '../../domain/events.js'
 import { accessOf, loadAudit, loadAuditView } from '../../infrastructure/audit.queries.js'
+import { TeamFolderProvisioningService } from '../../infrastructure/team-folder-provisioning.service.js'
 import { withAccess } from '../audit.presenter.js'
 import type { TransferAuditT } from '../audit.schemas.js'
 
@@ -16,6 +17,7 @@ export class TransferAuditUseCase {
     @InjectTx() private readonly tx: Tx,
     private readonly events: EventBus,
     private readonly users: UserDirectory,
+    private readonly folders: TeamFolderProvisioningService,
   ) {}
 
   /**
@@ -33,6 +35,9 @@ export class TransferAuditUseCase {
     if (audit.managerId !== next.id) {
       const previous = await this.users.getOrFail(audit.managerId)
       await this.tx.audit.update({ where: { id }, data: { managerId: next.id } })
+      // El acceso persistente en Nextcloud (docs/07 §1.5) se mueve con el puesto de manager, igual que al armar equipo.
+      await this.folders.revoke(audit.code, previous.username)
+      await this.folders.grant(audit.code, next.username)
       await this.events.publish(AuditEvents.AuditTransferred, {
         auditId: id,
         fromName: previous.name,
