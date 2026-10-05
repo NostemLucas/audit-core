@@ -107,3 +107,39 @@ NODE_EXTRA_CA_CERTS=<ruta absoluta a>/local-dev/nextcloud/certs/mkcert-ca/rootCA
 ```
 
 Verificar con `curl http://localhost:4000/health/ready` → `"nextcloud":"up"`.
+
+## 7. OnlyOffice (editar los informes generados — Reportes → Abrir)
+
+`audit-core` ya sube el `.docx` generado a `/Auditorias/{code}/Informes/` (paso 6); esto es solo para que el botón
+"Abrir" del frontend lo abra editable en vez de solo descargable. El Document Server (`onlyoffice`, puerto 8444 del
+proxy) y Nextcloud necesitan el **mismo** `ONLYOFFICE_JWT_SECRET` en **tres** lugares — si falta alguno, el editor
+carga (JS/toolbar se ven) pero falla al abrir el documento, con un error distinto según cuál:
+
+```bash
+SECRET=$(grep ONLYOFFICE_JWT_SECRET .env | cut -d= -f2-)
+
+# 1. Nextcloud → Document Server (qué token firma Nextcloud en el config que le manda al navegador). Si falta:
+#    el editor abre y al cargar el documento tira "El 'token' de seguridad del documento tiene un formato incorrecto".
+docker compose exec -u www-data app php occ config:app:set onlyoffice jwt_secret --value="$SECRET"
+
+# 2. Document Server → Nextcloud (qué header manda el Document Server al pedir el archivo/avisar que se guardó — debe
+#    ser el MISMO nombre que JWT_HEADER del servicio `onlyoffice` en docker-compose.yml, acá "Authorization"). Si
+#    jwt_header queda vacío, Nextcloud usa su propio default ("AuthorizationJwt") en vez de "Authorization", el
+#    Document Server manda el header con el nombre que SÍ configuramos y Nextcloud nunca lo encuentra: log de
+#    Nextcloud dice "Download without jwt", el editor tira "Error de descarga" — NO un error de secreto, uno de
+#    nombre de header. Fácil de confundir con el punto 1 porque el síntoma en el navegador es casi el mismo.
+docker compose exec -u www-data app php occ config:app:set onlyoffice jwt_header --value="Authorization"
+
+# 3. URLs de ida y vuelta (el mismo problema de "localhost significa otra cosa en cada lado" que el resto de este
+#    directorio): DocumentServerUrl es lo que el NAVEGADOR carga; DocumentServerInternalUrl es Nextcloud → Document
+#    Server (nombre del servicio en la red docker); StorageUrl es Document Server → Nextcloud (ídem).
+docker compose exec -u www-data app php occ config:app:set onlyoffice DocumentServerUrl --value="https://<tu-ip>.sslip.io:8444/"
+docker compose exec -u www-data app php occ config:app:set onlyoffice DocumentServerInternalUrl --value="http://onlyoffice/"
+docker compose exec -u www-data app php occ config:app:set onlyoffice StorageUrl --value="http://app/"
+```
+
+Para diagnosticar un fallo real (no solo los dos de arriba): `docker compose exec -u www-data app tail -n 50
+/var/www/html/data/nextcloud.log` filtrando por `"app":"onlyoffice"` tiene el mensaje exacto (`Download: <fileid>`,
+`Download without jwt`, `Track: ... status 1 result 0`, etc.) — mucho más útil que los logs del propio Document
+Server (`docker compose exec onlyoffice tail -n 40 /var/log/onlyoffice/documentserver/docservice/out.log`), que solo
+registra a nivel WARN y casi nunca tiene el error real de una sesión de edición fallida.

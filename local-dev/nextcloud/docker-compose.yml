@@ -49,13 +49,27 @@ services:
       - nc-data:/var/www/html
     networks: [internal]
 
+  onlyoffice:
+    # Document Server: edita/convierte los .docx que sube `generate-report.use-case.ts`. JWT obligatorio (si no,
+    # cualquiera en la red podría pedirle que abra/convierta lo que quiera) — el mismo secreto va acá Y en los dos
+    # config keys de Nextcloud de más abajo (README §4); si alguno de los tres no coincide, el editor carga pero
+    # falla al abrir el documento ("Error de descarga" o "token inválido" en vez de cargar el contenido).
+    image: onlyoffice/documentserver:latest
+    restart: unless-stopped
+    environment:
+      JWT_ENABLED: 'true'
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET}
+      JWT_HEADER: Authorization
+    networks: [internal]
+
   proxy:
     image: nginx:alpine
     restart: unless-stopped
-    depends_on: [app]
+    depends_on: [app, onlyoffice]
     ports:
       - '8098:80'
       - '8443:443'
+      - '8444:444'
     volumes:
       - ./nginx-cors.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs/nextcloud.pem:/etc/nginx/certs/nextcloud.pem:ro
