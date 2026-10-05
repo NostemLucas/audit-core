@@ -226,7 +226,7 @@ describe('listar y ver un informe', () => {
     void second
   })
 
-  it('GET de uno trae la URL de descarga (un share de solo lectura pedido al vuelo)', async () => {
+  it('GET de uno trae la URL de descarga (un share de solo lectura pedido al vuelo) y la de edición (permalink por fileid, sin pedir nada nuevo)', async () => {
     const ctx = await startedAudit(t)
     await closeAudit(ctx)
     const created = await generate(ctx)
@@ -234,6 +234,7 @@ describe('listar y ver un informe', () => {
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({ id: created.body.data.id, title: 'Auditoría ISO 27001' })
     expect(res.body.data.downloadUrl).toMatch(/^https:\/\/nextcloud\.test\/s\/read-/)
+    expect(res.body.data.editUrl).toMatch(/^https:\/\/nextcloud\.test\/f\/fake-/)
     const code = (await db.audit.findUniqueOrThrow({ where: { id: ctx.auditId } })).code
     expect(storage.readShares).toContain(`/Auditorias/${code}/Informes/${created.body.data.id}.docx`)
   })
