@@ -133,14 +133,22 @@ server.listen(PORT, () => {
 
 /** Todo lo que hay HOY bajo Evidencias/, como `Map<fileId, path>` — mismo PROPFIND que ya usaba el sondeo original. */
 async function listEvidenceFiles() {
-  const res = await fetch(`${NC_BASE}/remote.php/dav/files/${NC_USER}/Auditorias`, {
-    method: 'PROPFIND',
-    headers: { authorization: auth, depth: 'infinity', 'content-type': 'application/xml' },
-    body: `<?xml version="1.0"?>
+  let res
+  try {
+    res = await fetch(`${NC_BASE}/remote.php/dav/files/${NC_USER}/Auditorias`, {
+      method: 'PROPFIND',
+      headers: { authorization: auth, depth: 'infinity', 'content-type': 'application/xml' },
+      body: `<?xml version="1.0"?>
 <d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
   <d:prop><oc:fileid/><d:resourcetype/></d:prop>
 </d:propfind>`,
-  })
+    })
+  } catch (error) {
+    // Un timeout/caída de red acá no debe tirar abajo todo el adaptador (incluido el servidor HTTP que recibe las
+    // subidas push) — mismo tratamiento que el `!res.ok` de abajo: se reintenta en la próxima pasada de 60s.
+    console.error(`[${new Date().toISOString()}] reconciliación: PROPFIND falló (red):`, error.message)
+    return null
+  }
   if (res.status === 404) return new Map()
   if (!res.ok) {
     console.error(`[${new Date().toISOString()}] reconciliación: PROPFIND falló (${res.status})`)
