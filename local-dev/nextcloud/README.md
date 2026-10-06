@@ -143,3 +143,26 @@ Para diagnosticar un fallo real (no solo los dos de arriba): `docker compose exe
 `Download without jwt`, `Track: ... status 1 result 0`, etc.) — mucho más útil que los logs del propio Document
 Server (`docker compose exec onlyoffice tail -n 40 /var/log/onlyoffice/documentserver/docservice/out.log`), que solo
 registra a nivel WARN y casi nunca tiene el error real de una sesión de edición fallida.
+
+**4. Postgres/Redis/RabbitMQ propios del Document Server** (`onlyoffice-db`/`onlyoffice-redis`/`onlyoffice-rabbitmq`
+en `docker-compose.yml`, no están en `local-dev/authentik/` ni comparten nada con el Postgres de Nextcloud): sin
+estos tres, `onlyoffice` cae a "memory runtime" (log: `convertermaster: memory runtime detected ... no workers will
+be forked`) — `ConvertService.ashx` (conversión de un solo tiro, sin sesión) sigue funcionando perfecto, pero abrir
+una sesión real de edición completa falla. Comprobado en vivo con `nc -zv 127.0.0.1 5432/6379/5672` DENTRO del
+contenedor `onlyoffice`: los tres dan "connection refused" — no vienen incluidos en la imagen, hace falta levantarlos
+aparte (ya están en el compose de este repo).
+
+**5. `NODE_EXTRA_CA_CERTS` en el propio contenedor `onlyoffice`**: sin esto, su proceso Node no confía en el
+certificado mkcert y cualquier llamada HTTPS que haga hacia el proxy falla con `UNABLE_TO_VERIFY_LEAF_SIGNATURE` —
+mismo patrón que `NODE_EXTRA_CA_CERTS` en `audit-core/.env` (ver paso 6), acá del lado del Document Server. Ya está
+montado en el compose de este repo (`./certs/mkcert-ca:/certs/mkcert-ca:ro`).
+
+**Estado al momento de escribir esto**: con el JWT (puntos 1-3) Y los tres servicios propios (punto 4) Y la CA
+(punto 5) todos correctos — confirmado cada uno por separado, con pruebas directas (`ConvertService.ashx` da
+`Percent:100, EndConvert:true`; `nc -zv` confirma los tres puertos abiertos; los logs de Nextcloud confirman
+`Download:` y `Track: ... result 0` sin error) — el botón "Abrir" TODAVÍA mostraba "Error de descarga" en el
+navegador en la última prueba, sin ningún error nuevo en ninguno de los dos logs. La transferencia real del
+documento pasa por WebSocket (socket.io) una vez que la sesión abre, fuera del alcance de lo que estas herramientas
+pueden inspeccionar frame por frame — quedó sin diagnosticar más allá de este punto. Si esto vuelve a pasar: revisar
+los logs del Document Server en nivel DEBUG (no solo WARN, que es el default) y/o las herramientas de desarrollador
+del navegador en la pestaña Network filtrando por `ws`/`wss`, no solo HTTP.

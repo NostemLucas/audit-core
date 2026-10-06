@@ -49,17 +49,64 @@ services:
       - nc-data:/var/www/html
     networks: [internal]
 
+  onlyoffice-db:
+    # Postgres PROPIO del Document Server (doc_changes/task_result) — nada que ver con el `db` de Nextcloud de arriba.
+    # Sin esto (y sin onlyoffice-redis/onlyoffice-rabbitmq) el contenedor onlyoffice cae solo a "memory runtime" (log:
+    # "no workers will be forked"): ConvertService (conversión de un solo tiro) sigue andando, pero abrir una sesión
+    # real de edición falla — comprobado en vivo: con /ConvertService.ashx directo la conversión da 100%
+    # Percent/EndConvert=true, pero el editor completo en el navegador tira "Error de descarga", sin NINGÚN error
+    # nuevo en los logs de Nextcloud ni del Document Server (la falla real pasa en la parte que ninguno de los dos
+    # loguea por defecto — confirmado además con `nc -zv 127.0.0.1 5432/6379/5672` DENTRO del contenedor onlyoffice:
+    # connection refused en los tres, nada bundleado).
+    image: postgres:9-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: onlyoffice
+      POSTGRES_USER: onlyoffice
+      POSTGRES_PASSWORD: ${ONLYOFFICE_DB_PASS}
+    volumes:
+      - onlyoffice-db-data:/var/lib/postgresql/data
+    networks: [internal]
+
+  onlyoffice-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    networks: [internal]
+
+  onlyoffice-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [internal]
+
   onlyoffice:
     # Document Server: edita/convierte los .docx que sube `generate-report.use-case.ts`. JWT obligatorio (si no,
     # cualquiera en la red podría pedirle que abra/convierta lo que quiera) — el mismo secreto va acá Y en los dos
-    # config keys de Nextcloud de más abajo (README §4); si alguno de los tres no coincide, el editor carga pero
+    # config keys de Nextcloud de más abajo (README §7); si alguno de los tres no coincide, el editor carga pero
     # falla al abrir el documento ("Error de descarga" o "token inválido" en vez de cargar el contenido).
     image: onlyoffice/documentserver:latest
     restart: unless-stopped
+    depends_on: [onlyoffice-db, onlyoffice-rabbitmq, onlyoffice-redis]
     environment:
       JWT_ENABLED: 'true'
       JWT_SECRET: ${ONLYOFFICE_JWT_SECRET}
       JWT_HEADER: Authorization
+      DB_TYPE: postgres
+      DB_HOST: onlyoffice-db
+      DB_PORT: 5432
+      DB_NAME: onlyoffice
+      DB_USER: onlyoffice
+      DB_PWD: ${ONLYOFFICE_DB_PASS}
+      AMQP_TYPE: rabbitmq
+      AMQP_URI: amqp://guest:guest@onlyoffice-rabbitmq
+      REDIS_SERVER_HOST: onlyoffice-redis
+      REDIS_SERVER_PORT: 6379
+      # Sin esto, el propio proceso Node del Document Server no confía en el certificado mkcert y cualquier llamada
+      # HTTPS que haga hacia el proxy (p.ej. su propia DocumentServerUrl pública) falla con
+      # UNABLE_TO_VERIFY_LEAF_SIGNATURE — mismo patrón que NODE_EXTRA_CA_CERTS en audit-core/.env, acá del lado del
+      # Document Server en vez del backend.
+      NODE_EXTRA_CA_CERTS: /certs/mkcert-ca/rootCA.pem
+    volumes:
+      - ./certs/mkcert-ca:/certs/mkcert-ca:ro
     networks: [internal]
 
   proxy:
@@ -82,3 +129,4 @@ networks:
 volumes:
   db-data:
   nc-data:
+  onlyoffice-db-data:
