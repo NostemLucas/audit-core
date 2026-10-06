@@ -331,3 +331,54 @@ describe('ping', () => {
     await expect(client.ping()).rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' })
   })
 })
+
+describe('listFolder', () => {
+  const PROPFIND_XML = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response>
+    <d:href>/remote.php/dav/files/audit-core-test/Auditorias/AUD-1/Evidencias/</d:href>
+    <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/audit-core-test/Auditorias/AUD-1/Evidencias/eval-1/</d:href>
+    <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/audit-core-test/Auditorias/AUD-1/Evidencias/nota%20final.pdf</d:href>
+    <d:propstat><d:prop>
+      <d:getcontenttype>application/pdf</d:getcontenttype>
+      <d:getcontentlength>2048</d:getcontentlength>
+      <d:getlastmodified>Thu, 05 Mar 2026 10:00:00 GMT</d:getlastmodified>
+      <d:resourcetype/>
+    </d:prop></d:propstat>
+  </d:response>
+</d:multistatus>`
+
+  it('devuelve los hijos directos (sin la carpeta misma), carpetas primero, con tamaño y fecha de cada archivo', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ status: 207, text: async () => PROPFIND_XML, headers: new Headers() }) as Response),
+    )
+
+    const entries = await client.listFolder('/Auditorias/AUD-1/Evidencias')
+
+    expect(entries.map((e) => [e.name, e.isFolder])).toEqual([
+      ['eval-1', true],
+      ['nota final.pdf', false],
+    ])
+    expect(entries[1]).toMatchObject({
+      path: '/Auditorias/AUD-1/Evidencias/nota final.pdf',
+      size: 2048,
+      mimeType: 'application/pdf',
+      modifiedAt: new Date('2026-03-05T10:00:00.000Z'),
+    })
+  })
+
+  it('una carpeta inexistente (404) da lista vacía, no error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ status: 404, text: async () => '', headers: new Headers() }) as Response),
+    )
+    expect(await client.listFolder('/Auditorias/AUD-NUEVA/Informes')).toEqual([])
+  })
+})

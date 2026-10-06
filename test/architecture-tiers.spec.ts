@@ -15,6 +15,7 @@ const EXPECTED_TIERS: Readonly<Record<string, 'A' | 'B' | 'C'>> = {
   'src/modules/audits/evidence/evidence.controller.ts': 'B',
   'src/modules/audits/evidence/nextcloud-webhook.controller.ts': 'B',
   'src/modules/audits/history/history.controller.ts': 'C',
+  'src/modules/audits/files/audit-files.controller.ts': 'C',
   'src/modules/audits/reports/reports.controller.ts': 'B',
   'src/modules/audits/reports/report-templates.controller.ts': 'B',
   'src/modules/audits/results/results.controller.ts': 'C',

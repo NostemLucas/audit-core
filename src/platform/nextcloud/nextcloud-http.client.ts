@@ -2,7 +2,14 @@ import { Inject, Injectable } from '@nestjs/common'
 import { CLOCK, type Clock } from '../clock/index.js'
 import { ENV, type Env } from '../config/index.js'
 import { DomainError, PlatformErrors } from '../errors/index.js'
-import type { FileStoragePort, ReadShare, SharePermission, UploadedFile, UploadTarget } from './file-storage.port.js'
+import type {
+  FileStoragePort,
+  FolderEntry,
+  ReadShare,
+  SharePermission,
+  UploadedFile,
+  UploadTarget,
+} from './file-storage.port.js'
 
 /**
  * Adaptador real, por WebDAV (subir, crear carpetas) y la API OCS de *Files sharing* (compartir). Bitmask de
@@ -111,6 +118,45 @@ export class NextcloudHttpClient implements FileStoragePort {
         { method: 'DELETE' },
       )
     }
+  }
+
+  async listFolder(path: string): Promise<FolderEntry[]> {
+    const res = await this.request(
+      this.davUrl(path),
+      {
+        method: 'PROPFIND',
+        headers: { depth: '1', 'content-type': 'application/xml' },
+        body: `<?xml version="1.0"?>
+<d:propfind xmlns:d="DAV:"><d:prop><d:getcontenttype/><d:getcontentlength/><d:getlastmodified/><d:resourcetype/></d:prop></d:propfind>`,
+      },
+      { okStatuses: [207, 404] },
+    )
+    if (res.status === 404) return []
+    const xml = await res.text()
+    const ownPrefix = `/remote.php/dav/files/${this.env.NEXTCLOUD_SERVICE_USER}`
+    const folderPath = path.replace(/\/+$/, '')
+    const entries: FolderEntry[] = []
+    for (const raw of xml.split('<d:response>').slice(1)) {
+      const block = raw.split('</d:response>')[0] ?? ''
+      const href = decodeURIComponent(block.match(/<d:href>([^<]*)<\/d:href>/)?.[1] ?? '')
+      const at = href.indexOf(ownPrefix)
+      if (at === -1) continue
+      const entryPath = href.slice(at + ownPrefix.length).replace(/\/+$/, '')
+      if (!entryPath || entryPath === folderPath) continue
+      const isFolder = /<d:resourcetype>\s*<d:collection\s*\/>\s*<\/d:resourcetype>/.test(block)
+      const mimeType = block.match(/<d:getcontenttype>([^<]*)<\/d:getcontenttype>/)?.[1] ?? null
+      const size = block.match(/<d:getcontentlength>(\d+)<\/d:getcontentlength>/)?.[1]
+      const modified = block.match(/<d:getlastmodified>([^<]*)<\/d:getlastmodified>/)?.[1]
+      entries.push({
+        name: entryPath.split('/').pop() ?? entryPath,
+        path: entryPath,
+        isFolder,
+        size: isFolder || size === undefined ? null : Number(size),
+        mimeType: isFolder ? null : mimeType,
+        modifiedAt: modified ? new Date(modified) : null,
+      })
+    }
+    return entries.sort((a, b) => Number(b.isFolder) - Number(a.isFolder) || a.name.localeCompare(b.name, 'es'))
   }
 
   async ping(): Promise<void> {

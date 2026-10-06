@@ -22,6 +22,8 @@ import { RequestEvidenceUploadUseCase } from './evidence/use-cases/request-evide
 import { HistoryController } from './history/history.controller.js'
 import { GetEvaluationHistoryUseCase } from './history/use-cases/get-evaluation-history.use-case.js'
 import { ListAuditHistoryUseCase } from './history/use-cases/list-audit-history.use-case.js'
+import { AuditFilesController } from './files/audit-files.controller.js'
+import { ListAuditFilesUseCase } from './files/list-audit-files.use-case.js'
 import { ReportsController } from './reports/reports.controller.js'
 import { ReportTemplatesController } from './reports/report-templates.controller.js'
 import { GenerateReportUseCase } from './reports/use-cases/generate-report.use-case.js'
@@ -71,6 +73,7 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     NextcloudWebhookController,
     ReportsController,
     ReportTemplatesController,
+    AuditFilesController,
   ],
   providers: [
     AuditHistoryRecorder,
@@ -114,6 +117,7 @@ import { RemoveScopeItemUseCase } from './scope/use-cases/remove-scope-item.use-
     GenerateReportUseCase,
     ListReportsUseCase,
     GetReportUseCase,
+    ListAuditFilesUseCase,
     UploadReportTemplateUseCase,
     ListReportTemplatesUseCase,
     GetReportTemplateUseCase,

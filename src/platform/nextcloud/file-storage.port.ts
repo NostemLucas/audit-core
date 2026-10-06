@@ -21,6 +21,19 @@ export interface ReadShare {
   readonly url: string
 }
 
+export interface FolderEntry {
+  readonly name: string
+  /** Ruta absoluta dentro de la cuenta de servicio (la misma forma que usan `storage-paths.ts`). */
+  readonly path: string
+  readonly isFolder: boolean
+  /** Solo archivos: bytes. Carpetas: null. */
+  readonly size: number | null
+  /** Solo archivos: MIME reportado por Nextcloud. Carpetas: null. */
+  readonly mimeType: string | null
+  /** Última modificación, si Nextcloud la informó. */
+  readonly modifiedAt: Date | null
+}
+
 /**
  * `READ_ONLY`: ver y descargar. `EDIT_NO_DELETE`: además modificar contenido — para la carpeta de informes, que el
  * equipo trabaja en Nextcloud/OnlyOffice — pero NUNCA borrar ni crear archivos nuevos ahí: esa carpeta solo la llena
@@ -42,6 +55,11 @@ export interface FileStoragePort {
   shareWithUser(path: string, username: string, permission: SharePermission): Promise<void>
   /** Revoca lo que `shareWithUser` le dio a ese usuario sobre esa carpeta. Si no había nada que revocar, no es error. */
   unshareUser(path: string, username: string): Promise<void>
+  /**
+   * Lista los hijos directos de una carpeta (sin la carpeta misma). Una carpeta que todavía no existe da lista vacía,
+   * no error: una auditoría sin evidencia subida aún no tiene `Evidencias/`.
+   */
+  listFolder(path: string): Promise<FolderEntry[]>
   /** Para `/health/ready`: que el servidor responda, nada más. */
   ping(): Promise<void>
 }
