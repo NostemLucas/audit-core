@@ -5,21 +5,22 @@ import { ReportType, ScaleDimension } from '../../../shared/enums.js'
 export const ReportTemplateView = z.object({
   id: z.uuid(),
   type: z.enum(ReportType),
-  /** `null` = comodín: aplica a cualquier dimensión de escala de ese tipo (docs/07 §2). */
-  dimension: z.enum(ScaleDimension).nullable(),
+  /** `null` = comodín: aplica a cualquier escala de ese tipo (docs/07 §2). */
+  scaleId: z.uuid().nullable(),
+  /** La escala a la que aplica, para mostrarla sin otra consulta. `null` si es comodín. */
+  scale: z.object({ id: z.uuid(), name: z.string(), dimension: z.enum(ScaleDimension) }).nullable(),
   createdAt: Instant,
   updatedAt: Instant,
 })
 
 /**
- * `type` y `dimension` van en la query (igual que `scaleId` en `POST .../suggested-findings/import`), `file` en el
- * cuerpo multipart (`@UploadedFile()`). Subir reemplaza la que ya hubiera para ese (type, dimension) — no se
- * versiona (docs/07 §2).
+ * `type` y `scaleId` van en la query, `file` en el cuerpo multipart (`@UploadedFile()`). Subir reemplaza la que ya
+ * hubiera para ese (type, escala) — no se versiona (docs/07 §2).
  */
 export const UploadReportTemplateQuery = z.object({
   type: z.enum(ReportType),
-  /** Sin indicarla = comodín (aplica a cualquier dimensión de escala de ese tipo). */
-  dimension: z.enum(ScaleDimension).optional(),
+  /** Sin indicarla = comodín (aplica a cualquier escala de ese tipo). */
+  scaleId: z.uuid().optional(),
 })
 export type UploadReportTemplateQueryT = z.infer<typeof UploadReportTemplateQuery>
 

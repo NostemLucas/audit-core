@@ -9,12 +9,18 @@ function loadConstraints() {
   const dir = join(import.meta.dirname, '..', 'prisma', 'migrations')
   const sql = readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
-    .map((d) => readFileSync(join(dir, d.name, 'migration.sql'), 'utf8'))
+    .map((d) => d.name)
+    .sort()
+    .map((name) => readFileSync(join(dir, name, 'migration.sql'), 'utf8'))
     .join('\n')
-  const names = (re: RegExp) => new Set([...sql.matchAll(re)].map((m) => m[1]!))
+  const unique = new Set<string>()
+  for (const m of sql.matchAll(/CREATE UNIQUE INDEX "([^"]+)"|DROP INDEX (?:IF EXISTS )?"([^"]+)"/g)) {
+    if (m[1]) unique.add(m[1])
+    else unique.delete(m[2]!)
+  }
   return {
-    unique: names(/CREATE UNIQUE INDEX "([^"]+)"/g),
-    foreignKey: names(/ADD CONSTRAINT "([^"]+)" FOREIGN KEY/g),
+    unique,
+    foreignKey: new Set([...sql.matchAll(/ADD CONSTRAINT "([^"]+)" FOREIGN KEY/g)].map((m) => m[1]!)),
   }
 }
 
@@ -29,9 +35,9 @@ const UNMAPPED_UNIQUES: Readonly<Record<string, string>> = {
   evaluations_auditId_controlId_key: 'las evaluaciones las crea el inicializador de la auditoría; un choque es un bug',
   suggested_findings_controlId_levelId_key: 'siempre se escribe con upsert; un choque es un bug',
   reports_storageFileId_key: 'el archivo lo genera y sube el propio sistema; un choque es un bug',
-  report_templates_type_dimension_key:
-    'operación de administración, muy poco frecuente; una carrera real (dos subidas a la vez para el mismo tipo) cae como 409 genérico, no 500',
-  report_templates_one_wildcard: 'mismo caso que report_templates_type_dimension_key, para el comodín (dimension null)',
+  report_templates_type_scaleId_key:
+    'operación de administración, muy poco frecuente; una carrera real (dos subidas a la vez para el mismo tipo y escala) cae como 409 genérico, no 500',
+  report_templates_one_wildcard: 'mismo caso que report_templates_type_scaleId_key, para el comodín (scaleId null)',
 }
 
 describe('catálogo de errores', () => {

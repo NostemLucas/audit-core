@@ -57,17 +57,28 @@ describe('subir una plantilla de informe', () => {
   it('el GERENTE sube una válida: 201 con la vista y sin avisos (ya trae el marcador del gráfico)', async () => {
     const res = await upload(markedTemplate('x'), { type: 'COMPLIANCE' })
     expect(res.status).toBe(201)
-    expect(res.body.data.template).toMatchObject({ type: 'COMPLIANCE', dimension: null })
+    expect(res.body.data.template).toMatchObject({ type: 'COMPLIANCE', scaleId: null, scale: null })
     expect(res.body.data.warnings).toEqual([])
     expect(await db.reportTemplate.count()).toBe(1)
   })
 
-  it('con dimension: se guarda esa, no el comodín', async () => {
-    const res = await upload(markedTemplate('x'), { type: 'COMPLIANCE', dimension: 'MATURITY' })
-    expect(res.body.data.template).toMatchObject({ type: 'COMPLIANCE', dimension: 'MATURITY' })
+  it('con escala: se guarda esa, no el comodín, y la respuesta trae la escala', async () => {
+    const scale = await db.scale.create({ data: { name: 'Escala propia', dimension: 'MATURITY' } })
+    const res = await upload(markedTemplate('x'), { type: 'COMPLIANCE', scaleId: scale.id })
+    expect(res.body.data.template).toMatchObject({
+      type: 'COMPLIANCE',
+      scaleId: scale.id,
+      scale: { id: scale.id, name: 'Escala propia', dimension: 'MATURITY' },
+    })
   })
 
-  it('subir de nuevo para el mismo (type, dimension) reemplaza, no duplica', async () => {
+  it('una escala que no existe: 404, no se guarda nada', async () => {
+    const res = await upload(markedTemplate('x'), { type: 'COMPLIANCE', scaleId: UNKNOWN_ID })
+    expect(res.status).toBe(404)
+    expect(await db.reportTemplate.count()).toBe(0)
+  })
+
+  it('subir de nuevo para el mismo (tipo, escala) reemplaza, no duplica', async () => {
     const first = await upload(markedTemplate('uno'), { type: 'GAP_ANALYSIS' })
     const second = await upload(markedTemplate('dos'), { type: 'GAP_ANALYSIS' })
     expect(first.body.data.template.id).toBe(second.body.data.template.id)
@@ -104,16 +115,19 @@ describe('subir una plantilla de informe', () => {
 })
 
 describe('listar, descargar y borrar', () => {
-  it('la lista trae type y dimension de cada una; un AUDITOR no la administra ni la ve (403)', async () => {
+  it('la lista trae tipo y escala de cada una; un AUDITOR no la administra ni la ve (403)', async () => {
+    const scale = await db.scale.create({ data: { name: 'Conformidad propia', dimension: 'CONFORMITY' } })
     await upload(markedTemplate('a'), { type: 'COMPLIANCE' })
-    await upload(markedTemplate('b'), { type: 'COMPLIANCE', dimension: 'CONFORMITY' })
+    await upload(markedTemplate('b'), { type: 'COMPLIANCE', scaleId: scale.id })
     const res = await list()
     expect(res.status).toBe(200)
     expect(
-      res.body.data.map((tpl: { type: string; dimension: string | null }) => [tpl.type, tpl.dimension]).sort(),
+      res.body.data
+        .map((tpl: { type: string; scale: { name: string } | null }) => [tpl.type, tpl.scale?.name ?? null])
+        .sort(),
     ).toEqual([
       ['COMPLIANCE', null],
-      ['COMPLIANCE', 'CONFORMITY'],
+      ['COMPLIANCE', 'Conformidad propia'],
     ])
     expect((await list('auditor')).status).toBe(403)
   })
@@ -133,6 +147,28 @@ describe('listar, descargar y borrar', () => {
     expect((await del(id)).status).toBe(204)
     expect((await get(id)).status).toBe(404)
     expect(await db.reportTemplate.count()).toBe(0)
+  })
+
+  it('descarga la plantilla de fábrica (los bytes del archivo por defecto); un AUDITOR no la ve (403)', async () => {
+    const res = await api()
+      .get(`${T}/factory`)
+      .set('authorization', await as('manager'))
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = []
+        r.on('data', (c: Buffer) => chunks.push(c))
+        r.on('end', () => cb(null, Buffer.concat(chunks)))
+      })
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toBe(DOCX_MIME)
+    expect(Buffer.compare(res.body as Buffer, loadDefaultTemplate())).toBe(0)
+    expect(
+      (
+        await api()
+          .get(`${T}/factory`)
+          .set('authorization', await as('auditor'))
+      ).status,
+    ).toBe(403)
   })
 
   it('un id inexistente: 404 al descargar o borrar', async () => {
@@ -162,7 +198,7 @@ describe('la plantilla personalizada se usa al generar (docs/07 §2)', () => {
     expect(xmlOf(uploaded.content)).not.toContain('marcador-personalizado')
   })
 
-  it('con un comodín (sin dimension): se usa para cualquier dimensión de escala de ese tipo', async () => {
+  it('con un comodín (sin escala): se usa para cualquier escala de ese tipo', async () => {
     await upload(markedTemplate('marcador-comodin'), { type: 'COMPLIANCE' })
     const ctx = await startedAudit(t, 'MATURITY', '-comodin')
     await closeAudit(ctx.auditId)
@@ -173,14 +209,24 @@ describe('la plantilla personalizada se usa al generar (docs/07 §2)', () => {
 
   it('con una plantilla exacta Y un comodín para el mismo tipo: gana la exacta', async () => {
     await upload(markedTemplate('marcador-comodin'), { type: 'COMPLIANCE' })
-    await upload(markedTemplate('marcador-exacto'), { type: 'COMPLIANCE', dimension: 'CONFORMITY' })
     const ctx = await startedAudit(t, 'CONFORMITY', '-exacta')
+    await upload(markedTemplate('marcador-exacto'), { type: 'COMPLIANCE', scaleId: ctx.lib.scale.id })
     await closeAudit(ctx.auditId)
     const res = await generate(ctx.auditId, 'COMPLIANCE')
     const uploaded = t.storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
     const xml = xmlOf(uploaded.content)
     expect(xml).toContain('marcador-exacto')
     expect(xml).not.toContain('marcador-comodin')
+  })
+
+  it('una plantilla para OTRA escala de la misma dimensión no aplica', async () => {
+    const otra = await db.scale.create({ data: { name: 'Otra conformidad', dimension: 'CONFORMITY' } })
+    await upload(markedTemplate('marcador-otra-escala'), { type: 'COMPLIANCE', scaleId: otra.id })
+    const ctx = await startedAudit(t, 'CONFORMITY', '-otra-escala')
+    await closeAudit(ctx.auditId)
+    const res = await generate(ctx.auditId, 'COMPLIANCE')
+    const uploaded = t.storage.uploaded.find((u) => u.path.includes(res.body.data.id))!
+    expect(xmlOf(uploaded.content)).not.toContain('marcador-otra-escala')
   })
 
   it('la plantilla de otro tipo de informe no aplica', async () => {

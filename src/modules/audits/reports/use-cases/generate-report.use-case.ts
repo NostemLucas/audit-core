@@ -71,7 +71,7 @@ export class GenerateReportUseCase {
     }))
     const scaleMax = Math.max(...scale.levels.map((level) => level.value))
     const chartPng = await renderChartPng(buildDomainChartSvg(domains, scaleMax))
-    const customTemplate = await findReportTemplate(this.tx, input.type, scale.dimension)
+    const customTemplate = await findReportTemplate(this.tx, input.type, scale.id)
 
     const title = input.title ?? audit.name
     const buffer = renderReport(

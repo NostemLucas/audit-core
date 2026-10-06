@@ -15,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiOkResponse, ApiProduces } from '@nestjs/swagger'
 import { Can } from '../../../platform/authz/index.js'
 import { attachment, DOCX_MIME, Responds } from '../../../platform/http/index.js'
+import { loadDefaultTemplate } from './report.template.js'
 import { LIMITS } from '../../../shared/limits.js'
 import {
   ReportTemplateId,
@@ -57,7 +58,7 @@ export class ReportTemplatesController {
     @Body({ schema: UploadReportTemplateBody.optional() }) _body: UploadReportTemplateBodyT | undefined,
     @UploadedFile() file: { buffer: Buffer } | undefined,
   ) {
-    return this.uploadUseCase.execute({ type: query.type, dimension: query.dimension, file: file?.buffer })
+    return this.uploadUseCase.execute({ type: query.type, scaleId: query.scaleId, file: file?.buffer })
   }
 
   @Get()
@@ -65,6 +66,21 @@ export class ReportTemplatesController {
   @Responds(ReportTemplateView, { kind: 'list' })
   list() {
     return this.listUseCase.execute()
+  }
+
+  /**
+   * La plantilla de fábrica: la que usa todo informe que no tenga una propia para su tipo y escala. Va ANTES de `:id`
+   * para que `factory` no se tome como un id. Sirve de punto de partida para hacer una propia.
+   */
+  @Get('factory')
+  @Can('read', 'ReportTemplate')
+  @ApiProduces(DOCX_MIME)
+  @ApiOkResponse({
+    description: 'La plantilla de fábrica como .docx',
+    content: { [DOCX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+  })
+  factory(): StreamableFile {
+    return new StreamableFile(loadDefaultTemplate(), { type: DOCX_MIME, disposition: attachment('fabrica', 'docx') })
   }
 
   /** El .docx tal como se subió, para editarlo y volver a subirlo. */
@@ -80,7 +96,7 @@ export class ReportTemplatesController {
     return new StreamableFile(content, { type: DOCX_MIME, disposition: attachment(type, 'docx') })
   }
 
-  /** Vuelve a la plantilla de fábrica para ese (type, dimension). */
+  /** Vuelve a la plantilla de fábrica para ese tipo y escala. */
   @Delete(':id')
   @HttpCode(204)
   @Can('delete', 'ReportTemplate')

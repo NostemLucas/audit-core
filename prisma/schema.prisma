@@ -156,6 +156,7 @@ model Scale {
   updatedById String?  @db.Uuid
 
   levels ScaleLevel[]
+  reportTemplates ReportTemplate[]
   audits Audit[]
 
   @@map("scales")
@@ -450,25 +451,27 @@ model Report {
   @@map("reports")
 }
 
-/// Plantilla `.docx` personalizada del informe, por tipo (docs/07 §2). NO vive en Nextcloud (no es evidencia de una
-/// auditoría: es configuración del sistema, chica y poco frecuente) — se guarda como bytes aquí mismo. `dimension`
-/// null = comodín (aplica a cualquier dimensión de escala para ese tipo); con valor = solo esa dimensión. Al generar
-/// un informe gana la más específica: (type, dimension exacto) > (type, comodín) > la plantilla de fábrica.
-/// Subir reemplaza (no versiona): un caso de uso hace upsert por (type, dimension).
+/// Plantilla `.docx` personalizada del informe, por tipo y ESCALA (docs/07 §2). NO vive en Nextcloud (no es evidencia
+/// de una auditoría: es configuración del sistema, chica y poco frecuente) — se guarda como bytes aquí mismo.
+/// `scaleId` null = comodín (aplica a cualquier escala para ese tipo); con valor = solo esa escala. Al generar un
+/// informe gana la más específica: (type, escala exacta) > (type, comodín) > la plantilla de fábrica.
+/// Subir reemplaza (no versiona): un caso de uso hace upsert por (type, scaleId).
 model ReportTemplate {
-  id        String          @id @default(uuid(7)) @db.Uuid
-  type      ReportType
-  dimension ScaleDimension?
-  content   Bytes
+  id      String  @id @default(uuid(7)) @db.Uuid
+  type    ReportType
+  scaleId String? @db.Uuid
+  content Bytes
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
   createdById String?  @db.Uuid
   updatedById String?  @db.Uuid
 
-  /// Solo cubre el caso `dimension` NO nula (Postgres no considera dos NULL iguales); el comodín (dimension = null)
-  /// se garantiza único con un índice parcial a mano (bloque final de la migración inicial).
-  @@unique([type, dimension])
+  scale Scale? @relation(fields: [scaleId], references: [id], onDelete: Restrict)
+
+  /// Solo cubre el caso `scaleId` NO nulo (Postgres no considera dos NULL iguales); el comodín (scaleId = null) se
+  /// garantiza único con un índice parcial a mano (migración `report_templates_by_scale`).
+  @@unique([type, scaleId])
   @@map("report_templates")
 }
 
